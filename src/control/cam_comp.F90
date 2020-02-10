@@ -478,7 +478,7 @@ subroutine cam_final( cam_out, cam_in )
 
 #if (defined HEMCO_CESM)
    !----------------------------------------------------------
-   ! run hemco (first phase?)
+   ! cleanup hemco
    !----------------------------------------------------------
    call HCOI_Chunk_Final()
 #endif
