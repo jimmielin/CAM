@@ -2027,7 +2027,7 @@ unless ($target_os eq 'aix' or $target_os =~ 'bg' or $target_os eq 'darwin') {
 
 # Harmonized Emissions Component (HEMCO)
 if ($hemco) {
-    $cfg_cppdefs .= ' -DMODEL_ -DMODEL_CESM -DHEMCO_CESM ';
+    $cfg_cppdefs .= ' -DMODEL_ -DMODEL_CESM -DHEMCO_CESM -DUSE_REAL8 ';
     print "Compiling highly-experimental HEMCO with CESM.$eol";
 }
 
@@ -2867,6 +2867,21 @@ sub write_filepath
 
     if ($hemco) {
         print $fh "$camsrcdir/src/hemco\n";
+
+        # if not compiling with GEOS-Chem; coordinate this with tfritz later
+        # we may eventually remove all this
+        print $fh "$camsrcdir/src/hemco/HEMCO/src/Shared\n";
+
+        # to remove - need to use pio
+        print $fh "$camsrcdir/src/hemco/HEMCO/src/Shared/Headers\n";
+        print $fh "$camsrcdir/src/hemco/HEMCO/src/Shared/GeosUtil\n";
+        print $fh "$camsrcdir/src/hemco/HEMCO/src/Shared/NcdfUtil\n";
+
+        # hplin 2/16/20: temporarily add hemco src code directories manually
+        # until we figure out a better compile routine.
+        print $fh "$camsrcdir/src/hemco/HEMCO/src/Core\n";
+        print $fh "$camsrcdir/src/hemco/HEMCO/src/Extensions\n";
+        print $fh "$camsrcdir/src/hemco/HEMCO/src/Interfaces\n";
     }
 
     print $fh "$camsrcdir/src/chemistry/mozart\n";
