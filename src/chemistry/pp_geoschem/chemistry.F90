@@ -2867,11 +2867,11 @@ contains
     currSc  = 0
     currMn  = 0
     currHr  = 0
-    DO WHILE (currTOD > 3600)
+    DO WHILE (currTOD >= 3600)
         currTOD = currTOD - 3600
         currHr  = currHr + 1
     ENDDO
-    DO WHILE (currTOD > 60)
+    DO WHILE (currTOD >= 60)
         currTOD = currTOD - 60
         currMn  = currMn + 1
     ENDDO
