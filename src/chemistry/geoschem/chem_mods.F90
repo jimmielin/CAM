@@ -69,7 +69,7 @@
                             relcnt = 0, & ! number of relationship species
                             grpcnt = 0, & ! number of group members
                             nzcnt = 824, & ! number of non-zero matrix entries
-                            extcnt = 0, & ! number of species with external forcing
+                            extcnt = 34, & ! number of species with external forcing, aka 3-D emissions
                             clscnt1 = 8, & ! number of species in explicit class
                             clscnt2 = 0, & ! number of species in hov class
                             clscnt3 = 0, & ! number of species in ebi class
@@ -78,7 +78,7 @@
                             indexm = 1, & ! index of total atm density in invariant array
                             indexh2o = 4, & ! index of water vapor density
                             clsze = 1, & ! loop length for implicit chemistry
-                            rxt_tag_cnt = 95, &
+                            rxt_tag_cnt = 0, & ! number of tagged reactions (unused in GEOS-Chem)
                             enthalpy_cnt = 0, &
                             nslvd = 86  ! number of short-lived (non-advected) species
       integer :: clscnt(5) = 0
