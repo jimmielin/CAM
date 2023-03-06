@@ -1854,6 +1854,7 @@ contains
     use modal_aero_data,     only : lmassptr_amode, numptr_amode
     use modal_aero_data,     only : lptr_so4_a_amode
     use modal_aero_data,     only : lptr2_soa_a_amode, lptr2_soa_g_amode
+    use modal_aero_data,     only : specdens_amode
 #endif
 
     use Diagnostics_Mod,     only : Zero_Diagnostics_StartOfTimestep
@@ -1919,7 +1920,7 @@ contains
     ! CAM version of physical constants
     use PhysConst,           only : MWDry, Gravit
 
-    REAL(r8),            INTENT(IN)    :: dT          ! Time step
+    REAL(r8),            INTENT(IN)    :: dT          ! Time step [s]
     TYPE(physics_state), INTENT(IN)    :: state       ! Physics State variables
     TYPE(physics_ptend), INTENT(OUT)   :: ptend       ! indivdual parameterization tendencies
     TYPE(cam_in_t),      INTENT(INOUT) :: cam_in
@@ -1935,7 +1936,7 @@ contains
     LOGICAL :: lq(pcnst)
 
     ! Indexing
-    INTEGER :: K, N, M, P, SM, ND
+    INTEGER :: K, N, M, P, SM, ND, PS
     INTEGER :: I, J, L, nX, nY, nZ
 
     INTEGER :: LCHNK, NCOL
@@ -1968,14 +1969,13 @@ contains
     REAL(r8)          :: h2ovmr (state%NCOL,PVER)     ! H2O volume mixing ratio
     REAL(r8)          :: mBar   (state%NCOL,PVER)     ! Mean wet atmospheric mass [amu]
     REAL(r8)          :: invariants(state%NCOL,PVER,nfs)
-    REAL(r8)          :: reaction_rates(1,1,1)        ! Reaction rates (unused)
+    REAL(r8)          :: reaction_rates(1,1,1)        ! Reaction rates (unused dummy for MAM4 call)
 
     ! For aerosol formation
     REAL(r8)          :: del_h2so4_gasprod(state%NCOL,PVER)
 
-    REAL(r8)          :: vmr0(state%NCOL,PVER,gas_pcnst)
-    REAL(r8)          :: vmr1(state%NCOL,PVER,gas_pcnst)
-    REAL(r8)          :: vmr2(state%NCOL,PVER,gas_pcnst)
+    REAL(r8)          :: vmr0(state%NCOL,PVER,gas_pcnst) ! Temporaries for storing VMR before GC for MAM4 coupling [mol/mol dry]
+    REAL(r8)          :: vmr1(state%NCOL,PVER,gas_pcnst) ! Temporaries for storing VMR after GC and MAM4 for MAM4 coupling [mol/mol dry]
 
     REAL(r8)          :: wetdepflx(pcols,pcnst)       ! Wet deposition fluxes (kg/m2/s)
 
@@ -1993,7 +1993,6 @@ contains
     INTEGER           :: iMap, nMapping, iBin, binSOA_1, binSOA_2
     INTEGER           :: K1, K2, K3, K4
     LOGICAL           :: isSOA_aerosol
-
 #endif
 
     ! For emissions
@@ -2064,6 +2063,9 @@ contains
     LOGICAL                :: lastChunk
     INTEGER                :: RC
 
+    ! Fields for scaling num_aX by changes in aer_aX
+    REAL(r8), POINTER      :: dgncur_a(:,:,:)
+    REAL(r8)               :: vmr_mam_delta(state%NCOL,PVER)
 
     ! Initialize pointers
     SpcInfo  => NULL()
@@ -2249,6 +2251,12 @@ contains
     ENDDO
 
 #if defined( MODAL_AERO )
+    ! NOTE: GEOS-Chem bulk aerosol concentrations (BCPI, BCPO, SO4, ...) are ZEROED OUT
+    ! here in order to be reconstructed from the modal concentrations.
+    !
+    ! This means that any changes to the BULK mass will be ignored between the end
+    ! of the gas_phase_chemdr and the beginning of the next!!
+    !
     ! First reset State_Chm%Species to zero out MAM-inherited GEOS-Chem aerosols
     DO M = 1, ntot_amode
        DO SM = 1, nspec_amode(M)
@@ -2472,6 +2480,8 @@ contains
     ENDIF
 #endif
 
+    ! Store v/v dry VMR concentrations at the BEGINNING of the timestep in VMR0
+    ! For later coupling with MAM4.
     DO N = 1, gas_pcnst
        ! See definition of map2chm
        M = map2chm(N)
@@ -3854,8 +3864,10 @@ contains
        pbuf_i   => NULL()
     ENDIF
 
+    ! Convert end-of-GEOS-Chem gas-phase chemistry MMR (kg/kg) to VMR dry (mol/mol dry)
+    ! stored in VMR1 for use in later operations with MAM4.
     DO N = 1, gas_pcnst
-       ! See definition of map2chm
+       ! ma2chm converts N (1:gas_pcnst) to GEOS-Chem state
        M = map2chm(N)
        IF ( M > 0 ) THEN
           vmr1(:nY,:nZ,N) = State_Chm(LCHNK)%Species(M)%Conc(1,:nY,nZ:1:-1) * &
@@ -3868,22 +3880,54 @@ contains
 
     !==============================================================
     ! ***** M A M   G A S - A E R O S O L   E X C H A N G E *****
+    ! Has to be performed after chemistry as requires SO2+OH rate
     !==============================================================
 
 #if defined( MODAL_AERO )
+    ! Construct dgncur_a array for the dry geometric mean diameter [m]
+    ! of given number distribution. (hplin, 3/6/23)
+    ! Requires a pbuf field DGNUM
+    call pbuf_get_field(pbuf, pbuf_get_index('DGNUM'), dgncur_a)
+
     ! Repartition SO4 into H2SO4 and so4_a*
+    !
+    ! Also, scale num_a* delta according to changes in so4_a* modes.
+    ! The diameter used is the dry geometric mean diameter [m] of the appropriate
+    ! number distribution. (hplin, 3/6/23)
+    !
+    ! Note: vmr0, 1, 2 are only local temporaries. In the end all concentrations
+    ! must be updated into state%q to be applied to the timestep.
     IF ( l_H2SO4 > 0 .AND. l_SO4 > 0 ) THEN
-       P = l_H2SO4
+       ! Update H2SO4
        ! SO4_gasRatio is mol(SO4) (gaseous) / mol(SO4) (gaseous+aerosol)
+       P = l_H2SO4
        vmr1(:nY,:nZ,P) = SO4_gasRatio(:nY,:nZ) * vmr1(:nY,:nZ,l_SO4)
+
+       ! Update so4_a* (for each mode, 1 to ntot_amode)
        ! binRatio is mol(SO4) (current bin) / mol(SO4) (all bins)
        DO M = 1, ntot_amode
           N = lptr_so4_a_amode(M)
-          IF ( N <= 0 ) CYCLE
+          IF ( N <= 0 ) CYCLE        ! If mode does not exist for so4 (e.g. 4)
           P = mapCnst(N)
-          vmr1(:nY,:nZ,P) = vmr1(:nY,:nZ,l_SO4)                &
-                          * ( 1.0_r8 - SO4_gasRatio(:nY,:nZ) ) &
+
+          ! Store the previous VMR so we know how much to scale number conc for.
+          vmr_mam_delta = vmr1(:nY,:nZ,P)
+          vmr1(:nY,:nZ,P) = vmr1(:nY,:nZ,l_SO4)                & ! Get the SO4 bulk mass from VMR1
+                          * ( 1.0_r8 - SO4_gasRatio(:nY,:nZ) ) & ! Remove the H2SO4 from SO4 bulk mass
                           * binRatio(iSulf(M),M,:nY,:nZ)
+          vmr_mam_delta = vmr1(:nY,:nZ,P) - vmr_mam_delta        ! Shape :nY,:nZ
+
+          ! Scale (add) num by delta converted to number distribution based
+          ! on geometric mean dia of the current mode
+          ! numptr_amode is 251, 252, 253, 254 for modes 1, 2, 3, 4 ... used to map into constituents
+          ! but dgncur_a is sized on 3rd dim as ntot_amode, so has to be indexed 1, 2, 3, 4 directly
+          N = numptr_amode(M)
+          P = mapCnst(N)
+          ! write(6,*) "hplin debug ch=", lchnk, "md=", M, "scaled 1,nZ was=", vmr1(1,nZ,P), "by=", 6 * vmr_mam_delta(1,nZ) / pi / specdens_amode(iSulf(M),M) / dgncur_a(1,nZ,M)**3, "dens=", specdens_amode(iSulf(M),M), dgncur_a(1,nZ,M)
+          vmr1(:nY,:nZ,P) = vmr1(:nY,:nZ,P) +                  &    ! VMR is mol/mol
+                            6 * vmr_mam_delta / pi /           &    ! vmr_mam_delta is mass conc change in mol/mol
+                            specdens_amode(iSulf(M),M) /       &    ! specdens_amode is [kg/m3]
+                            dgncur_a(:nY,:nZ,M)**3                  ! dgncur_a is 1e-6~1e-7
        ENDDO
     ENDIF
 
@@ -3891,11 +3935,13 @@ contains
     ! This is archived from fullchem_mod.F90 using SO2 + OH rate from KPP (hplin, 1/25/23)
     del_h2so4_gasprod(:nY,:nZ) = State_Chm(LCHNK)%H2SO4_PRDR(1,:nY,nZ:1:-1)
 
+    ! Run gas-aerosol exchange in MAM
+    ! Returns vmr1 which is the resulting VMRs after gas-aerosol exchange. Note, state%q is NOT mutated here
     call aero_model_gasaerexch( loffset           = iFirstCnst - 1,         &
                                 ncol              = NCOL,                   &
                                 lchnk             = LCHNK,                  &
                                 troplev           = Trop_Lev(:),            &
-                                delt              = dT,                     &
+                                delt              = dT,                     &  ! Timestep [s] verified to be the same as C-CC.
                                 reaction_rates    = reaction_rates,         &
                                 tfld              = state%t(:,:),           &
                                 pmid              = state%pmid(:,:),        &
@@ -3911,7 +3957,7 @@ contains
                                 invariants        = invariants,             &
                                 del_h2so4_gasprod = del_h2so4_gasprod,      &
                                 vmr0              = vmr0,                   &
-                                vmr               = vmr1,                   &
+                                vmr               = vmr1,                   &  ! Output VMR at end of gas-aer exch.
                                 pbuf              = pbuf )
 
     ! Repartition MAM SOAs following mapping:
@@ -4099,8 +4145,15 @@ contains
                               + (MMR_End(:nY,:nZ,M)-MMR_Beg(:nY,:nZ,M))/dT
     ENDDO
 
+
+    !==============================================================
+    ! ***** M A M 4   A E R O S O L   C O U P L I N G (2)     *****
+    !==============================================================
 #if defined( MODAL_AERO )
     ! Here apply tendencies to MAM aerosols
+    ! Because previous MAM Gas-Aerosol change etc. processes are only
+    ! saved in vmr1 but must be COMMITTED to ptend%q as a tendency flux.
+    !
     ! Initial mass in bin SM is stored as state%q(N)
     ! Final mass in bin SM is stored as binRatio(SM,M) * State_Chm(P)
     !
@@ -4109,24 +4162,60 @@ contains
     ! partitioned in aero_model_gasaerexch.
     DO M = 1, ntot_amode
        DO SM = 1, nspec_amode(M)
-          N = lmassptr_amode(SM,M)
-          P = mapCnst(N)
+          !---------------------------------------
+          ! For all aerosols, all modes - apply tendency changes from vmr1 to vmr0
+          !---------------------------------------
+          N = lmassptr_amode(SM,M)   ! constituent index (for use in state%q and ptend%q)
+          P = mapCnst(N)             ! chemical tracer index (for use in adv_mass)
+          PS = mapCnst(N)            ! chemical tracer index (for use in adv_mass) copy for num conc calc below.
           IF ( P <= 0 ) CYCLE
-          ! Apply tendency from MAM gasaerexch
+          ! Apply tendency from MAM gasaerexch (tendencies are in kg/kg s-1)
           ptend%q(:nY,:nZ,N) = ptend%q(:nY,:nZ,N) &
                              + (vmr1(:nY,:nZ,P) - vmr0(:nY,:nZ,P))/dT &
                                   * adv_mass(P) / MWDry
           P = map2MAM4(SM,M)
           IF ( P <= 0 ) CYCLE
           K = map2GC(P)
-          IF ( K <= 0 .or. K == iSO4 ) CYCLE
+
+          !---------------------------------------
           ! Apply MAM4 chemical tendencies owing to GEOS-Chem aerosol processing
+          ! Skip this handling for sulfate aerosols because H2SO4 is handled
+          !---------------------------------------
+          IF ( K <= 0 .or. K == iSO4 ) CYCLE
+
           ptend%q(:nY,:nZ,N) = ptend%q(:nY,:nZ,N)                                  &
                              + (binRatio(SM,M,:nY,:nZ) *                           &
                                 REAL(State_Chm(LCHNK)%Species(K)%Conc(1,:nY,nZ:1:-1),r8) &
                                   * adv_mass(mapCnst(N)) / adv_mass(mapCnst(P))    &
                                 - state%q(:nY,:nZ,N))/dT
+
+          !---------------------------------------
+          ! Apply MAM4 *number concentration changes* due to changes in GEOS-Chem
+          ! aerosol bulk mass.
+          ! Assumes aerosol numbers are grown using the dry geometric mean dia [m]
+          ! from the given mode. (hplin, 3/6/23)
+          !
+          ! The same process for sulfate is handled separately.
+          ! Note that ptend%q is kg/kg s-1 tendency and state%q is conc in MMR kg/kg
+          !
+          ! The changes induced by this process appear to be minimal compared to SO4.
+          ! This is because 'chemistry' operations on other aerosols are minimal
+          ! In the interest of performance, this part could be potentially skipped
+          ! with minimal impact to simulation accuracy?
+          !---------------------------------------
+          N = numptr_amode(M)   ! constituent index (for use in state%q and ptend%q)
+          P = mapCnst(N)        ! chemical tracer index (for use in adv_mass) and VMR1
+          ptend%q(:nY,:nZ,N) = ptend%q(:nY,:nZ,N) +                               &
+                               6 * (vmr1(:nY,:nZ,PS) - vmr0(:nY,:nZ,PS))/dT / pi /  &  ! VMR is mol/mol, /dT to get s-1
+                               specdens_amode(SM,M) /                             &    ! specdens_amode is kg/m3
+                               dgncur_a(:nY,:nZ,M)**3 *                           &    ! dgncur_a is in m, 1e-6~1e-7
+                               adv_mass(PS) / MWDry                                    ! Convert VMR to MMR using adv_mass of spc, ! num!
+          ! write(6,*) "hplin debug ch=", lchnk, "md=", M, "scaled 1,nZ was=", state%q(1,nZ,N), "numtend=", 6 * (vmr1(1,nZ,PS) - vmr0(1,nZ,PS))/dT / pi / specdens_amode(SM,M) / dgncur_a(1,nZ,M)**3 * adv_mass(PS) / MWDry, "nowtend=", ptend%q(1,nZ,N)
        ENDDO
+
+       ! Update number concentrations in changes to VMR1 for *number concentrations only*
+       ! here. Note that changes in number concentrations due to changes in mass
+       ! are NOT committed here.
        N = numptr_amode(M)
        P = mapCnst(N)
        IF ( P <= 0 ) CYCLE
@@ -4134,6 +4223,8 @@ contains
                           + (vmr1(:nY,:nZ,P) - vmr0(:nY,:nZ,P))/dT &
                                * adv_mass(P) / MWDry
     ENDDO
+
+    ! Handle H2SO4 tendencies separately
     N = cH2SO4
     P = l_H2SO4
     IF ( P > 0 ) THEN
@@ -4141,6 +4232,8 @@ contains
                           + (vmr1(:nY,:nZ,P) - vmr0(:nY,:nZ,P))/dT &
                                * adv_mass(P) / MWDry
     ENDIF
+
+    ! Handle SOA tendencies
     DO iBin = 1, nsoa
        N = lptr2_soa_g_amode(iBin)
        P = mapCnst(N)
