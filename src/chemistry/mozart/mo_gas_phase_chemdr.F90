@@ -11,6 +11,16 @@ module mo_gas_phase_chemdr
   use carma_flags_mod,  only : carma_hetchem_feedback
   use chem_prod_loss_diags, only: chem_prod_loss_diags_init, chem_prod_loss_diags_out
 
+! For Fast-JX in CAM-chem
+  use spmc_utils,          only : masterproc, iam, npes
+  USE Input_Opt_Mod,       ONLY : OptInput      ! Derived type for Input Options
+  USE State_Chm_Mod,       ONLY : ChmState      ! Derived type for Chemistry State object
+  USE State_Diag_Mod,      ONLY : DgnState      ! Derived type for Diagnostics State object
+  USE State_Grid_Mod,      ONLY : GrdState      ! Derived type for Grid State object
+  USE State_Met_Mod,       ONLY : MetState      ! Derived type for Meteorology State object
+  USE Precision_Mod,       ONLY : fp, f4        ! Flexible precision
+
+
   implicit none
   save
 
@@ -21,6 +31,7 @@ module mo_gas_phase_chemdr
   integer :: map2chm(pcnst) = 0           ! index map to/from chemistry/constituents list
 
   integer :: so4_ndx, h2o_ndx, o2_ndx, o_ndx, hno3_ndx, hcl_ndx, cldice_ndx, snow_ndx
+  integer :: cldliq_ndx
   integer :: o3_ndx, o3s_ndx, o3_inv_ndx, srf_ozone_pbf_ndx=-1
   integer :: het1_ndx
   integer :: ndx_cldfr, ndx_cmfdqr, ndx_nevapr, ndx_cldtop, ndx_prain
@@ -48,6 +59,18 @@ module mo_gas_phase_chemdr
   logical :: convproc_do_aer
   integer :: ele_temp_ndx, ion_temp_ndx
 
+!
+! fast-jx in cam-chem (hplin, 3/13/23)
+! one is shared across all chunks. we allocate by ppgrid:pcols since its the maximum
+! and adjust %NX, %NY for reuse, similar to WRF-GC.
+!
+  type(OptInput) :: Input_Opt
+  type(ChmState) :: State_Chm
+  type(DgnState) :: State_Diag
+  type(GrdState) :: State_Grid
+  type(MetState) :: State_Met
+  integer :: gi_O3
+
 contains
 
   subroutine gas_phase_chemdr_inti()
@@ -60,12 +83,23 @@ contains
     use rate_diags,        only : rate_diags_init
     use cam_abortutils,    only : endrun
 
+! fast-jx in cam-chem hplin 3/13/23
+    use Input_Opt_Mod,     only : Set_Input_Opt
+    use State_Chm_Mod,     only : Init_State_Chm, IND_
+    use Input_Mod,         only : Read_Input_File
+    use State_Grid_Mod,    only : Init_State_Grid
+    use GC_Environment_Mod,only : GC_Init_Grid
+    use FAST_JX_MOD,       only : INIT_FJX
+
     character(len=3) :: string
     integer          :: n, m, err, ii
     logical :: history_cesm_forcing
     character(len=16) :: unitstr
     !-----------------------------------------------------------------------
     logical :: history_scwaccm_forcing
+
+! fast-jx in cam-chem hplin 3/13/23
+    integer :: RC
 
     call phys_getopts( history_scwaccm_forcing_out = history_scwaccm_forcing )
 
@@ -123,6 +157,7 @@ contains
     h2o_ndx = get_spc_ndx('H2O')
     hno3_ndx = get_spc_ndx('HNO3')
     hcl_ndx  = get_spc_ndx('HCL')
+    call cnst_get_ind( 'CLDLIQ', cldliq_ndx )
     call cnst_get_ind( 'CLDICE', cldice_ndx )
     call cnst_get_ind( 'SNOWQM', snow_ndx, abort=.false. )
 
@@ -225,6 +260,47 @@ contains
 
     call chem_prod_loss_diags_init
 
+!-----------------------------------------------------------------------
+! initialize a dummy GEOS-Chem to run Fast-JX
+!-----------------------------------------------------------------------
+   Input_Opt%amIRoot = masterproc
+   Input_Opt%thisCPU = iam
+
+   ! initialize Input_Opt to zeros or equivalent
+   call Set_Input_Opt(am_I_Root = masterproc, Input_Opt = Input_Opt, RC = RC)
+
+   ! initialize State_Grid
+   call Init_State_Grid(Input_Opt, State_Grid, RC)
+   State_Grid%NX = 1
+   State_Grid%NY = pcols
+   State_Grid%NZ = pver
+   call GC_Init_Grid(Input_Opt, State_Grid, RC)
+   State_Grid%MaxTropLev = 18
+   State_Grid%MaxStratLev = pver
+   State_Grid%MaxChemLev = pver
+
+   ! now read Input_Opt
+   call Read_Input_File(Input_Opt, State_Grid, RC)
+   Input_Opt%Chem_Inputs_Dir = '/glade/p/univ/umit0034/ExtData/CHEM_INPUTS/'
+   Input_Opt%SpcDatabaseFile = '/glade/p/univ/umit0034/ExtData/CHEM_INPUTS/hplin_FJX_CC/species_database.yml'
+   Input_Opt%FAST_JX_DIR     = TRIM(Input_Opt%Chem_Inputs_Dir) // 'FAST_JX/v2020-02/'
+
+   call Init_CMN_FJX(Input_Opt, State_Grid, RC)
+
+   ! initialize State_Met
+   call Init_State_Met(Input_Opt, State_Grid, State_Met, RC)
+
+   ! initialize State_Chm. this only needs to hold the single O3 species molec cm-3
+   ! that we pass to fjx.
+   call Init_State_Chm(Input_Opt, State_Chm, State_Grid, RC)
+   gi_O3 = IND_('O3')
+
+   ! Can leave State_Diag dangling because all the booleans are set to false by default,
+   ! leave all arrays deallocated. This is ugly but it will work
+
+   ! INIT_FJX
+   call INIT_FJX(Input_Opt, State_Chm, State_Diag, State_Grid, RC)
+
   end subroutine gas_phase_chemdr_inti
 
 
@@ -292,6 +368,13 @@ contains
     use aero_model,        only : aero_model_gasaerexch
 
     use aero_model,        only : aero_model_strat_surfarea
+
+! fast-jx in cam-chem (hplin, 3/13/23)
+    use time_manager,          only : get_curr_date
+    use GC_Grid_Mod,           only : SetGridFromCtr
+    use Time_Mod,              only : Accept_External_Date_Time
+    use Pressure_Mod,          only : Accept_External_Pedge
+    use FAST_JX_MOD,           only : FAST_JX
 
     !-----------------------------------------------------------------------
     !        ... Dummy arguments
@@ -417,6 +500,12 @@ contains
   ! for aerosol formation....
     real(r8) :: del_h2so4_gasprod(ncol,pver)
     real(r8) :: vmr0(ncol,pver,gas_pcnst)
+
+   ! fast-jx in cam-chem - qtys (hplin, 3/13/23)
+   real(f4) :: lonMidArr(1,ncol), latMidArr(1,ncol)
+   integer :: currYr, currMo, currDy, currTOD, currUTC, currSc, currMn, currHr, currHMS, currYMD
+   integer :: RC
+   real(r8) :: taucli(ncol,pver), tauclw(ncol,pver), cszamid(ncol)
 
 !
 ! CCMI
@@ -787,6 +876,135 @@ contains
     call table_photo( reaction_rates, pmid, pdel, tfld, zmid, zint, &
                       col_dens, zen_angle, asdir, cwat, cldfr, &
                       esfact, vmr, invariants, ncol, lchnk, pbuf )
+
+    ! ====================== F A S T - J X  - C A M - C H E M ====================== !
+    !-----------------------------------------------------------------
+    ! ... replace photolysis rates with Fast-JX values
+    ! where available. (hplin, 3/13/23)
+    !-----------------------------------------------------------------
+    ! prepare grid parameters for use: NX, NY, NZ, Ymid
+    ! we update this here because we want to use one set of state variables for all the chunks
+    ! this is very insane if I did not know this worked
+    State_Grid%NX = 1
+    State_Grid%NY = ncol
+    State_Grid%NZ = pver
+
+    lonMidArr = 0.0e+0_f4
+    latMidArr = 0.0e+0_f4
+    DO J = 1, ncol
+       lonMidArr(1,J) = REAL(state%lon(J), f4)
+       latMidArr(1,J) = REAL(state%lat(J), f4)
+    ENDDO
+    CALL SetGridFromCtr( Input_Opt  = Input_Opt,         &
+                         State_Grid = State_Grid,        &
+                         lonCtr     = lonMidArr,         &
+                         latCtr     = latMidArr,         &
+                         RC         = RC )
+
+    ! Update GEOS-Chem clock
+    CALL Get_Curr_Date( yr  = currYr,  &
+                        mon = currMo,  &
+                        day = currDy,  &
+                        tod = currTOD )
+    currUTC = REAL(currTOD,f4)/3600.0e+0_f4
+    currSc  = 0
+    currMn  = 0
+    currHr  = 0
+    DO WHILE (currTOD >= 3600)
+       currTOD = currTOD - 3600
+       currHr  = currHr + 1
+    ENDDO
+    DO WHILE (currTOD >= 60)
+       currTOD = currTOD - 60
+       currMn  = currMn + 1
+    ENDDO
+    currSc  = currTOD
+    currHMS = (currHr*1000) + (currMn*100) + (currSc)
+    currYMD = (currYr*1000) + (currMo*100) + (currDy)
+
+    CALL Accept_External_Date_Time( value_NYMD     = currYMD,            &
+                                    value_NHMS     = currHMS,            &
+                                    value_YEAR     = currYr,             &
+                                    value_MONTH    = currMo,             &
+                                    value_DAY      = currDy,             &
+                                    value_DAYOFYR  = INT(FLOOR(calday)), &
+                                    value_HOUR     = currHr,             &
+                                    value_MINUTE   = currMn,             &
+                                    value_HELAPSED = 0.0e+0_f4,          &
+                                    value_UTC      = currUTC,            &
+                                    RC             = RC    )
+
+    ! prepare meteorology variables for use - note we have to flip the atm
+    ! PEDGE
+    do i = 1, ncol
+    do l = 1, pver+1
+      State_Met%PEDGE(1,i,l) = state%pint(i,pver+2-l) * 0.01e+0_fp
+    enddo
+    enddo
+
+    ! Compute cloud optical depth and other properties (Liao et al., 1999)
+    ! as well as other 3-D fields when available...
+    taucli = 0.0e+0_r8
+    tauclw = 0.0e+0_r8
+    do i = 1, ncol
+    do l = 1, pver
+      if(cldf(i,l) > 1.0e-02_r8) then  ! Minimum cloud cover parameter
+         tauclw(i,l) = state%q(i,l,cldliq_ndx)               &
+                   * (state%pint(i,l+1)-state%pint(i,l)) &
+                   * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldFrc(i,l)
+         tauclw(i,l) = MAX(tauclw(i,l), 0.0e+00_r8)
+         taucli(i,l) = state%q(i,l,cldice_ndx)               &
+                   * (state%pint(i,l+1)-state%pint(i,l)) &
+                   * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldFrc(i,l)
+         taucli(i,l) = MAX(taucli(i,l), 0.0e+00_r8)
+      endif
+
+      State_Met%CLDF  (1,i,l) = cldfr  (i,pver+1-l)
+      State_Met%T     (1,i,l) = state%t(i,pver+1-l)
+      State_Met%TAUCLI(1,i,l) = taucli (i,pver+1-l)
+      State_Met%TAUCLW(1,i,l) = tauclw (i,pver+1-l)
+    enddo
+    enddo
+
+    ! OPTD = TAUCLI + TAUCLW
+    State_Met%OPTD(1,i,l) = State_Met%TAUCLI + State_Met%TAUCLW
+
+    ! SUNCOSmid
+    call zenith( calday, rlats, rlons, CSZAmid, ncol )
+    State_Met%SUNCOSmid(1,:ncol) = CSZAmid(:ncol)
+
+    ! UVALBEDO
+    State_Met%UVALBEDO(1,:ncol) = cam_in%asdir(:ncol)
+
+    ! AIRNUMDEN - not needed
+    ! AVGW - not needed
+    ! ChemGridLev - set to pver for now as we do not extend to mesosphere
+    State_Met%ChemGridLev(1,:ncol) = pver
+    ! InTroposphere - not needed (for pNIT- photol Shah et al. only)
+    call Accept_External_PEDGE(State_Met, State_Grid, RC)
+
+    ! airqnt can help with a lot of State_Met
+    ! but you will have to provide a ton of (no pun intended) air quantities into it
+    ! for this process: PEDGE, SPHU, T, AREA_M2, DELP_DRY, TROPP
+    ! this is not needed for FAST_JX to function2
+    ! call AIRQNT(Input_Opt, State_Chm, State_Grid, State_Met, RC, .false.)
+
+    ! populate O3 concentrations in State_Chm%Species(gi_O3)%Conc(1,:ncol,:pver)
+    ! remember to appropriately convert units to molec cm-3 and invert vertical
+
+
+    ! eventually run FAST_JX - photolysis rates will be available in ZPJ
+    call FAST_JX(0, Input_Opt, State_Chm, State_Diag, State_Grid, State_Met, RC)
+
+    ! copy ZPJ in reverse direction to reaction_rates(1:phtcnt)
+    ! based on mapping array (if >0)
+
+
+    ! eventually process all the aliases if they have not been overridden (mapping<0)
+
+
+
+    ! ====================== // F A S T - J X  - C A M - C H E M ====================== !
 
     do i = 1,phtcnt
        call outfld( tag_names(i), reaction_rates(:ncol,:,rxt_tag_map(i)), ncol, lchnk )
