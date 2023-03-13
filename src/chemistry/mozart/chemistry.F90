@@ -83,6 +83,7 @@ module chemistry
   character(len=shr_kind_cl) :: depvel_lnd_file = 'depvel_lnd_file'
 
   ! emis
+  logical            :: use_hemco = .false.
 
   character(len=shr_kind_cl) :: airpl_emis_file = '' ! airplane emissions
   character(len=shr_kind_cl) :: srf_emis_specifier(pcnst) = ''
@@ -675,7 +676,8 @@ end function chem_is_active
                        history_chemistry_out=history_chemistry , &
                        history_budget_out = history_budget , &
                        history_budget_histfile_num_out = history_budget_histfile_num, &
-                       history_cesm_forcing_out = history_cesm_forcing )
+                       history_cesm_forcing_out = history_cesm_forcing, &
+                       use_hemco_out = use_hemco )
 
     ! aqueous chem initialization
     call sox_inti()
@@ -768,6 +770,7 @@ end function chem_is_active
        , ext_frc_fixed_tod &
        , exo_coldens_file &
        , lght_no_prd_factor &
+       , use_hemco &
        , pbuf2d &
        )
 
@@ -823,12 +826,14 @@ end function chem_is_active
 
 !================================================================================
 !================================================================================
-  subroutine chem_emissions( state, cam_in )
+  subroutine chem_emissions( state, cam_in, pbuf )
+    use physics_buffer,   only: physics_buffer_desc
     use aero_model,       only: aero_model_emissions
     use camsrfexch,       only: cam_in_t
     use constituents,     only: sflxnam
     use cam_history,      only: outfld
     use mo_srf_emissions, only: set_srf_emissions
+    use hco_cc_emissions, only: hco_set_srf_emissions
     use fire_emissions,   only: fire_emissions_srf
     use ocean_emis,       only: ocean_emis_getflux
 
@@ -836,6 +841,7 @@ end function chem_is_active
 
     type(physics_state),    intent(in)    :: state   ! Physics state variables
     type(cam_in_t),         intent(inout) :: cam_in  ! import state
+    type(physics_buffer_desc), pointer    :: pbuf(:) ! Physics buffer in chunk, for HEMCO
 
     ! local vars
 
@@ -874,12 +880,22 @@ end function chem_is_active
 
     endif
 
-   ! prescribed emissions from file ...
+    if ( use_hemco ) then
+       ! prescribed emissions from HEMCO ...
 
-    !-----------------------------------------------------------------------
-    !        ... Set surface emissions
-    !-----------------------------------------------------------------------
-    call set_srf_emissions( lchnk, ncol, sflx(:,:) )
+       !-----------------------------------------------------------------------
+       !        ... Set surface emissions using HEMCO compatibility API
+       ! (hplin, 8/8/22)
+       !-----------------------------------------------------------------------
+       call hco_set_srf_emissions( lchnk, ncol, sflx(:,:), pbuf )
+    else
+       ! prescribed emissions from file ...
+
+       !-----------------------------------------------------------------------
+       !        ... Set surface emissions
+       !-----------------------------------------------------------------------
+       call set_srf_emissions( lchnk, ncol, sflx(:,:) )
+    endif
 
     do m = 1,pcnst
        n = map2chm(m)
@@ -1223,7 +1239,7 @@ end function chem_is_active
                           fsds, cam_in%ts, cam_in%asdir, cam_in%ocnfrac, cam_in%icefrac, &
                           cam_out%precc, cam_out%precl, cam_in%snowhland, ghg_chem, state%latmapback, &
                           drydepflx, wetdepflx, cam_in%cflx, cam_in%fireflx, cam_in%fireztop, &
-                          nhx_nitrogen_flx, noy_nitrogen_flx, ptend%q, pbuf )
+                          nhx_nitrogen_flx, noy_nitrogen_flx, use_hemco, ptend%q, pbuf )
     if (associated(cam_out%nhx_nitrogen_flx)) then
        cam_out%nhx_nitrogen_flx(:ncol) = nhx_nitrogen_flx(:ncol)
     endif

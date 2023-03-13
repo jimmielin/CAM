@@ -37,6 +37,7 @@ contains
        , ext_frc_fixed_tod &
        , exo_coldens_file &
        , lght_no_prd_factor &
+       , use_hemco &
        , pbuf2d &
        )
 
@@ -56,6 +57,7 @@ contains
     use mo_fstrat,         only : fstrat_inti
     use mo_sethet,         only : sethet_inti
     use mo_usrrxt,         only : usrrxt_inti
+    use hco_cc_emissions,  only : hco_extfrc_inti
     use mo_extfrc,         only : extfrc_inti
     use mo_setext,         only : setext_inti
     use mo_setinv,         only : setinv_inti
@@ -103,6 +105,7 @@ contains
     integer,          intent(in) :: srf_emis_cycle_yr
     integer,          intent(in) :: srf_emis_fixed_ymd
     integer,          intent(in) :: srf_emis_fixed_tod
+    logical,          intent(in) :: use_hemco
 
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
@@ -149,8 +152,15 @@ contains
     ! 	... initialize external forcings module
     !-----------------------------------------------------------------------
     call setext_inti()
-    call extfrc_inti(ext_frc_specifier, ext_frc_type, ext_frc_cycle_yr, ext_frc_fixed_ymd, ext_frc_fixed_tod)
-    if (masterproc) write(iulog,*) 'chemini: after extfrc_inti on node ',iam
+
+    if ( use_hemco ) then
+        ! Initialize HEMCO version of extfrc_inti
+        call hco_extfrc_inti()
+        if (masterproc) write(iulog,*) 'chemini: after hco_extfrc_inti on node ',iam
+    else
+        call extfrc_inti(ext_frc_specifier, ext_frc_type, ext_frc_cycle_yr, ext_frc_fixed_ymd, ext_frc_fixed_tod)
+        if (masterproc) write(iulog,*) 'chemini: after extfrc_inti on node ',iam
+    endif
 
     call sulf_inti()
     if (masterproc) write(iulog,*) 'chemini: after sulf_inti on node ',iam

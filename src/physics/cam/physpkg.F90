@@ -63,6 +63,7 @@ module physpkg
   logical           :: state_debug_checks  ! Debug physics_state.
   logical           :: clim_modal_aero     ! climate controled by prognostic or prescribed modal aerosols
   logical           :: prog_modal_aero     ! Prognostic modal aerosols present
+  logical           :: use_hemco           ! Use Harmonized Emissions Component (HEMCO)
 
   !  Physics buffer index
   integer ::  teout_idx          = 0
@@ -155,6 +156,7 @@ contains
     use dyn_comp,           only: dyn_register
     use spcam_drivers,      only: spcam_register
     use offline_driver,     only: offline_driver_reg
+    use hemco_interface,    only: HCOI_Chunk_Init
     use upper_bc,           only: ubc_fixed_conc
 
     !---------------------------Local variables-----------------------------
@@ -176,7 +178,8 @@ contains
                       cam_take_snapshot_before_out= cam_take_snapshot_before, &
                       cam_take_snapshot_after_out = cam_take_snapshot_after, &
                       cam_snapshot_before_num_out = cam_snapshot_before_num, &
-                      cam_snapshot_after_num_out  = cam_snapshot_after_num)
+                      cam_snapshot_after_num_out  = cam_snapshot_after_num, &
+                      use_hemco_out               = use_hemco)
 
     subcol_scheme = subcol_get_scheme()
 
@@ -344,6 +347,14 @@ contains
     ! ***NOTE*** No registering constituents after the call to cnst_chk_dim.
 
     call offline_driver_reg()
+
+    if(use_hemco) then
+        ! initialize harmonized emissions component (HEMCO). this will add
+        ! pbuf fields so must go before pbuf_initialize. also, it must go
+        ! before pbuf_cam_snapshot_register as pbuf fields are registered within
+        ! hcoi_chunk_init here.
+        call hcoi_chunk_init()
+    endif
 
     ! This needs to be last as it requires all pbuf fields to be added
     if (cam_snapshot_before_num > 0 .or. cam_snapshot_after_num > 0) then
@@ -1070,6 +1081,7 @@ contains
 #if ( defined OFFLINE_DYN )
      use metdata,       only: get_met_srf1
 #endif
+    use hemco_interface, only: HCOI_Chunk_Run
     !
     ! Input arguments
     !
@@ -1132,6 +1144,12 @@ contains
     call gmean_mass ('before tphysbc DRY', phys_state)
 #endif
 
+    if(use_hemco) then
+        !----------------------------------------------------------
+        ! run hemco (first phase)
+        !----------------------------------------------------------
+        call HCOI_Chunk_Run(cam_in, phys_state, pbuf2d, phase=1)
+    endif
 
     !-----------------------------------------------------------------------
     ! Tendency physics before flux coupler invocation
@@ -1207,6 +1225,7 @@ contains
 #if ( defined OFFLINE_DYN )
     use metdata,         only: get_met_srf2
 #endif
+    use hemco_interface,  only: HCOI_Chunk_Run
     !
     ! Input arguments
     !
@@ -1239,6 +1258,14 @@ contains
     ! if using IOP values for surface fluxes overwrite here after surface components run
     !-----------------------------------------------------------------------
     if (single_column) call scam_use_iop_srf(cam_in)
+
+
+    if(use_hemco) then
+        !----------------------------------------------------------
+        ! run hemco (phase 2 before chemistry)
+        !----------------------------------------------------------
+        call HCOI_Chunk_Run(cam_in, phys_state, pbuf2d, phase=2)
+    endif
 
     !-----------------------------------------------------------------------
     ! Tendency physics after coupler
@@ -1306,6 +1333,7 @@ contains
     use chemistry, only : chem_final
     use carma_intr, only : carma_final
     use wv_saturation, only : wv_sat_final
+    use hemco_interface,  only: HCOI_Chunk_Final
     use microp_aero, only : microp_aero_final
     use phys_grid_ctem, only : phys_grid_ctem_final
     use nudging, only: Nudge_Model, nudging_final
@@ -1333,6 +1361,11 @@ contains
     call microp_aero_final()
     call phys_grid_ctem_final()
     if(Nudge_Model) call nudging_final()
+
+    if(use_hemco) then
+        ! cleanup hemco
+        call HCOI_Chunk_Final
+    endif
 
   end subroutine phys_final
 
@@ -1506,7 +1539,7 @@ contains
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat)
     end if
-    call chem_emissions( state, cam_in )
+    call chem_emissions( state, cam_in, pbuf )
     if (trim(cam_take_snapshot_after) == "chem_emissions") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat)

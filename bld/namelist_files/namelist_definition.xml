@@ -4784,6 +4784,14 @@ cache file to be consistent with how CAM was built.
 Default: set by build-namelist
 </entry>
 
+<entry id="use_hemco" type="logical" category="hemco"
+       group="phys_ctl_nl" valid_values="" >
+If TRUE then the Harmonized Emissions Component, HEMCO, will be used
+to calculate emissions in chemistry. ext_frc_specifier and srf_emis_specifier
+will be ignored.
+Default: FALSE
+</entry>
+
 <entry id="waccmx_opt" type="char*16" category="waccmx"
        group="phys_ctl_nl" valid_values="ionosphere,neutral,off" >
 Runtime options of upper thermosphere WACCM-X.  'ionosphere' for
@@ -4923,9 +4931,9 @@ Default: set by build-namelist.
 </entry>
 
 <!-- HEMCO -->
-<entry id="hemco_config_file" type="char*256" category="hemco"
+<entry id="hemco_config_file" type="char*256" input_pathname="abs" category="hemco"
        group="hemco_nl" valid_values="" >
-Full pathname to HEMCO_Config.rc, which prescribes emission inventories     
+Full pathname of the HEMCO_Config.rc input file used to configure HEMCO.
 Default: set by build-namelist.
 </entry>
 
@@ -4939,6 +4947,12 @@ Default: set by build-namelist.
        group="hemco_nl" valid_values="">
 Number of y-dimensions in HEMCO internal grid.
 Default: set by build-namelist.
+</entry>
+
+<entry id="hemco_emission_year" type="integer" category="hemco"
+       group="hemco_nl" valid_values="">
+Force emission year for HEMCO clock if positive. This will force cycling of data on this year.
+Default: set by build-namelist for climo cases, otherwise -1 to use model clock
 </entry>
 
 <!-- Reference Pressures -->
