@@ -2177,6 +2177,15 @@ sub write_filepath
             print $fh "$camsrcdir/src/chemistry/pp_none\n";
             print $fh "$camsrcdir/src/chemistry/mozart\n";
         }
+        else {
+            # build GEOS-Chem source always in order to have
+            # access to Fast-JX in other modules. hplin 3/13/23
+            print $fh "$camsrcdir/src/chemistry/geoschem/geoschem_src/GeosCore\n";
+            print $fh "$camsrcdir/src/chemistry/geoschem/geoschem_src/GeosUtil\n";
+            print $fh "$camsrcdir/src/chemistry/geoschem/geoschem_src/Headers\n";
+            print $fh "$camsrcdir/src/chemistry/geoschem/geoschem_src/ISORROPIA\n";
+            print $fh "$camsrcdir/src/chemistry/geoschem/geoschem_src/KPP/fullchem\n";
+        }
     }
 
     if ($waccmx) {
