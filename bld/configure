@@ -1403,6 +1403,8 @@ if ($chem_pkg =~ 'geoschem') {
     $chem_nadv = 267; # includes GC advected species (233), CO2 (1), and MAM aerosols (33)
 }
 
+# hplin 3/13/23 fjx in cc
+    $chem_cppdefs .= ' -DEXTERNAL_GRID -DEXTERNAL_FORCING -DLINUX_IFORT -DUSE_REAL8 -DMODEL_ -DMODEL_CESM';
 
 # CARMA sectional microphysics
 #
