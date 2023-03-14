@@ -12,7 +12,7 @@ module mo_gas_phase_chemdr
   use chem_prod_loss_diags, only: chem_prod_loss_diags_init, chem_prod_loss_diags_out
 
 ! For Fast-JX in CAM-chem
-  use spmc_utils,          only : masterproc, iam, npes
+  use spmd_utils,          only : masterproc, iam, npes
   USE Input_Opt_Mod,       ONLY : OptInput      ! Derived type for Input Options
   USE State_Chm_Mod,       ONLY : ChmState      ! Derived type for Chemistry State object
   USE State_Diag_Mod,      ONLY : DgnState      ! Derived type for Diagnostics State object
@@ -919,8 +919,8 @@ contains
     lonMidArr = 0.0e+0_f4
     latMidArr = 0.0e+0_f4
     DO J = 1, ncol
-       lonMidArr(1,J) = REAL(state%lon(J), f4)
-       latMidArr(1,J) = REAL(state%lat(J), f4)
+       lonMidArr(1,J) = REAL(rlons(J), f4)
+       latMidArr(1,J) = REAL(rlats(J), f4)
     ENDDO
     CALL SetGridFromCtr( Input_Opt  = Input_Opt,         &
                          State_Grid = State_Grid,        &
@@ -964,8 +964,8 @@ contains
     ! prepare meteorology variables for use - note we have to flip the atm
     ! PEDGE
     do i = 1, ncol
-    do l = 1, pver+1
-      State_Met%PEDGE(1,i,l) = state%pint(i,pver+2-l) * 0.01e+0_fp
+    do k = 1, pver+1
+      State_Met%PEDGE(1,i,k) = pint(i,pver+2-k) * 0.01e+0_fp
     enddo
     enddo
 
@@ -974,34 +974,34 @@ contains
     taucli = 0.0e+0_r8
     tauclw = 0.0e+0_r8
     do i = 1, ncol
-    do l = 1, pver
-      if(cldf(i,l) > 1.0e-02_r8) then  ! Minimum cloud cover parameter
-         tauclw(i,l) = state%q(i,l,cldliq_ndx)               &
-                   * (state%pint(i,l+1)-state%pint(i,l)) &
-                   * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldFrc(i,l)
-         tauclw(i,l) = MAX(tauclw(i,l), 0.0e+00_r8)
-         taucli(i,l) = state%q(i,l,cldice_ndx)               &
-                   * (state%pint(i,l+1)-state%pint(i,l)) &
-                   * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldFrc(i,l)
-         taucli(i,l) = MAX(taucli(i,l), 0.0e+00_r8)
+    do k = 1, pver
+      if(cldf(i,k) > 1.0e-02_r8) then  ! Minimum cloud cover parameter
+         tauclw(i,k) = q(i,k,cldliq_ndx)               &
+                   * (pint(i,k+1)-pint(i,k)) &
+                   * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldFrc(i,k)
+         tauclw(i,k) = MAX(tauclw(i,k), 0.0e+00_r8)
+         taucli(i,k) = q(i,k,cldice_ndx)               &
+                   * (pint(i,k+1)-pint(i,l)) &
+                   * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldFrc(i,k)
+         taucli(i,k) = MAX(taucli(i,k), 0.0e+00_r8)
       endif
 
-      State_Met%CLDF  (1,i,l) = cldfr  (i,pver+1-l)
-      State_Met%T     (1,i,l) = state%t(i,pver+1-l)
-      State_Met%TAUCLI(1,i,l) = taucli (i,pver+1-l)
-      State_Met%TAUCLW(1,i,l) = tauclw (i,pver+1-l)
+      State_Met%CLDF  (1,i,l) = cldfr  (i,pver+1-k)
+      State_Met%T     (1,i,l) = tfld   (i,pver+1-k)
+      State_Met%TAUCLI(1,i,l) = taucli (i,pver+1-k)
+      State_Met%TAUCLW(1,i,l) = tauclw (i,pver+1-k)
     enddo
     enddo
 
     ! OPTD = TAUCLI + TAUCLW
-    State_Met%OPTD(1,i,l) = State_Met%TAUCLI + State_Met%TAUCLW
+    State_Met%OPTD = State_Met%TAUCLI + State_Met%TAUCLW
 
     ! SUNCOSmid
     call zenith( calday, rlats, rlons, CSZAmid, ncol )
     State_Met%SUNCOSmid(1,:ncol) = CSZAmid(:ncol)
 
     ! UVALBEDO
-    State_Met%UVALBEDO(1,:ncol) = cam_in%asdir(:ncol)
+    State_Met%UVALBEDO(1,:ncol) = asdir(:ncol)
 
     ! AIRNUMDEN - not needed
     ! AVGW - not needed
