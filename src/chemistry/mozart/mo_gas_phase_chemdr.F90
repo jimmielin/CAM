@@ -527,7 +527,8 @@ contains
 
    ! fast-jx in cam-chem - qtys (hplin, 3/13/23)
    real(f4) :: lonMidArr(1,ncol), latMidArr(1,ncol)
-   integer :: currYr, currMo, currDy, currTOD, currUTC, currSc, currMn, currHr, currHMS, currYMD
+   real(f4) :: currUTC
+   integer :: currYr, currMo, currDy, currTOD, currSc, currMn, currHr, currHMS, currYMD
    integer :: RC
    real(r8) :: taucli(ncol,pver), tauclw(ncol,pver), cszamid(ncol)
 
@@ -975,14 +976,14 @@ contains
     tauclw = 0.0e+0_r8
     do i = 1, ncol
     do k = 1, pver
-      if(cldf(i,k) > 1.0e-02_r8) then  ! Minimum cloud cover parameter
+      if(cldfr(i,k) > 1.0e-02_r8) then  ! Minimum cloud cover parameter
          tauclw(i,k) = q(i,k,cldliq_ndx)               &
                    * (pint(i,k+1)-pint(i,k)) &
-                   * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldFrc(i,k)
+                   * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldfr(i,k)
          tauclw(i,k) = MAX(tauclw(i,k), 0.0e+00_r8)
          taucli(i,k) = q(i,k,cldice_ndx)               &
-                   * (pint(i,k+1)-pint(i,l)) &
-                   * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldFrc(i,k)
+                   * (pint(i,k+1)-pint(i,k)) &
+                   * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldfr(i,k)
          taucli(i,k) = MAX(taucli(i,k), 0.0e+00_r8)
       endif
 
