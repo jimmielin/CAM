@@ -398,6 +398,8 @@ contains
     use Time_Mod,              only : Accept_External_Date_Time
     use Pressure_Mod,          only : Accept_External_Pedge
     use FAST_JX_MOD,           only : FAST_JX
+    use mo_constants,          only : avogadro
+    use physconst,             only : rair, mwdry
 
     !-----------------------------------------------------------------------
     !        ... Dummy arguments
@@ -987,10 +989,10 @@ contains
          taucli(i,k) = MAX(taucli(i,k), 0.0e+00_r8)
       endif
 
-      State_Met%CLDF  (1,i,l) = cldfr  (i,pver+1-k)
-      State_Met%T     (1,i,l) = tfld   (i,pver+1-k)
-      State_Met%TAUCLI(1,i,l) = taucli (i,pver+1-k)
-      State_Met%TAUCLW(1,i,l) = tauclw (i,pver+1-k)
+      State_Met%CLDF  (1,i,k) = cldfr  (i,pver+1-k)
+      State_Met%T     (1,i,k) = tfld   (i,pver+1-k)
+      State_Met%TAUCLI(1,i,k) = taucli (i,pver+1-k)
+      State_Met%TAUCLW(1,i,k) = tauclw (i,pver+1-k)
     enddo
     enddo
 
@@ -1018,8 +1020,18 @@ contains
     ! call AIRQNT(Input_Opt, State_Chm, State_Grid, State_Met, RC, .false.)
 
     ! populate O3 concentrations in State_Chm%Species(gi_O3)%Conc(1,:ncol,:pver)
-    ! remember to appropriately convert units to molec cm-3 and invert vertical
-
+    ! remember to appropriately convert units to molec cm-3 and invert vertical.
+    !
+    ! vmr to molec cm-3
+    !
+    ! rho = pmid / (rair * t)
+    !       J m-3 / (J K-1 kg-1 * K) = kg m-3
+    !
+    do i = 1, ncol
+    do k = 1, pver
+        State_Chm%Species(gi_O3)%Conc(1,i,k) = vmr(i,pver+1-k,o3_ndx) * pmid(i,pver+1-k) / (rair * tfld(i,pver+1-k)) * avogadro / 1e3 / mwdry
+    enddo
+    enddo
 
     ! eventually run FAST_JX - photolysis rates will be available in ZPJ
     call FAST_JX(0, Input_Opt, State_Chm, State_Diag, State_Grid, State_Met, RC)
