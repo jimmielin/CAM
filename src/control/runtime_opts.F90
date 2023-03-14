@@ -100,10 +100,6 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    use upper_bc,            only: ubc_readnl
    use phys_grid_ctem,      only: phys_grid_ctem_readnl
 
-#if (defined HEMCO_CESM)
-   use hemco_interface,     only: hemco_readnl
-#endif
-
    !---------------------------Arguments-----------------------------------
 
    character(len=*), intent(in) :: nlfilename
@@ -203,9 +199,6 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    call qneg_readnl(nlfilename)
    call hemco_readnl(nlfilename)
    call phys_grid_ctem_readnl(nlfilename)
-#if (defined HEMCO_CESM)
-   call hemco_readnl(nlfilename)
-#endif
 
 end subroutine read_namelist
 
