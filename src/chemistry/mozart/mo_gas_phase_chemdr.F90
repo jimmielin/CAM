@@ -90,10 +90,12 @@ contains
 ! fast-jx in cam-chem hplin 3/13/23
     use Input_Opt_Mod,     only : Set_Input_Opt
     use State_Chm_Mod,     only : Init_State_Chm, IND_
+    use State_Met_Mod,     only : Init_State_Met
     use Input_Mod,         only : Read_Input_File
     use State_Grid_Mod,    only : Init_State_Grid
     use GC_Environment_Mod,only : GC_Init_Grid
     use FAST_JX_MOD,       only : INIT_FJX
+    use CMN_FJX_MOD,       only : INIT_CMN_FJX
 
     character(len=3) :: string
     integer          :: n, m, err, ii
@@ -400,6 +402,7 @@ contains
     use FAST_JX_MOD,           only : FAST_JX
     use mo_constants,          only : avogadro
     use physconst,             only : rair, mwdry
+    use chem_mods,             only : pht_to_fjx_map ! added for map.
 
     !-----------------------------------------------------------------------
     !        ... Dummy arguments
