@@ -1042,13 +1042,35 @@ contains
     ! eventually run FAST_JX - photolysis rates will be available in ZPJ
     call FAST_JX(0, Input_Opt, State_Chm, State_Diag, State_Grid, State_Met, RC)
 
-    ! copy ZPJ in reverse direction to reaction_rates(1:phtcnt)
+    ! copy ZPJ(NZ, JVN_, NX, NY) in reverse direction to reaction_rates(1:phtcnt)
     ! based on mapping array (if >0)
+    !
+    ! because pht_alias_lst is in text and not directly mapped save for in sht_indexer,
+    ! we also set these to >0 in the mapping array but make sure to check for the
+    ! pht_alias_lst for whether it is indexed, and to multiply by pht_alias_mult.
+    !
+    ! note that pht_alias_mult is actually 1 for non-mapped species but we will not rely on it
+    do m = 1, phtcnt
+        if(pht_to_fjx_map(m) .le. 0) then
+            ! cannot do mapping as this species is non-existent or will be handled by multiplier
+            cycle
+        endif
 
-
-    ! eventually process all the aliases if they have not been overridden (mapping<0)
-
-
+        ! only process long phtrates since short are not overridden by Fast-JX (unavail.) this is just for speed
+        if(pht_alias_lst(m,2) /= ' ') then
+            do i = 1, ncol
+            do k = 1, pver
+                reaction_rates(i,pver+1-k,rxt_tag_map(m)) = ZPJ(k,pht_to_fjx_map(m),1,i) * pht_alias_mult(m,2)
+            enddo
+            enddo
+        else
+            do i = 1, ncol
+            do k = 1, pver
+                reaction_rates(i,pver+1-k,rxt_tag_map(m)) = ZPJ(k,pht_to_fjx_map(m),1,i)
+            enddo
+            enddo
+        endif
+    enddo
 
     ! ====================== // F A S T - J X  - C A M - C H E M ====================== !
 
