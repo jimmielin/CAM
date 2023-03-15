@@ -399,13 +399,16 @@ contains
 
 ! fast-jx in cam-chem (hplin, 3/13/23)
     use time_manager,          only : get_curr_date
+    use mo_constants,          only : avogadro
+    use physconst,             only : rair, mwdry
+    use chem_mods,             only : pht_to_fjx_map ! added for map.
+    use chem_mods,             only : pht_alias_mult, pht_alias_lst
+
     use GC_Grid_Mod,           only : SetGridFromCtr
     use Time_Mod,              only : Accept_External_Date_Time
     use Pressure_Mod,          only : Accept_External_Pedge
     use FAST_JX_MOD,           only : FAST_JX
-    use mo_constants,          only : avogadro
-    use physconst,             only : rair, mwdry
-    use chem_mods,             only : pht_to_fjx_map ! added for map.
+    use CMN_FJX_MOD,           only : ZPJ
 
     !-----------------------------------------------------------------------
     !        ... Dummy arguments
