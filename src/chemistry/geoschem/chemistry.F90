@@ -136,6 +136,8 @@ module chemistry
   INTEGER                    :: iH2O, iO3, iCO2, iSO4
   INTEGER                    :: iO, iH, iO2
   REAL(r8)                   :: MWO3
+
+  integer :: id_Br, id_Br2, id_BrCl, id_BrNO2, id_BrNO3, id_BrO, id_CH3Br, id_CH2Br2, id_CHBr3, id_HOBr, id_HBr, id_Cl, id_ClO, id_Cl2, id_Cl2NO2, id_ClOO, id_ClNO2, id_ClNO3, id_CCl4, id_CH3Cl, id_CH2Cl2, id_CH3CCl3, id_CHCl3, id_HOCl, id_HCl, id_OClO, id_I, id_I2, id_IBr, id_ICl, id_IO, id_IONO, id_IONO2, id_CH3I, id_CH2I2, id_CH2ICl, id_CH2IBr, id_HI, id_HOI, id_OIO, id_SALACl, id_SALCCl, id_BrSALA, id_BrSALC
   ! Indices of critical species in the constituent list
   INTEGER                    :: cQ, cH2O, cH2SO4
   ! Indices of critical species in the solsym list
@@ -1644,6 +1646,53 @@ contains
     iO    = Ind_('O')
     iH    = Ind_('H')
     iO2   = Ind_('O2')
+
+    ! hplin 3/15/23 -- disable trop hal chem., specify all halogen species to disable
+    id_Br = IND_('Br')
+    id_Br2 = IND_('Br2')
+    id_BrCl = IND_('BrCl')
+    id_BrNO2 = IND_('BrNO2')
+    id_BrNO3 = IND_('BrNO3')
+    id_BrO = IND_('BrO')
+    id_CH3Br = IND_('CH3Br')
+    id_CH2Br2 = IND_('CH2Br2')
+    id_CHBr3 = IND_('CHBr3')
+    id_HOBr = IND_('HOBr')
+    id_HBr = IND_('HBr')
+    id_Cl = IND_('Cl')
+    id_ClO = IND_('ClO')
+    id_Cl2 = IND_('Cl2')
+    id_Cl2NO2 = IND_('Cl2NO2')
+    id_ClOO = IND_('ClOO')
+    id_ClNO2 = IND_('ClNO2')
+    id_ClNO3 = IND_('ClNO3')
+    id_CCl4 = IND_('CCl4')
+    id_CH3Cl = IND_('CH3Cl')
+    id_CH2Cl2 = IND_('CH2Cl2')
+    id_CH3CCl3 = IND_('CH3CCl3')
+    id_CHCl3 = IND_('CHCl3')
+    id_HOCl = IND_('HOCl')
+    id_HCl = IND_('HCl')
+    id_OClO = IND_('OClO')
+    id_I = IND_('I')
+    id_I2 = IND_('I2')
+    id_IBr = IND_('IBr')
+    id_ICl = IND_('ICl')
+    id_IO = IND_('IO')
+    id_IONO = IND_('IONO')
+    id_IONO2 = IND_('IONO2')
+    id_CH3I = IND_('CH3I')
+    id_CH2I2 = IND_('CH2I2')
+    id_CH2ICl = IND_('CH2ICl')
+    id_CH2IBr = IND_('CH2IBr')
+    id_HI = IND_('HI')
+    id_HOI = IND_('HOI')
+    id_OIO = IND_('OIO')
+    id_SALACl = IND_('SALACl')
+    id_SALCCl = IND_('SALCCl')
+    id_BrSALA = IND_('BrSALA')
+    id_BrSALC = IND_('BrSALC')
+    ! //
 
     ! This is used to compute overhead ozone column
     SpcInfo => State_Chm(BEGCHUNK)%SpcData(iO3)%Info
@@ -3799,6 +3848,55 @@ contains
 
     ! Reset photolysis rates
     ZPJ = 0.0e+0_r8
+
+    ! -- hplin 3/15/23 -- disable tropospheric halogen chemistry
+    do J = 1, ny
+        State_Chm(LCHNK)%Species(id_Br)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_Br2)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_BrCl)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_BrNO2)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_BrNO3)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_BrO)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_CH3Br)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_CH2Br2)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_CHBr3)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_HOBr)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_HBr)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_Cl)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_ClO)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_Cl2)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_Cl2NO2)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_ClOO)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_ClNO2)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_ClNO3)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_CCl4)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_CH3Cl)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_CH2Cl2)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_CH3CCl3)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_CHCl3)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_HOCl)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_HCl)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_OClO)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_I)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_I2)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_IBr)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_ICl)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_IO)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_IONO)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_IONO2)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_CH3I)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_CH2I2)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_CH2ICl)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_CH2IBr)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_HI)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_HOI)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_OIO)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_SALACl)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_SALCCl)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_BrSALA)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+        State_Chm(LCHNK)%Species(id_BrSALC)%Conc(1,J,Trop_Lev(J):pver) = 0.0_fp
+    enddo
+    ! // hplin 3/15/23
 
     ! Perform chemistry
     CALL Do_Chemistry( Input_Opt  = Input_Opt,         &
