@@ -96,6 +96,7 @@ contains
     use GC_Environment_Mod,only : GC_Init_Grid
     use FAST_JX_MOD,       only : INIT_FJX
     use CMN_FJX_MOD,       only : INIT_CMN_FJX
+    use PRESSURE_MOD,      only : Init_Pressure
 
     character(len=3) :: string
     integer          :: n, m, err, ii
@@ -305,9 +306,11 @@ contains
    ! Can leave State_Diag dangling because all the booleans are set to false by default,
    ! leave all arrays deallocated. This is ugly but it will work
 
+   ! INIT_PRESSURE
+   CALL Init_Pressure( Input_Opt, State_Grid, RC )
+
    ! INIT_FJX
    call INIT_FJX(Input_Opt, State_Chm, State_Diag, State_Grid, RC)
-
 
     ! diagnostics for HEMCO ParaNOx extension
     hco_jno2_idx = pbuf_get_index('HCO_IN_JNO2',errcode=err)
