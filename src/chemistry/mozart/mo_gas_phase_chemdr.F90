@@ -342,6 +342,11 @@ contains
    gi_BCPI = IND_('BCPI')
    gi_BCPO = IND_('BCPO')
 
+   ! Also initialize some fields that are supposed to be initialized by UCX.
+   ! Fixme: Set KG_AER to 0 for now and not computed using UCX
+   allocate(State_Chm%KG_AER(State_Grid%NX, State_Grid%NY, State_Grid%NZ, 2))
+   State_Chm%KG_AER = 0.0_fp
+
    ! Use global mean OM/OC from GEOS-Chem aerosols WG (for OPOA, OCPI, and OCPO)
    State_Chm%OMOC(:,:) = 2.1e+0_fp
 
@@ -448,6 +453,8 @@ contains
     use physconst,             only : rair, mwdry
     use chem_mods,             only : pht_to_fjx_map ! added for map.
     use chem_mods,             only : pht_alias_mult, pht_alias_lst
+    use phys_grid,             only : get_area_all_p
+    use cam_abortutils,        only : endrun
 
     use GC_Grid_Mod,           only : SetGridFromCtr
     use Time_Mod,              only : Accept_External_Date_Time
@@ -456,8 +463,8 @@ contains
     use CMN_FJX_MOD,           only : ZPJ
     use AEROSOL_MOD,           only : AEROSOL_CONC, RDAER
     use DUST_MOD,              only : RDUST_ONLINE
+    use physconstants,         only : Re
     use ErrCode_Mod,           only : GC_SUCCESS
-    use cam_abortutils,        only : endrun
 
     !-----------------------------------------------------------------------
     !        ... Dummy arguments
@@ -590,7 +597,7 @@ contains
    real(f4) :: currUTC
    integer :: currYr, currMo, currDy, currTOD, currSc, currMn, currHr, currHMS, currYMD
    integer :: RC
-   real(r8) :: taucli(ncol,pver), tauclw(ncol,pver), cszamid(ncol), conv_factor
+   real(r8) :: taucli(ncol,pver), tauclw(ncol,pver), cszamid(ncol), conv_factor, col_area(ncol)
 
   ! for HEMCO-CESM ... passing J-values to ParaNOx ship plume extension
     real(r8), pointer :: hco_j_tmp_fld(:)    ! J-value pointer (sfc only) [1/s]
@@ -989,6 +996,8 @@ contains
                          latCtr     = latMidArr,         &
                          RC         = RC )
 
+    call get_area_all_p(lchnk, ncol, col_area)
+
     ! Update GEOS-Chem clock
     CALL Get_Curr_Date( yr  = currYr,  &
                         mon = currMo,  &
@@ -1026,7 +1035,7 @@ contains
     ! PEDGE
     do i = 1, ncol
     do k = 1, pver+1
-      State_Met%PEDGE(1,i,k) = pint(i,pver+2-k) * 0.01e+0_fp
+      State_Met%PEDGE(1,i,k) = pint(i,pver+2-k) * 0.01e+0_fp ! hPa
     enddo
     enddo
 
@@ -1035,24 +1044,31 @@ contains
     taucli = 0.0e+0_r8
     tauclw = 0.0e+0_r8
     do i = 1, ncol
-    do k = 1, pver
-      if(cldfr(i,k) > 1.0e-02_r8) then  ! Minimum cloud cover parameter
-         tauclw(i,k) = q(i,k,cldliq_ndx)               &
-                   * (pint(i,k+1)-pint(i,k)) &
-                   * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldfr(i,k)
-         tauclw(i,k) = MAX(tauclw(i,k), 0.0e+00_r8)
-         taucli(i,k) = q(i,k,cldice_ndx)               &
-                   * (pint(i,k+1)-pint(i,k)) &
-                   * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldfr(i,k)
-         taucli(i,k) = MAX(taucli(i,k), 0.0e+00_r8)
-      endif
+      State_Grid%AREA_M2(1,i) = real(col_area(i) * Re**2, fp)
+      State_Met%AREA_M2(1,i)  = State_Grid%AREA_M2(1,i)
+      do k = 1, pver
+        State_Met%PMID(1,i,k) = pmid(i,pver+1-k) * 0.01e+0_fp ! hPa
 
-      State_Met%CLDF  (1,i,k) = cldfr  (i,pver+1-k)
-      State_Met%T     (1,i,k) = tfld   (i,pver+1-k)
-      State_Met%TAUCLI(1,i,k) = taucli (i,pver+1-k)
-      State_Met%TAUCLW(1,i,k) = tauclw (i,pver+1-k)
+        if(cldfr(i,k) > 1.0e-02_r8) then  ! Minimum cloud cover parameter
+           tauclw(i,k) = q(i,k,cldliq_ndx)               &
+                     * (pint(i,k+1)-pint(i,k)) &
+                     * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldfr(i,k)
+           tauclw(i,k) = MAX(tauclw(i,k), 0.0e+00_r8)
+           taucli(i,k) = q(i,k,cldice_ndx)               &
+                     * (pint(i,k+1)-pint(i,k)) &
+                     * 1.5e+00_r8 / (1.0e-05_r8 * 1.0e+03_r8 * 9.80665e+0_fp) / cldfr(i,k)
+           taucli(i,k) = MAX(taucli(i,k), 0.0e+00_r8)
+        endif
 
-      State_Met%BXHEIGHT(1,i,k) = (zintr(i,pver-k) - zintr(i,pver+1-k)) * 0.001_fp ! km to m
+        State_Met%CLDF  (1,i,k) = cldfr  (i,pver+1-k)
+        State_Met%T     (1,i,k) = tfld   (i,pver+1-k)
+        State_Met%TAUCLI(1,i,k) = taucli (i,pver+1-k)
+        State_Met%TAUCLW(1,i,k) = tauclw (i,pver+1-k)
+
+        State_Met%BXHEIGHT(1,i,k) = (zintr(i,pver-k) - zintr(i,pver+1-k)) * 0.001_fp ! km to m
+
+        ! AIRVOL needs to be computed for use in AEROSOL_CONC. [m3]
+        State_Met%AIRVOL(1,i,k) = State_Met%AREA_M2(1,i) * State_Met%BXHEIGHT(1,i,k)
     enddo
     enddo
 
