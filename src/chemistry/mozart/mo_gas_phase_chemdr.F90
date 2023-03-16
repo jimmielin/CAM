@@ -314,6 +314,7 @@ contains
    ! initialize State_Chm. this only needs to hold the single O3 species molec cm-3
    ! that we pass to fjx.
    call Init_State_Chm(Input_Opt, State_Chm, State_Grid, RC)
+   State_Chm%Spc_Units = 'molec/cm3'
    gi_O3 = IND_('O3')
 
    cnst_pom_a1 = get_spc_ndx('pom_a1')
