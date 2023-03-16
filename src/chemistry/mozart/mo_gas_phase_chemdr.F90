@@ -456,6 +456,7 @@ contains
     use AEROSOL_MOD,           only : AEROSOL_CONC, RDAER
     use DUST_MOD,              only : RDUST_ONLINE
     use ErrCode_Mod,           only : GC_SUCCESS
+    use cam_abortutils,        only : endrun
 
     !-----------------------------------------------------------------------
     !        ... Dummy arguments
