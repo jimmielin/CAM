@@ -70,6 +70,18 @@ module mo_gas_phase_chemdr
   type(GrdState) :: State_Grid
   type(MetState) :: State_Met
   integer :: gi_O3
+      !    pom_a1 -> OCPI
+    !    pom_a4 -> OCPO
+    !    ncl_a1 + ncl_a2 -> SALA
+    !    ncl_a3 -> SALC
+    !    so4_a1 + so4_a2 + so4_a3 + h2so4 -> SO4
+    !    dst_a1 + dst_a2 -> DST1
+    !    dst_a3 -> DST4
+    !    bc_a1  -> BCPI
+    !    bc_a4  -> BCPO
+  integer :: cnst_pom_a1, cnst_pom_a4, cnst_ncl_a1, cnst_ncl_a2, cnst_ncl_a3, cnst_so4_a1, cnst_so4_a2, cnst_so4_a3, cnst_h2so4, &
+             cnst_dst_a1, cnst_dst_a2, cnst_dst_a3, cnst_bc_a1, cnst_bc_a4
+  integer :: gi_OCPI, gi_OCPO, gi_SALA, gi_SALC, gi_SO4, gi_DST1, gi_DST4, gi_BCPI, gi_BCPO
 
   ! for HEMCO-CESM ... passing J-values to ParaNOx ship plume extension
   integer :: hco_jno2_idx, hco_joh_idx
@@ -97,6 +109,7 @@ contains
     use FAST_JX_MOD,       only : INIT_FJX
     use CMN_FJX_MOD,       only : INIT_CMN_FJX
     use PRESSURE_MOD,      only : Init_Pressure
+    use AEROSOL_MOD,       only : Init_Aerosol
 
     character(len=3) :: string
     integer          :: n, m, err, ii
@@ -303,6 +316,34 @@ contains
    call Init_State_Chm(Input_Opt, State_Chm, State_Grid, RC)
    gi_O3 = IND_('O3')
 
+   cnst_pom_a1 = get_spc_ndx('pom_a1')
+   cnst_pom_a4 = get_spc_ndx('pom_a4')
+   cnst_ncl_a1 = get_spc_ndx('ncl_a1')
+   cnst_ncl_a2 = get_spc_ndx('ncl_a2')
+   cnst_ncl_a3 = get_spc_ndx('ncl_a3')
+   cnst_so4_a1 = get_spc_ndx('so4_a1')
+   cnst_so4_a2 = get_spc_ndx('so4_a2')
+   cnst_so4_a3 = get_spc_ndx('so4_a3')
+   cnst_h2so4 = get_spc_ndx('h2so4')
+   cnst_dst_a1 = get_spc_ndx('dst_a1')
+   cnst_dst_a2 = get_spc_ndx('dst_a2')
+   cnst_dst_a3 = get_spc_ndx('dst_a3')
+   cnst_bc_a1 = get_spc_ndx('bc_a1')
+   cnst_bc_a4 = get_spc_ndx('bc_a4')
+
+   gi_OCPI = IND_('OCPI')
+   gi_OCPO = IND_('OCPO')
+   gi_SALA = IND_('SALA')
+   gi_SALC = IND_('SALC')
+   gi_SO4  = IND_('SO4')
+   gi_DST1 = IND_('DST1')
+   gi_DST4 = IND_('DST4')
+   gi_BCPI = IND_('BCPI')
+   gi_BCPO = IND_('BCPO')
+
+   ! Use global mean OM/OC from GEOS-Chem aerosols WG (for OPOA, OCPI, and OCPO)
+   State_Chm%OMOC(:,:) = 2.1e+0_fp
+
    ! Can leave State_Diag dangling because all the booleans are set to false by default,
    ! leave all arrays deallocated. This is ugly but it will work
 
@@ -311,6 +352,9 @@ contains
 
    ! INIT_FJX
    call INIT_FJX(Input_Opt, State_Chm, State_Diag, State_Grid, RC)
+
+   ! INIT_AEROSOL
+   call INIT_AEROSOL(Input_Opt, State_Chm, State_Diag, State_Grid, RC)
 
     ! diagnostics for HEMCO ParaNOx extension
     hco_jno2_idx = pbuf_get_index('HCO_IN_JNO2',errcode=err)
@@ -409,6 +453,8 @@ contains
     use Pressure_Mod,          only : Accept_External_Pedge
     use FAST_JX_MOD,           only : FAST_JX
     use CMN_FJX_MOD,           only : ZPJ
+    use AEROSOL_MOD,           only : AEROSOL_CONC, RDAER, RDUST_ONLINE
+    use ErrCode_Mod,           only : GC_SUCCESS
 
     !-----------------------------------------------------------------------
     !        ... Dummy arguments
@@ -541,7 +587,7 @@ contains
    real(f4) :: currUTC
    integer :: currYr, currMo, currDy, currTOD, currSc, currMn, currHr, currHMS, currYMD
    integer :: RC
-   real(r8) :: taucli(ncol,pver), tauclw(ncol,pver), cszamid(ncol)
+   real(r8) :: taucli(ncol,pver), tauclw(ncol,pver), cszamid(ncol), conv_factor
 
   ! for HEMCO-CESM ... passing J-values to ParaNOx ship plume extension
     real(r8), pointer :: hco_j_tmp_fld(:)    ! J-value pointer (sfc only) [1/s]
@@ -1002,6 +1048,8 @@ contains
       State_Met%T     (1,i,k) = tfld   (i,pver+1-k)
       State_Met%TAUCLI(1,i,k) = taucli (i,pver+1-k)
       State_Met%TAUCLW(1,i,k) = tauclw (i,pver+1-k)
+
+      State_Met%BXHEIGHT(1,i,k) = (zintr(i,pver-k) - zintr(i,pver+1-k)) * 0.001_fp ! km to m
     enddo
     enddo
 
@@ -1036,14 +1084,53 @@ contains
     ! rho = pmid / (rair * t)
     !       J m-3 / (J K-1 kg-1 * K) = kg m-3
     !
+    !
+    ! also populate aerosol concentrations for AOD effect.
+    ! use mapping from Fritz et al.
+    !    pom_a1 -> OCPI
+    !    pom_a4 -> OCPO
+    !    ncl_a1 + ncl_a2 -> SALA
+    !    ncl_a3 -> SALC
+    !    so4_a1 + so4_a2 + so4_a3 + h2so4 -> SO4
+    !    dst_a1 + dst_a2 -> DST1
+    !    dst_a3 -> DST4
+    !    bc_a1  -> BCPI
+    !    bc_a4  -> BCPO
     do i = 1, ncol
     do k = 1, pver
-        State_Chm%Species(gi_O3)%Conc(1,i,k) = vmr(i,pver+1-k,o3_ndx) * pmid(i,pver+1-k) / (rair * tfld(i,pver+1-k)) * avogadro / 1e3 / mwdry
+        conv_factor = pmid(i,pver+1-k) / (rair * tfld(i,pver+1-k)) * avogadro / 1e3 / mwdry
+        State_Chm%Species(gi_O3)%Conc(1,i,k) = vmr(i,pver+1-k,o3_ndx) * conv_factor
+        State_Chm%Species(gi_OCPI)%Conc(1,i,k) = vmr(i,pver+1-k,cnst_pom_a1) * conv_factor
+        State_Chm%Species(gi_OCPO)%Conc(1,i,k) = vmr(i,pver+1-k,cnst_pom_a4) * conv_factor
+        State_Chm%Species(gi_BCPI)%Conc(1,i,k) = vmr(i,pver+1-k,cnst_bc_a1 ) * conv_factor
+        State_Chm%Species(gi_BCPO)%Conc(1,i,k) = vmr(i,pver+1-k,cnst_bc_a4 ) * conv_factor
+        State_Chm%Species(gi_SALA)%Conc(1,i,k) = (vmr(i,pver+1-k,cnst_ncl_a1) + vmr(i,pver+1-k,cnst_ncl_a2)) * conv_factor
+        State_Chm%Species(gi_SALC)%Conc(1,i,k) = vmr(i,pver+1-k,cnst_ncl_a3) * conv_factor
+        State_Chm%Species(gi_SO4 )%Conc(1,i,k) = (vmr(i,pver+1-k,cnst_so4_a1) + vmr(i,pver+1-k,cnst_so4_a2) + &
+                                                  vmr(i,pver+1-k,cnst_so4_a3) + vmr(i,pver+1-k,cnst_h2so4 )) * conv_factor
+        State_Chm%Species(gi_DST1)%Conc(1,i,k) = (vmr(i,pver+1-k,cnst_dst_a1) + vmr(i,pver+1-k,cnst_dst_a2)) * conv_factor
+        State_Chm%Species(gi_DST4)%Conc(1,i,k) = vmr(i,pver+1-k,cnst_dst_a3) * conv_factor
     enddo
     enddo
 
+    ! calculate aerosol concentrations into AEROSOL_MOD
+    call AEROSOL_CONC(Input_Opt, State_Chm, State_Diag, State_Grid, State_Met, RC)
+
+    ! calculate aerosol and dust optical properties from bulk masses
+    call RDAER(Input_Opt, State_Chm, State_Diag, State_Grid, State_Met, currMo, currYr, 0, RC)
+    if(RC /= GC_SUCCESS) then
+        call endrun('gas_phase_chemdr: Fast-JX RDAER failed')
+    endif
+    call RDUST_ONLINE(Input_Opt, State_Chm, State_Diag, State_Grid, State_Met, 0, RC)
+    if(RC /= GC_SUCCESS) then
+        call endrun('gas_phase_chemdr: Fast-JX RDUST_ONLINE failed')
+    endif
+
     ! eventually run FAST_JX - photolysis rates will be available in ZPJ
     call FAST_JX(0, Input_Opt, State_Chm, State_Diag, State_Grid, State_Met, RC)
+    if(RC /= GC_SUCCESS) then
+        call endrun('gas_phase_chemdr: Fast-JX FAST_JX failed')
+    endif
 
     ! copy ZPJ(NZ, JVN_, NX, NY) in reverse direction to reaction_rates(1:phtcnt)
     ! based on mapping array (if >0)
