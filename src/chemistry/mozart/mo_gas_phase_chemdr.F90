@@ -453,7 +453,8 @@ contains
     use Pressure_Mod,          only : Accept_External_Pedge
     use FAST_JX_MOD,           only : FAST_JX
     use CMN_FJX_MOD,           only : ZPJ
-    use AEROSOL_MOD,           only : AEROSOL_CONC, RDAER, RDUST_ONLINE
+    use AEROSOL_MOD,           only : AEROSOL_CONC, RDAER
+    use DUST_MOD,              only : RDUST_ONLINE
     use ErrCode_Mod,           only : GC_SUCCESS
 
     !-----------------------------------------------------------------------
