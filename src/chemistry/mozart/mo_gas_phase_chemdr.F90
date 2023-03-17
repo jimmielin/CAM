@@ -464,6 +464,7 @@ contains
     use AEROSOL_MOD,           only : AEROSOL_CONC, RDAER
     use DUST_MOD,              only : RDUST_ONLINE
     use physconstants,         only : Re
+    use Calc_Met_Mod,          only : AIRQNT
     use ErrCode_Mod,           only : GC_SUCCESS
 
     !-----------------------------------------------------------------------
@@ -1046,6 +1047,9 @@ contains
     do i = 1, ncol
       State_Grid%AREA_M2(1,i) = real(col_area(i) * Re**2, fp)
       State_Met%AREA_M2(1,i)  = State_Grid%AREA_M2(1,i)
+
+      State_Met%TROPP(1,i)    = pint(i,troplev(i))
+
       do k = 1, pver
         State_Met%PMID(1,i,k) = pmid(i,pver+1-k) * 0.01e+0_fp ! hPa
 
@@ -1065,10 +1069,13 @@ contains
         State_Met%TAUCLI(1,i,k) = taucli (i,pver+1-k)
         State_Met%TAUCLW(1,i,k) = tauclw (i,pver+1-k)
 
-        State_Met%BXHEIGHT(1,i,k) = (zintr(i,pver-k) - zintr(i,pver+1-k)) * 0.001_fp ! km to m
-
+        ! BXHEIGHT needs to be computed for use in RDAER.
         ! AIRVOL needs to be computed for use in AEROSOL_CONC. [m3]
-        State_Met%AIRVOL(1,i,k) = State_Met%AREA_M2(1,i) * State_Met%BXHEIGHT(1,i,k)
+
+        ! Looks like a lot of quantities need to be computed
+        ! using AIRQNT after all. We need to provide:
+        ! SPHU [g H2O/kg air]
+        State_Met%SPHU  (1,i,k) = qh2o(i,pver+1-k) * 1.0e+3_fp
     enddo
     enddo
 
@@ -1092,8 +1099,7 @@ contains
     ! airqnt can help with a lot of State_Met
     ! but you will have to provide a ton of (no pun intended) air quantities into it
     ! for this process: PEDGE, SPHU, T, AREA_M2, DELP_DRY, TROPP
-    ! this is not needed for FAST_JX to function2
-    ! call AIRQNT(Input_Opt, State_Chm, State_Grid, State_Met, RC, .false.)
+    call AIRQNT(Input_Opt, State_Chm, State_Grid, State_Met, RC, .false.)
 
     ! populate O3 concentrations in State_Chm%Species(gi_O3)%Conc(1,:ncol,:pver)
     ! remember to appropriately convert units to molec cm-3 and invert vertical.
