@@ -345,7 +345,9 @@ contains
    ! Also initialize some fields that are supposed to be initialized by UCX.
    ! Fixme: Set KG_AER to 0 for now and not computed using UCX
    allocate(State_Chm%KG_AER(State_Grid%NX, State_Grid%NY, State_Grid%NZ, 2))
+   allocate(State_Chm%SAD_AER(State_Grid%NX, State_Grid%NY, State_Grid%NZ, 2))
    State_Chm%KG_AER = 0.0_fp
+   State_Chm%SAD_AER = 0.0_fp
 
    ! Use global mean OM/OC from GEOS-Chem aerosols WG (for OPOA, OCPI, and OCPO)
    State_Chm%OMOC(:,:) = 2.1e+0_fp
