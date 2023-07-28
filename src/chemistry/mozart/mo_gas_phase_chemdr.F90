@@ -1050,7 +1050,9 @@ contains
       State_Grid%AREA_M2(1,i) = real(col_area(i) * Re**2, fp)
       State_Met%AREA_M2(1,i)  = State_Grid%AREA_M2(1,i)
 
-      State_Met%TROPP(1,i)    = pint(i,troplev(i))
+      ! For some reason, setting this to hPa value causes artifacting
+      ! in the model output. Disabling this for now.
+      State_Met%TROPP(1,i)    = pmid(i,troplev(i))! * 0.01e+0_fp ! hPa
 
       do k = 1, pver
         State_Met%PMID(1,i,k) = pmid(i,pver+1-k) * 0.01e+0_fp ! hPa
@@ -1154,6 +1156,7 @@ contains
     endif
 
     ! eventually run FAST_JX - photolysis rates will be available in ZPJ
+    ZPJ = 0.0_fp
     call FAST_JX(0, Input_Opt, State_Chm, State_Diag, State_Grid, State_Met, RC)
     if(RC /= GC_SUCCESS) then
         call endrun('gas_phase_chemdr: Fast-JX FAST_JX failed')
