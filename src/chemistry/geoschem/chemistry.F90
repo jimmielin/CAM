@@ -3869,6 +3869,7 @@ contains
     !==============================================================
 
 #if defined( MODAL_AERO )
+    call t_startf('GEOSChem_MAM_Interfacing')
     ! Repartition SO4 into H2SO4 and so4_a*
     IF ( l_H2SO4 > 0 .AND. l_SO4 > 0 ) THEN
        P = l_H2SO4
@@ -3884,13 +3885,13 @@ contains
                           * binRatio(iSulf(M),M,:nY,:nZ)
        ENDDO
     ENDIF
-    call t_startf('GEOSChem_MAM_Interfacing')
+    call t_stopf('GEOSChem_MAM_Interfacing')
 
     ! Amount of chemically-produced H2SO4 (mol/mol)
     ! This is archived from fullchem_mod.F90 using SO2 + OH rate from KPP (hplin, 1/25/23)
     del_h2so4_gasprod(:nY,:nZ) = State_Chm(LCHNK)%H2SO4_PRDR(1,:nY,nZ:1:-1)
 
-
+    call t_startf('GEOSChem_MAM_GasAerExch')
     call aero_model_gasaerexch( loffset           = iFirstCnst - 1,         &
                                 ncol              = NCOL,                   &
                                 lchnk             = LCHNK,                  &
@@ -4022,9 +4023,9 @@ contains
        K2 = get_spc_ndx(TRIM(speciesName_2), ignore_case=.true.)
        IF ( P > 0 .AND. K1 > 0 .AND. K2 > 0 ) vmr1(:nY,:nZ,P) = vmr1(:nY,:nZ,K1) + vmr1(:nY,:nZ,K2)
     ENDDO
+    call t_stopf('GEOSChem_MAM_Interfacing')
 
 #endif
-    call t_stopf('GEOSChem_MAM_Interfacing')
 
     !==============================================================
     ! ***** W E T   D E P O S I T I O N  (rainout + washout) *****
