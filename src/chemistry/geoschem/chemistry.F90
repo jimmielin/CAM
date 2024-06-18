@@ -356,7 +356,7 @@ contains
           IF ( to_upper(TRIM(tracerNames(I))) /= to_upper(TRIM(solsym(I))) ) THEN
              Write(iulog,*) "tracerNames (", TRIM(tracerNames(I)), ") /= solsym (", &
                    TRIM(solsym(I)), ")"
-             CALL ENDRUN('Solsym must be following GEOS-Chem tracer. Check geoschem/mo_sim.dat')
+             CALL ENDRUN('Solsym must be following GEOS-Chem tracer. Check geoschem/mo_sim_dat.F90')
           ENDIF
           ! Nullify pointer
           ThisSpc => NULL()
