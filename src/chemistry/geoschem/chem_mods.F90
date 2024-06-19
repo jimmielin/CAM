@@ -81,7 +81,7 @@
                             clsze = 1, & ! loop length for implicit chemistry
                             rxt_tag_cnt = 0, & ! number of tagged reactions (unused in GEOS-Chem)
                             enthalpy_cnt = 0, &
-                            nslvd = 88  ! number of short-lived (non-advected) species
+                            nslvd = 87  ! number of short-lived (non-advected) species
       integer :: clscnt(5) = 0
       integer :: cls_rxt_cnt(4,5) = 0
       integer :: clsmap(gas_pcnst,5) = 0
