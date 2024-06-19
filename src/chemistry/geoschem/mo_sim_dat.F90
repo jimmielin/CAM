@@ -53,7 +53,7 @@
       !   1. cam/bld/configure variable $chem_nadv
       !   2. cam/src/chemistry/geoschem/chem_mods.F90 vars gas_pcnst and nTracersMax
       ! Also update adv_mass to store MWs for species in solsym (ewl, 8/8/22)
-      solsym(:356) = (/ &
+      solsym(:357) = (/ &
       'ACET           ', 'ACTA           ', 'AERI           ', &
       'ALD2           ', 'ALK4           ', 'AONITA         ', &
       'AROMP4         ', 'AROMP5         ', 'ASOA1          ', &
@@ -164,15 +164,16 @@
       'LTRO2N         ', 'LXRO2H         ', 'LXRO2N         ', &
       'MACR1OO        ', 'MACRNO2        ', 'MCO3           ', &
       'MCROHOO        ', 'MO2            ', 'MVKOHOO        ', &
-      'N              ', 'N2             ', 'NRO2           ', &
-      'O              ', 'O1D            ', 'O2             ', &
-      'OH             ', 'OLND           ', 'OLNN           ', &
-      'OTHRO2         ', 'PCO            ', 'PH2O2          ', &
-      'PH2SO4         ', 'PIO2           ', 'PO2            ', &
-      'POX            ', 'PRN1           ', 'PSO4           ', &
-      'PSO4AQ         ', 'R4N1           ', 'R4O2           ', &
-      'RCO3           ', 'RCOOH          ', 'ROH            ', &
-      'TRO2           ', 'XRO2           '  /)
+      'N              ', 'N2             ', 'NAP            ', &
+      'NRO2           ', 'O              ', 'O1D            ', &
+      'O2             ', 'OH             ', 'OLND           ', &
+      'OLNN           ', 'OTHRO2         ', 'PCO            ', &
+      'PH2O2          ', 'PH2SO4         ', 'PIO2           ', &
+      'PO2            ', 'POX            ', 'PRN1           ', &
+      'PSO4           ', 'PSO4AQ         ', 'R4N1           ', &
+      'R4O2           ', 'RCO3           ', 'RCOOH          ', &
+      'ROH            ', 'TRO2           ', 'XRO2           '  &
+      /)
 
       inv_lst(:  6)  = (/ 'M               ', 'N2              ', 'O2              ', &
                           'H2              ', 'MOH             ', 'RCOOH           ' /)
@@ -180,7 +181,7 @@
       fix_mass(:  6) = (/ 0.00000000_r8, 28.0134800_r8, 31.9988000_r8, 2.020000_r8,  32.050000_r8, &
                           74.090000_r8 /)
 
-      adv_mass(:356) = (/ &
+      adv_mass(:357) = (/ &
                58.09_r8,          60.06_r8,          126.9_r8, &
                44.06_r8,          58.12_r8,         189.12_r8, &
                68.08_r8,           98.1_r8,          150.0_r8, &
@@ -291,15 +292,16 @@
               173.16_r8,         187.19_r8,         187.19_r8, &
               101.09_r8,          180.1_r8,          75.05_r8, &
               119.11_r8,          47.04_r8,         119.11_r8, &
-               14.01_r8,          28.02_r8,         159.17_r8, &
-                16.0_r8,           16.0_r8,           32.0_r8, &
-               17.01_r8,         230.27_r8,         230.27_r8, &
-               61.07_r8,          28.01_r8,          34.02_r8, &
-               96.06_r8,         185.27_r8,           91.1_r8, &
-                48.0_r8,         136.09_r8,          96.06_r8, &
-               96.06_r8,         150.13_r8,          89.13_r8, &
-               89.08_r8,          74.09_r8,          60.11_r8, &
-              173.16_r8,         187.19_r8  /)
+               14.01_r8,          28.02_r8,         128.18_r8, &
+              159.17_r8,           16.0_r8,           16.0_r8, &
+                32.0_r8,          17.01_r8,         230.27_r8, &
+              230.27_r8,          61.07_r8,          28.01_r8, &
+               34.02_r8,          96.06_r8,         185.27_r8, &
+                91.1_r8,           48.0_r8,         136.09_r8, &
+               96.06_r8,          96.06_r8,         150.13_r8, &
+               89.13_r8,          89.08_r8,          74.09_r8, &
+               60.11_r8,         173.16_r8,         187.19_r8  &
+      /)
 
       extfrc_lst(: 34) = (/ 'NO              ', 'CO              ', 'SO2             ', 'SO4             ', &
                            'NH3             ', 'ACET            ', 'ALD2            ', 'ALK4            ', &
