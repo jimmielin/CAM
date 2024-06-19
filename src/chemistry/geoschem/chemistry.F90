@@ -378,7 +378,7 @@ contains
           cnstName    = TRIM(tracerNames(I))
           trueName    = cnstName
           lngName     = cnstName
-          MWTmp       = 1000.0e+0_r8 * (0.001e+0_r8)
+          MWTmp       = adv_mass(I)   ! Mass is available in mo_sim_dat: adv_mass for all spc (hplin, 6/19/24)
           refmmr      = 1.0e-38_r8
        ENDIF
 
