@@ -1424,7 +1424,7 @@ if ($chem_pkg =~ '_mam3') {
 if ($chem_pkg =~ 'geoschem') {
     $chem_cppdefs .= ' -DEXTERNAL_GRID -DEXTERNAL_FORCING ';
     if ($chem_pkg =~ '_mam4') {
-        $chem_nadv = 267; # includes GC advected species (233), CO2 (1), and MAM aerosols (33)
+        $chem_nadv = 269; # includes GC advected species (233), CO2 (1), and MAM aerosols (33)
     }
 }
 # CARMA sectional microphysics

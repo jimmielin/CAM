@@ -7,7 +7,7 @@
       implicit none
       save
 
-      INTEGER, PARAMETER   :: nTracersMax = 267    ! Must be equal to chem_nadv
+      INTEGER, PARAMETER   :: nTracersMax = 269    ! Must be equal to chem_nadv
       INTEGER              :: nTracers
       REAL(r8)             :: ref_MMR(pcnst)
 
@@ -62,7 +62,7 @@
                             rxntot = 212, & ! number of total reactions
                             gascnt = 172, & ! number of gas phase reactions
                             nabscol = 2, & ! number of absorbing column densities
-                            gas_pcnst = 269, & ! number of "gas phase" species (same as solsym length)
+                            gas_pcnst = 355, & ! number of "gas phase" species (same as solsym length)
                                                ! Includes GC advected species (233), MAM aerosols (33),
                                                ! and CO2 (1), as well as any non-advected species added
                                                ! to solsym and mo_sim_dat.F90.
