@@ -3834,6 +3834,9 @@ contains
     ! Reset photolysis rates
     State_Chm(LCHNK)%Phot%ZPJ = 0.0e+0_r8
 
+    ! Reset RC flag (used by pbuf_get_index above)
+    RC = GC_SUCCESS
+
     ! Perform chemistry
     CALL Do_Chemistry( Input_Opt  = Input_Opt,         &
                        State_Chm  = State_Chm(LCHNK),  &
