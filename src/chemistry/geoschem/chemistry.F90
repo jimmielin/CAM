@@ -252,7 +252,7 @@ contains
     ! Options needed by Init_State_Chm
     IO%ITS_A_FULLCHEM_SIM  = .True.
     IO%LLinoz              = .True.
-    IO%LPRT                = .False.
+    IO%Verbose             = .False.
     IO%N_Advect            = nTracers
     DO I = 1, nTracers
        IO%AdvectSpc_Name(I) = TRIM(tracerNames(I))
@@ -971,7 +971,6 @@ contains
     use geoschem_history_mod,     only : HistoryExports_SetServices
 
     ! GEOS-Chem modules
-    use Chemistry_Mod,         only : Init_Chemistry
     use DiagList_Mod,          only : Init_DiagList, Print_DiagList
     use Drydep_Mod,            only : depName, Ndvzind
     use Error_Mod,             only : Init_Error
@@ -983,6 +982,7 @@ contains
     use isorropiaII_Mod,       only : Init_IsorropiaII
     use Linear_Chem_Mod,       only : Init_Linear_Chem
     use Linoz_Mod,             only : Linoz_Read
+    use Photolysis_Mod,        only : Init_Photolysis
     use PhysConstants,         only : PI, PI_180, Re
     use Pressure_Mod,          only : Accept_External_ApBp
     use State_Chm_Mod,         only : Ind_
@@ -1149,7 +1149,7 @@ contains
     Input_Opt%applyQtend             = .False.
 
     ! correctConvUTLS: Apply photolytic correction for convective scavenging of soluble tracers?
-    Input_Opt%correctConvUTLS        = .true.
+    ! Input_Opt%correctConvUTLS        = .true. ! not in 14.2.1
 
     IF ( .NOT. Input_Opt%LSOA ) THEN
        CALL ENDRUN('CESM2-GC requires the complex SOA option to be on!')
@@ -1356,7 +1356,7 @@ contains
     ENDIF
 
     ! Set a flag to denote if we should print ND70 debug output
-    prtDebug            = ( Input_Opt%LPRT .and. MasterProc )
+    prtDebug            = ( Input_Opt%Verbose .and. MasterProc )
 
     historyConfigFile = 'HISTORY.rc'
     ! This requires geoschem_config.yml and HISTORY.rc to be in the run directory
@@ -1574,15 +1574,13 @@ contains
 
     IF ( Input_Opt%Its_A_FullChem_Sim .OR. &
          Input_Opt%Its_An_Aerosol_Sim ) THEN
-       ! This also initializes Fast-JX
-       CALL Init_Chemistry( Input_Opt  = Input_Opt,            &
+       CALL Init_Photolysis( Input_Opt  = Input_Opt,            &
                             State_Chm  = State_Chm(BEGCHUNK),  &
                             State_Diag = State_Diag(BEGCHUNK), &
-                            State_Grid = State_Grid(BEGCHUNK), &
                             RC         = RC                    )
 
        IF ( RC /= GC_SUCCESS ) THEN
-          ErrMsg = 'Error encountered in "Init_Chemistry"!'
+          ErrMsg = 'Error encountered in "Init_Photolysis"!'
           CALL Error_Stop( ErrMsg, ThisLoc )
        ENDIF
     ENDIF
@@ -1843,11 +1841,9 @@ contains
     use Aerosol_Mod,         only : Set_AerMass_Diagnostic
     use Calc_Met_Mod,        only : Set_Dry_Surface_Pressure, AirQnt
     use Chemistry_Mod,       only : Do_Chemistry
-    use CMN_FJX_MOD,         only : ZPJ
     use CMN_Size_Mod,        only : NSURFTYPE, PTop
     use Diagnostics_Mod,     only : Zero_Diagnostics_StartOfTimestep, Set_Diagnostics_EndofTimestep
     use Drydep_Mod,          only : Do_Drydep, DEPNAME, NDVZIND, Update_DryDepFreq
-    use FAST_JX_MOD,         only : RXN_NO2, RXN_O3_1
     use GC_Grid_Mod,         only : SetGridFromCtr
     use HCO_Interface_GC_Mod,only : Compute_Sflx_For_Vdiff
     use Linear_Chem_Mod,     only : TrID_GC, GC_Bry_TrID, NSCHEM
@@ -3758,7 +3754,7 @@ contains
     ENDDO
 
     ! Reset photolysis rates
-    ZPJ = 0.0e+0_r8
+    State_Chm(LCHNK)%Phot%ZPJ = 0.0e+0_r8
 
     ! Perform chemistry
     CALL Do_Chemistry( Input_Opt  = Input_Opt,         &
@@ -3800,7 +3796,7 @@ contains
        CALL pbuf_get_field(pbuf_chnk, tmpIdx, pbuf_i)
 
        ! RXN_NO2: NO2 + hv --> NO  + O
-       pbuf_i(:nY) = ZPJ(1,RXN_NO2,1,:nY)
+       pbuf_i(:nY) = State_Chm(LCHNK)%Phot%ZPJ(1,State_Chm(LCHNK)%Phot%RXN_NO2,1,:nY)
 
        pbuf_chnk => NULL()
        pbuf_i    => NULL()
@@ -3815,7 +3811,7 @@ contains
        CALL pbuf_get_field(pbuf_chnk, tmpIdx, pbuf_i)
 
        ! RXN_O3_1: O3  + hv --> O2  + O
-       pbuf_i(:nY) = ZPJ(1,RXN_O3_1,1,:nY)
+       pbuf_i(:nY) = State_Chm(LCHNK)%Phot%ZPJ(1,State_Chm(LCHNK)%Phot%RXN_O3_1,1,:nY)
        pbuf_chnk => NULL()
        pbuf_i   => NULL()
     ENDIF
@@ -4266,7 +4262,6 @@ contains
     ! GEOS-Chem modules
     use Aerosol_Mod,     only : Cleanup_Aerosol
     use Carbon_Mod,      only : Cleanup_Carbon
-    use CMN_FJX_Mod,     only : Cleanup_CMN_FJX
     use Drydep_Mod,      only : Cleanup_Drydep
     use Dust_Mod,        only : Cleanup_Dust
     use Error_Mod,       only : Cleanup_Error
@@ -4307,12 +4302,6 @@ contains
     CALL GC_Emissions_Final
 
     CALL short_lived_species_final()
-
-    CALL Cleanup_CMN_FJX( RC )
-    IF ( RC /= GC_SUCCESS ) THEN
-       ErrMsg = 'Error encountered in "Cleanup_CMN_FJX"!'
-       CALL Error_Stop( ErrMsg, ThisLoc )
-    ENDIF
 
     ! Cleanup Input_Opt
     CALL Cleanup_Input_Opt( Input_Opt, RC )
