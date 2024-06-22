@@ -1135,7 +1135,7 @@ contains
     ! First setup directories
     Input_Opt%Chem_Inputs_Dir      = TRIM(geoschem_cheminputs)
     Input_Opt%SpcDatabaseFile      = TRIM(speciesDB)
-    Input_Opt%FAST_JX_DIR          = TRIM(geoschem_cheminputs)//'FAST_JX/v2020-02/'
+    Input_Opt%FAST_JX_DIR          = TRIM(geoschem_cheminputs)//'FAST_JX/v2021-10/'
 
     !----------------------------------------------------------
     ! CESM-specific input flags
@@ -1562,6 +1562,7 @@ contains
 
     ! Once the initial met fields have been read in, we need to find
     ! the maximum PBL level for the non-local mixing algorithm.
+    ! This populates module-local variables so only has to be done on BEGCHUNK, as of v14.2. (hplin, 6/22/24)
     CALL Max_PblHt_For_Vdiff( Input_Opt  = Input_Opt,            &
                               State_Grid = State_Grid(BEGCHUNK), &
                               State_Met  = State_Met(BEGCHUNK),  &
@@ -1574,15 +1575,20 @@ contains
 
     IF ( Input_Opt%Its_A_FullChem_Sim .OR. &
          Input_Opt%Its_An_Aerosol_Sim ) THEN
-       CALL Init_Photolysis( Input_Opt  = Input_Opt,            &
-                            State_Chm  = State_Chm(BEGCHUNK),  &
-                            State_Diag = State_Diag(BEGCHUNK), &
-                            RC         = RC                    )
+       ! NOTE hplin 6/22/24: as a result of migration of CMN_FJX variables to State_Chm%Phot,
+       ! initialization has to be done on ALL chunks. This will have to eventually be done
+       ! for a lot of initialization here that is only done on BEGCHUNK.
+       DO I = BEGCHUNK, ENDCHUNK
+           CALL Init_Photolysis( Input_Opt  = Input_Opt,            &
+                                State_Chm  = State_Chm(I),  &
+                                State_Diag = State_Diag(I), &
+                                RC         = RC                    )
 
-       IF ( RC /= GC_SUCCESS ) THEN
-          ErrMsg = 'Error encountered in "Init_Photolysis"!'
-          CALL Error_Stop( ErrMsg, ThisLoc )
-       ENDIF
+           IF ( RC /= GC_SUCCESS ) THEN
+              ErrMsg = 'Error encountered in "Init_Photolysis"!'
+              CALL Error_Stop( ErrMsg, ThisLoc )
+           ENDIF
+       ENDDO
     ENDIF
 
     ! hplin 3/3/23: note, since we moved UCX module variables to
