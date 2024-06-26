@@ -72,6 +72,7 @@ module chemistry
   CHARACTER(LEN=500) :: speciesDB = 'species_database.yml'
 
   CHARACTER(LEN=shr_kind_cl) :: geoschem_chem_inputs
+  CHARACTER(LEN=shr_kind_cl) :: geoschem_aeropt_inputs
   CHARACTER(LEN=shr_kind_cl) :: geoschem_photol_inputs
 
   ! Debugging
@@ -1163,10 +1164,11 @@ contains
                           State_Grid = maxGrid,   &
                           RC         = RC        )
 
-    ! First setup directories
+    ! First setup directories. FAST-JX directory is still used for
+    ! optical properties of aerosols outside of Cloud-J.
     Input_Opt%Chem_Inputs_Dir      = TRIM(geoschem_chem_inputs)
     Input_Opt%SpcDatabaseFile      = TRIM(speciesDB)
-    Input_Opt%FAST_JX_DIR          = TRIM(geoschem_photol_inputs)
+    Input_Opt%FAST_JX_DIR          = TRIM(geoschem_aeropt_inputs)
     Input_Opt%CLOUDJ_DIR           = TRIM(geoschem_photol_inputs)
 
     !----------------------------------------------------------
@@ -1812,6 +1814,7 @@ contains
     character(len=*), parameter :: subname = 'geoschem_readnl'
 
     namelist /geoschem_nl/ geoschem_chem_inputs
+    namelist /geoschem_nl/ geoschem_aeropt_inputs
     namelist /geoschem_nl/ geoschem_photol_inputs
 
     ! Read namelist
@@ -1833,6 +1836,11 @@ contains
     CALL mpi_bcast(geoschem_chem_inputs, LEN(geoschem_chem_inputs), mpi_character, masterprocid, mpicom, ierr)
     IF ( ierr /= mpi_success ) then
        CALL endrun(subname//': MPI_BCAST ERROR: geoschem_chem_inputs')
+    ENDIF
+
+    CALL mpi_bcast(geoschem_aeropt_inputs, LEN(geoschem_aeropt_inputs), mpi_character, masterprocid, mpicom, ierr)
+    IF ( ierr /= mpi_success ) then
+       CALL endrun(subname//': MPI_BCAST ERROR: geoschem_aeropt_inputs')
     ENDIF
 
     CALL mpi_bcast(geoschem_photol_inputs, LEN(geoschem_photol_inputs), mpi_character, masterprocid, mpicom, ierr)
