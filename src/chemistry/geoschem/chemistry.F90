@@ -1224,8 +1224,8 @@ contains
        ENDIF
 
        ! Set grid metadata. This has to be after State_Grid is initialized.
-       State_Grid(I)%ID = I
-       State_Grid(I)%ROOT_ID = BEGCHUNK
+       State_Grid(I)%CPU_Subdomain_ID = I
+       State_Grid(I)%CPU_Subdomain_FirstID = BEGCHUNK
 
        State_Grid(I)%NX = nX
        State_Grid(I)%NY = NCOL(I)
