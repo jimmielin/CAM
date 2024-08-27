@@ -7,7 +7,7 @@
       implicit none
       save
 
-      INTEGER, PARAMETER   :: nTracersMax = 269    ! = chem_nadv in cam/bld/configure
+      INTEGER, PARAMETER   :: nTracersMax = 270    ! = chem_nadv in cam/bld/configure
       INTEGER              :: nTracers
       REAL(r8)             :: ref_MMR(pcnst)
 
