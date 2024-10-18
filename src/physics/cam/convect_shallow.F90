@@ -289,7 +289,7 @@
          write(iulog,*) 'MFINTI: Convection will be capped at intfc ', limcnv, ' which is ', pref_edge(limcnv), ' pascals'
      end if
 
-     call mfinti( rair, cpair, gravit, latvap, rhoh2o, limcnv) ! Get args from inti.F90
+     call mfinti( rair, cpair, gravit, latvap, rhoh2o, pref_edge) ! Get args from inti.F90
 
   case('UW') ! Park and Bretherton shallow convection scheme
 
@@ -561,6 +561,14 @@
 
       call pbuf_get_field(pbuf, qpert_idx, qpert)
       qpert(:ncol,2:pcnst) = 0._r8
+
+        ! subroutine cmfmca(lchnk   ,ncol    , &
+        !                   nstep   ,ztodt     ,pmid    ,pdel    , &
+        !                   rpdel   ,zm      ,tpert   ,qpert   ,phis    , &
+        !                   pblh    ,t       ,q       ,cmfdt   ,dq      , &
+        !                   cmfmc   ,cmfdqr  ,cmfsl   ,cmflq   ,precc   , &
+        !                   qc      ,cnt     ,cnb     ,icwmr   ,rliq    , &
+        !                   pmiddry ,pdeldry ,rpdeldry)
 
       call cmfmca( lchnk        ,  ncol         ,                                               &
                    nstep        ,  ztodt        ,  state%pmid ,  state%pdel  ,                  &
