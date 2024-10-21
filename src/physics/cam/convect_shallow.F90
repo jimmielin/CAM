@@ -361,7 +361,7 @@
    use camsrfexch,      only : cam_in_t
 
    use constituents,    only : pcnst, cnst_get_ind, cnst_get_type_byind
-   use hk_conv,         only : cmfmca
+   use hk_conv,         only : cmfmca_cam
    use uwshcu,          only : compute_uwshcu_inv
    use unicon_cam,      only : unicon_out_t, unicon_cam_tend
 
@@ -562,15 +562,7 @@
       call pbuf_get_field(pbuf, qpert_idx, qpert)
       qpert(:ncol,2:pcnst) = 0._r8
 
-        ! subroutine cmfmca(lchnk   ,ncol    , &
-        !                   nstep   ,ztodt     ,pmid    ,pdel    , &
-        !                   rpdel   ,zm      ,tpert   ,qpert   ,phis    , &
-        !                   pblh    ,t       ,q       ,cmfdt   ,dq      , &
-        !                   cmfmc   ,cmfdqr  ,cmfsl   ,cmflq   ,precc   , &
-        !                   qc      ,cnt     ,cnb     ,icwmr   ,rliq    , &
-        !                   pmiddry ,pdeldry ,rpdeldry)
-
-      call cmfmca( lchnk        ,  ncol         ,                                               &
+      call cmfmca_cam( lchnk        ,  ncol         ,                                               &
                    nstep        ,  ztodt        ,  state%pmid ,  state%pdel  ,                  &
                    state%rpdel  ,  state%zm     ,  tpert      ,  qpert       ,  state%phis  ,   &
                    pblh         ,  state%t      ,  state%q    ,  ptend_loc%s ,  ptend_loc%q ,   &

@@ -1,5 +1,10 @@
 ! CAM interface for Hack shallow moist convection
 module hk_conv
+   use shr_kind_mod,     only: r8 => shr_kind_r8
+   use cam_logfile,      only: iulog
+   use spmd_utils,       only: masterproc
+   use cam_abortutils,   only: endrun
+
    implicit none
    private
    save
@@ -16,6 +21,9 @@ module hk_conv
    ! Namelist variables
    real(r8) :: hkconv_c0 = unset_r8
    real(r8) :: hkconv_cmftau = unset_r8
+
+   real(r8) :: cmftau      ! characteristic adjustment time scale set from namelist input hkconv_cmftau
+   real(r8) :: c0          ! rain water autoconversion coefficient set from namelist input hkconv_c0
 
 contains
    subroutine hkconv_readnl(nlfile)
@@ -70,7 +78,7 @@ contains
       real(r8), intent(in) :: gravit            ! acceleration due to gravity
       real(r8), intent(in) :: latvap            ! latent heat of vaporization
       real(r8), intent(in) :: rhowtr            ! density of liquid water (STP)
-      real(kind_phys), intent(in)  :: pref_edge(:) ! reference pressures at interface [Pa]
+      real(r8), intent(in)  :: pref_edge(:) ! reference pressures at interface [Pa]
 
       character(len=512)   :: errmsg
       integer              :: errflg
@@ -127,7 +135,8 @@ contains
       real(r8), intent(in) :: rpdeldry(pcols,pver)   ! 1./pdel
       real(r8), intent(in) :: zm(pcols,pver)      ! height abv sfc at midpoints
       real(r8), intent(in) :: tpert(pcols)        ! PBL perturbation theta
-      real(r8), intent(in) :: qpert(pcols,pcnst)  ! PBL perturbation specific humidity
+      ! Note: this is inout to replicate behavior in convect_shallow that resets non-water constituents qpert to 0.
+      real(r8), intent(inout) :: qpert(pcols,pcnst)  ! PBL perturbation specific humidity
       real(r8), intent(in) :: phis(pcols)         ! surface geopotential
       real(r8), intent(in) :: pblh(pcols)         ! PBL height (provided by PBL routine)
       real(r8), intent(in) :: t(pcols,pver)       ! temperature (t bar)
@@ -194,7 +203,7 @@ contains
          cnt_sh = cnt(:ncol), &
          cnb_sh = cnb(:ncol), &
          icwmr = icwmr(:ncol,:), &
-         rliq = rliq(:ncol) &
+         rliq_sh = rliq(:ncol) &
       )
    end subroutine cmfmca_cam
 
