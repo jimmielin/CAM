@@ -3702,7 +3702,7 @@
 
 <!-- GEOS-Chem chemistry -->
 <geoschem_chem_inputs chem="geoschem_mam4">atm/cam/geoschem/emis/ExtData/CHEM_INPUTS</geoschem_chem_inputs>
-<geoschem_aeropt_inputs chem="geoschem_mam4">atm/cam/geoschem/emis/ExtData/CHEM_INPUTS/FAST_JX/v2024-05/</geoschem_aeropt_inputs>
 <geoschem_photol_inputs chem="geoschem_mam4">atm/cam/geoschem/emis/ExtData/CHEM_INPUTS/CLOUD_J/v2023-05/</geoschem_photol_inputs>
+<geoschem_aeropt_inputs chem="geoschem_mam4">atm/cam/geoschem/ExtData/CHEM_INPUTS/Aerosol_Optics/v2024-08/</geoschem_aeropt_inputs>
 
 </namelist_defaults>
