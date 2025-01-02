@@ -466,18 +466,12 @@ contains
     qpert_idx = pbuf_get_index( 'qpert',ierr)
     if (qpert_idx > 0) then
        call infld(fieldname, fh_ini, dim1name, dim2name, 1, pcols, begchunk, endchunk, &
-            tptr, found, gridname='physgrid')
+            tptr(:,:), found, gridname='physgrid')
        if(.not. found) then
-          tptr=0_r8
+          tptr(:,:) = 0._r8
           if (masterproc) write(iulog,*) trim(fieldname), ' initialized to 0.'
        end if
-
-       allocate(tptr3d_2(pcols,pcnst,begchunk:endchunk))
-       tptr3d_2 = 0_r8
-       tptr3d_2(:,1,:) = tptr(:,:)
-
-       call pbuf_set_field(pbuf2d, qpert_idx, tptr3d_2)
-       deallocate(tptr3d_2)
+       call pbuf_set_field(pbuf2d, qpert_idx, tptr)
     end if
 
     fieldname='CUSH'
@@ -731,6 +725,7 @@ contains
     use co2_cycle,          only: co2_init, co2_transport
     use convect_deep,       only: convect_deep_init
     use convect_shallow,    only: convect_shallow_init
+    use constituents,       only: cnst_get_ind
     use cam_diagnostics,    only: diag_init
     use gw_drag,            only: gw_init
     use radheat,            only: radheat_init
@@ -787,7 +782,7 @@ contains
 
     ! local variables
     integer :: lchnk
-    integer :: ierr
+    integer :: ierr, ixq
 
     logical :: history_budget              ! output tendencies and state variables for
                                            ! temperature, water vapor, cloud
@@ -966,7 +961,8 @@ contains
 
     ! Initialize CAM CCPP constituent properties array
     ! for use in CCPP-ized physics schemes:
-    call ccpp_const_props_init()
+    call cnst_get_ind('Q', ixq)
+    call ccpp_const_props_init(ixq)
 
     ! Initialize qneg3 and qneg4
     call qneg_init()
