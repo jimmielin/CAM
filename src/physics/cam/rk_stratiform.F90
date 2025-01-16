@@ -82,7 +82,10 @@ contains
 
    use namelist_utils,  only: find_group_name
    use units,           only: getunit, freeunit
-   use cldwat,          only: cldwat_init
+
+   use prognostic_cloud_water, only: prognostic_cloud_water_init
+   use physconst,       only: tmelt, rhodair, pi
+
    use mpishorthand
 
    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
@@ -90,6 +93,9 @@ contains
    ! Local variables
    integer :: unitn, ierr
    character(len=*), parameter :: subname = 'rk_stratiform_readnl'
+
+   character(len=512) :: errmsg
+   integer            :: errflg
 
    ! Namelist variables
    real(r8) :: rk_strat_icritw  = unset_r8    !   icritw  = threshold for autoconversion of warm ice
@@ -128,8 +134,27 @@ contains
 
    do_psrhmin = rk_strat_polstrat_rhmin .ne. unset_r8
 
-   call cldwat_init(rk_strat_icritw,rk_strat_icritc,rk_strat_conke,&
-                    rk_strat_r3lcrit,rk_strat_polstrat_rhmin,do_psrhmin)
+   ! call cldwat_init(rk_strat_icritw,rk_strat_icritc,rk_strat_conke,&
+   !                  rk_strat_r3lcrit,rk_strat_polstrat_rhmin,do_psrhmin)
+
+   call prognostic_cloud_water_init(&
+      amIRoot = masterproc, &
+      iulog   = iulog, &
+      tmelt   = tmelt, &
+      rhodair = rhodair, &
+      pi      = pi, &
+      icritc_in = rk_strat_icritc, &
+      icritw_in = rk_strat_icritw, &
+      conke_in  = rk_strat_conke,  &
+      r3lcrit_in = rk_strat_r3lcrit, &
+      do_psrhmin_in = do_psrhmin, &
+      psrhmin_in = rk_strat_polstrat_rhmin, &
+      errmsg = errmsg, &
+      errflg = errflg)
+
+   if(errflg /= 0) then
+      call endrun(subname // errmsg)
+   endif
 
 end subroutine rk_stratiform_readnl
 
@@ -162,23 +187,23 @@ subroutine rk_stratiform_register
    call pbuf_add_field('LCWAT',  'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), lcwat_idx)
    call pbuf_add_field('TCWAT',  'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), tcwat_idx)
 
-   call pbuf_add_field('CLD',    'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), cld_idx)
-   call pbuf_add_field('AST',    'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), ast_idx)
-   call pbuf_add_field('CONCLD', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), concld_idx)
+   call pbuf_add_field('CLD',    'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), cld_idx) ! cloud_area_fraction
+   call pbuf_add_field('AST',    'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), ast_idx) ! stratiform_cloud_area_fraction
+   call pbuf_add_field('CONCLD', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), concld_idx) ! convective_cloud_area_fraction
 
-   call pbuf_add_field('FICE',   'physpkg', dtype_r8, (/pcols,pver/), fice_idx)
+   call pbuf_add_field('FICE',   'physpkg', dtype_r8, (/pcols,pver/), fice_idx) ! mass_fraction_of_ice_content_within_stratiform_cloud
 
-   call pbuf_add_field('QME',       'physpkg', dtype_r8, (/pcols,pver/), qme_idx)
-   call pbuf_add_field('PRAIN',     'physpkg', dtype_r8, (/pcols,pver/), prain_idx)
-   call pbuf_add_field('NEVAPR',    'physpkg', dtype_r8, (/pcols,pver/), nevapr_idx)
+   call pbuf_add_field('QME',       'physpkg', dtype_r8, (/pcols,pver/), qme_idx) ! net_condensation_rate_due_to_microphysics
+   call pbuf_add_field('PRAIN',     'physpkg', dtype_r8, (/pcols,pver/), prain_idx) ! precipitation_production_due_to_microphysics
+   call pbuf_add_field('NEVAPR',    'physpkg', dtype_r8, (/pcols,pver/), nevapr_idx) ! precipitation_evaporation_due_to_microphysics
 
-   call pbuf_add_field('WSEDL',     'physpkg', dtype_r8, (/pcols,pver/), wsedl_idx)
+   call pbuf_add_field('WSEDL',     'physpkg', dtype_r8, (/pcols,pver/), wsedl_idx) ! ??
 
-   call pbuf_add_field('REI',       'physpkg', dtype_r8, (/pcols,pver/), rei_idx)
-   call pbuf_add_field('REL',       'physpkg', dtype_r8, (/pcols,pver/), rel_idx)
+   call pbuf_add_field('REI',       'physpkg', dtype_r8, (/pcols,pver/), rei_idx) ! effective_radius_of_stratiform_cloud_ice_particle
+   call pbuf_add_field('REL',       'physpkg', dtype_r8, (/pcols,pver/), rel_idx) ! effective_radius_of_stratiform_cloud_liquid_water_particle
 
-   call pbuf_add_field('LS_FLXPRC', 'physpkg', dtype_r8, (/pcols,pverp/), ls_flxprc_idx)
-   call pbuf_add_field('LS_FLXSNW', 'physpkg', dtype_r8, (/pcols,pverp/), ls_flxsnw_idx)
+   call pbuf_add_field('LS_FLXPRC', 'physpkg', dtype_r8, (/pcols,pverp/), ls_flxprc_idx) ! effective_radius_of_stratiform_cloud_liquid_water_particle
+   call pbuf_add_field('LS_FLXSNW', 'physpkg', dtype_r8, (/pcols,pverp/), ls_flxsnw_idx) ! stratiform_snow_flux_at_interface
 
 end subroutine rk_stratiform_register
 
@@ -246,7 +271,6 @@ subroutine rk_stratiform_init()
    use convect_shallow, only: convect_shallow_use_shfrc
    use phys_control,    only: cam_physpkg_is
    use physconst,       only: tmelt, rhodair, rh2o
-   use cldwat,          only: inimc
 
    integer :: m, mm
    logical :: history_amwg         ! output the variables used by the AMWG diag package
@@ -399,16 +423,16 @@ subroutine rk_stratiform_init()
    call addfld ('CLDLIQCON', (/ 'lev' /),  'A', 'kg/kg', 'Convective CLDLIQ')
    call addfld ('CLDICECON', (/ 'lev' /),  'A', 'kg/kg', 'Convective CLDICE')
 
-   cmfmc_sh_idx = pbuf_get_index('CMFMC_SH')
-   prec_str_idx = pbuf_get_index('PREC_STR')
-   snow_str_idx = pbuf_get_index('SNOW_STR')
-   prec_pcw_idx = pbuf_get_index('PREC_PCW')
-   snow_pcw_idx = pbuf_get_index('SNOW_PCW')
-   prec_sed_idx = pbuf_get_index('PREC_SED')
+   cmfmc_sh_idx = pbuf_get_index('CMFMC_SH') !atmosphere_convective_mass_flux_due_to_shallow_convection
+   prec_str_idx = pbuf_get_index('PREC_STR') ! stratiform_rain_and_snow_surface_flux_due_to_sedimentation
+   snow_str_idx = pbuf_get_index('SNOW_STR') ! lwe_snow_and_cloud_ice_precipitation_rate_at_surface_due_to_microphysics
+   prec_pcw_idx = pbuf_get_index('PREC_PCW') ! lwe_stratiform_precipitation_rate_at_surface
+   snow_pcw_idx = pbuf_get_index('SNOW_PCW') ! lwe_snow_precipitation_rate_at_surface_due_to_microphysics
+   prec_sed_idx = pbuf_get_index('PREC_SED') ! stratiform_cloud_water_surface_flux_due_to_sedimentation
    snow_sed_idx = pbuf_get_index('SNOW_SED')
 
    ! Initialize cldwat with constants.
-   call inimc(tmelt, rhodair/1000.0_r8, gravit, rh2o)
+   !call inimc(tmelt, rhodair/1000.0_r8, gravit, rh2o)
 
 end subroutine rk_stratiform_init
 
@@ -434,9 +458,15 @@ subroutine rk_stratiform_tend( &
    use physics_types,    only: physics_state_dealloc
    use cam_history,      only: outfld
    use physics_buffer,   only: physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx
-   use pkg_cld_sediment, only: cld_sediment_vel, cld_sediment_tend
-   use cldwat,           only: pcond
-   use pkg_cldoptics,    only: cldefr
+   use cloud_particle_sedimentation, only: cloud_particle_sedimentation_run
+
+   use prognostic_cloud_water, only: prognostic_cloud_water_run
+   use prognostic_cloud_water, only: icritc !REMOVECAM no longer need to be public after CAM is retired
+   use physconst,        only: gravit, rhoh2o, epsilo, latvap, latice, cpair, tmelt
+   use physconst,        only: rair, rh2o
+   use ref_pres,         only: trop_cloud_top_lev
+
+   use cloud_optical_properties,    only: cldefr
    use phys_control,     only: cam_physpkg_is
    use tropopause,       only: tropopause_find_cam
    use phys_grid,        only: get_rlat_all_p
@@ -576,6 +606,8 @@ subroutine rk_stratiform_tend( &
    real(r8) :: rlat(pcols)
    real(r8) :: dlat(pcols)
    real(r8), parameter :: rad2deg = 180._r8/pi
+   character(len=512) :: errmsg
+   integer            :: errflg
 
    ! ======================================================================
 
@@ -586,7 +618,7 @@ subroutine rk_stratiform_tend( &
 
    ! Associate pointers with physics buffer fields
 
-   call pbuf_get_field(pbuf, landm_idx,   landm)
+   call pbuf_get_field(pbuf, landm_idx,   landm) ! smoothed_land_area_fraction
 
    itim_old = pbuf_old_tim_idx()
    call pbuf_get_field(pbuf, qcwat_idx,   qcwat,   start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
@@ -630,9 +662,11 @@ subroutine rk_stratiform_tend( &
       troplev(:) = 0
       !REMOVECAM_END
       call tropopause_find_cam(state, troplev)
-      call get_rlat_all_p(lchnk,ncol,rlat)
-      dlat(:ncol) = rlat(:ncol)*rad2deg
    endif
+
+   ! rlat, dlat required for CCPPized scheme
+   call get_rlat_all_p(lchnk,ncol,rlat)
+   dlat(:ncol) = rlat(:ncol)*rad2deg
 
    ! ------------- !
    ! Sedimentation !
@@ -644,24 +678,54 @@ subroutine rk_stratiform_tend( &
 
    call t_startf('stratiform_sediment')
 
-   call cld_sediment_vel( ncol,                                                           &
-                          icefrac, landfrac, ocnfrac, state1%pmid, state1%pdel, state1%t, &
-                          cld, state1%q(:,:,ixcldliq), state1%q(:,:,ixcldice),            &
-                          pvliq, pvice, landm, snowh )
-
-   wsedl(:ncol,:pver) = pvliq(:ncol,:pver)/gravit/(state1%pmid(:ncol,:pver)/(287.15_r8*state1%t(:ncol,:pver)))
-
    lq(:)        = .FALSE.
    lq(1)        = .TRUE.
    lq(ixcldice) = .TRUE.
    lq(ixcldliq) = .TRUE.
    call physics_ptend_init(ptend_loc, state%psetcols, 'pcwsediment', ls=.true., lq=lq)! Initialize local ptend type
 
-   call cld_sediment_tend( ncol, dtime ,                                                             &
-                           state1%pint, state1%pmid, state1%pdel, state1%t,                          &
-                           cld, state1%q(:,:,ixcldliq), state1%q(:,:,ixcldice), pvliq, pvice,        &
-                           ptend_loc%q(:,:,ixcldliq), ptend_loc%q(:,:,ixcldice), ptend_loc%q(:,:,1), &
-                           ptend_loc%s, rain, snow_sed )
+   ! Call CCPP-ized subroutine for cld_sediment_vel and cld_sediment_tend combined
+   call cloud_particle_sedimentation_run( &
+     ncol                = ncol,                           &
+     pver                = pver,                           &
+     pverp               = pverp,                          &
+     dtime               = dtime,                          &
+     tmelt               = tmelt,                          &
+     gravit              = gravit,                         &
+     latvap              = latvap,                         &
+     latice              = latice,                         &
+     rair                = rair,                           &
+     rhoh2o              = rhoh2o,                         &
+     icritc              = icritc,                         &
+     pint                = state1%pint(:ncol,:),           &
+     pmid                = state1%pmid(:ncol,:),           &
+     pdel                = state1%pdel(:ncol,:),           &
+     t                   = state1%t(:ncol,:),              &
+     cloud               = cld(:ncol,:),                   &
+     icefrac             = icefrac(:ncol),                 &
+     landfrac            = landfrac(:ncol),                &
+     ocnfrac             = ocnfrac(:ncol),                 &
+     cldliq              = state1%q(:ncol,:,ixcldliq),     &
+     cldice              = state1%q(:ncol,:,ixcldice),     &
+     snowh               = snowh(:ncol),                    &
+     landm               = landm(:ncol),                    &
+     ! Outputs
+     pvliq               = pvliq(:ncol,:),                 &
+     pvice               = pvice(:ncol,:),                 &
+     liqtend             = ptend_loc%q(:ncol,:,ixcldliq),  &
+     icetend             = ptend_loc%q(:ncol,:,ixcldice),  &
+     wvtend              = ptend_loc%q(:ncol,:,1),         & ! assumes wv is at 1
+     htend               = ptend_loc%s(:ncol,:),           &
+     sfliq               = rain(:ncol),                    & ! mass units (not precip units)
+     sfice               = snow_sed(:ncol),                & ! mass units (not precip units)
+     errmsg              = errmsg,                         &
+     errflg              = errflg)
+
+   if(errflg /= 0) then
+      call endrun('rk_stratiform_tend:' // errmsg)
+   endif
+
+   wsedl(:ncol,:pver) = pvliq(:ncol,:pver)/gravit/(state1%pmid(:ncol,:pver)/(287.15_r8*state1%t(:ncol,:pver)))
 
    ! Convert rain and snow fluxes at the surface from [kg/m2/s] to [m/s]
    ! Compute total precipitation flux at the surface in [m/s]
@@ -851,14 +915,74 @@ subroutine rk_stratiform_tend( &
    call pbuf_get_field(pbuf, ls_flxsnw_idx, rkflxsnw)
 
    call t_startf('pcond')
-   call pcond( lchnk, ncol, troplev, dlat,                                 &
-               state1%t, ttend, state1%q(1,1,1), qtend, state1%omega,      &
-               totcw, state1%pmid , state1%pdel, cld, fice, fsnow,         &
-               qme, prain, prodsnow, nevapr, evapsnow, evapheat, prfzheat, &
-               meltheat, prec_pcw, snow_pcw, dtime, fwaut,                 &
-               fsaut, fracw, fsacw, fsaci, ltend,                          &
-               rhdfda, rhu00, landm, icefrac, state1%zi, ice2pr, liq2pr,   &
-               liq2snow, snowh, rkflxprc, rkflxsnw, pracwo, psacwo, psacio )
+   ! call pcond( lchnk, ncol, troplev, dlat,                                 &
+   !             state1%t, ttend, state1%q(1,1,1), qtend, state1%omega,      &
+   !             totcw, state1%pmid , state1%pdel, cld, fice, fsnow,         &
+   !             qme, prain, prodsnow, nevapr, evapsnow, evapheat, prfzheat, &
+   !             meltheat, prec_pcw, snow_pcw, dtime, fwaut,                 &
+   !             fsaut, fracw, fsacw, fsaci, ltend,                          &
+   !             rhdfda, rhu00, landm, icefrac, state1%zi, ice2pr, liq2pr,   &
+   !             liq2snow, snowh, rkflxprc, rkflxsnw, pracwo, psacwo, psacio )
+   ! call CCPP-ized subroutine
+   call prognostic_cloud_water_run( &
+      ncol            = ncol,                  &
+      pver            = pver,                  &
+      top_lev         = trop_cloud_top_lev,    &
+      deltat          = dtime,                 &
+      iulog           = iulog,                 &
+      pi              = pi,                    &
+      gravit          = gravit,                &
+      rh2o            = rh2o,                  &
+      epsilo          = epsilo,                &
+      latvap          = latvap,                &
+      latice          = latice,                &
+      cpair           = cpair,                 &
+      dlat            = dlat(:ncol),           &
+      rlat            = rlat(:ncol),           &
+      p               = state1%pmid(:ncol,:),  &
+      pdel            = state1%pdel(:ncol,:),  &
+      zi              = state1%zi(:ncol,:),    &
+      troplev         = troplev(:ncol),        &
+      ttend           = ttend(:ncol,:),        &
+      tn              = state1%t(:ncol,:),     &
+      qtend           = qtend(:ncol,:),        &
+      qn              = state1%q(:ncol,:,1),   & ! assumes wv is at 1
+      lctend          = ltend(:ncol,:),        &
+      cwat            = totcw(:ncol,:),        &
+      omega           = state1%omega(:ncol,:), &
+      cldn            = cld(:ncol,:),          &
+      fice            = fice(:ncol,:),         &
+      fsnow           = fsnow(:ncol,:),        &
+      rhdfda          = rhdfda(:ncol,:),       &
+      rhu00           = rhu00(:ncol,:),        &
+      landm           = landm(:ncol),          &
+      seaicef         = icefrac(:ncol),        &
+      snowh           = snowh(:ncol),          &
+      ! below output
+      cme             = qme(:ncol,:),          &
+      prodprec        = prain(:ncol,:),        &
+      prodsnow        = prodsnow(:ncol,:),     & ! ignored in rk?
+      evapprec        = nevapr(:ncol,:),       &
+      evapsnow        = evapsnow(:ncol,:),     &
+      evapheat        = evapheat(:ncol,:),     &
+      prfzheat        = prfzheat(:ncol,:),     &
+      meltheat        = meltheat(:ncol,:),     &
+      precip          = prec_pcw(:ncol),       &
+      snowab          = snow_pcw(:ncol),       &
+      ice2pr          = ice2pr(:ncol,:),       &
+      liq2pr          = liq2pr(:ncol,:),       &
+      liq2snow        = liq2snow(:ncol,:),     &
+      lsflxprc        = rkflxprc(:ncol,:),     &
+      lsflxsnw        = rkflxsnw(:ncol,:),     &
+      pracwo          = pracwo(:ncol,:),       &
+      psacwo          = psacwo(:ncol,:),       &
+      psacio          = psacio(:ncol,:),       &
+      errmsg          = errmsg,                &
+      errflg          = errflg)
+   if(errflg /= 0) then
+      call endrun('rk_stratiform_tend:' // errmsg)
+   endif
+
    call t_stopf('pcond')
 
    lq(:)        = .FALSE.
@@ -1006,7 +1130,7 @@ subroutine rk_stratiform_tend( &
 
    ! Cloud water and ice particle sizes, saved in physics buffer for radiation
 
-   call cldefr( lchnk, ncol, landfrac, state1%t, rel, rei, state1%ps, state1%pmid, landm, icefrac, snowh )
+   call cldefr( ncol, pver, tmelt, landfrac, state1%t, rel, rei, state1%ps, state1%pmid, landm, icefrac, snowh )
 
    call outfld('REL', rel, pcols, lchnk)
    call outfld('REI', rei, pcols, lchnk)

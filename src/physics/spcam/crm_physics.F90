@@ -765,7 +765,7 @@ end subroutine crm_init_cnst
 #endif
 #ifdef SPCAM_CLUBB_SGS
      use cloud_cover_diags, only: cloud_cover_diags_out
-     use pkg_cldoptics,     only: cldovrlap
+     use cloud_optical_properties,     only: cldovrlap
 #endif
 
 #endif

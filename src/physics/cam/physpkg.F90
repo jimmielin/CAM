@@ -2478,6 +2478,13 @@ contains
        !===================================================
        call t_startf('rk_stratiform_tend')
 
+       ! hplin
+       if (trim(cam_take_snapshot_before) == "user_set") then
+            call cam_snapshot_all_outfld_tphysbc(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf, &
+                 flx_heat, cmfmc, cmfcme, zdu, rliq, rice, dlf, dlf2, rliq2, det_s, det_ice, net_flx)
+       end if
+       ! / hplin
+
        call rk_stratiform_tend(state, ptend, pbuf, ztodt, &
             cam_in%icefrac, cam_in%landfrac, cam_in%ocnfrac, &
             cam_in%snowhland, & ! sediment
@@ -2486,7 +2493,22 @@ contains
             cmfmc,  &
             cam_in%ts,      cam_in%sst,        zdu)
 
+       ! hplin
+       if ( (trim(cam_take_snapshot_after) == "user_set") .and. &
+         (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
+            call cam_snapshot_ptend_outfld(ptend, lchnk)
+       end if
+       ! / hplin
+
        call physics_update(state, ptend, ztodt, tend)
+
+       ! hplin
+       if (trim(cam_take_snapshot_after) == "user_set") then
+           call cam_snapshot_all_outfld_tphysbc(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf, &
+               flx_heat, cmfmc, cmfcme, zdu, rliq, rice, dlf, dlf2, rliq2, det_s, det_ice, net_flx)
+       end if
+       ! / hplin
+
        call check_energy_cam_chng(state, tend, "cldwat_tend", nstep, ztodt, zero, prec_str, snow_str, zero)
 
        call t_stopf('rk_stratiform_tend')

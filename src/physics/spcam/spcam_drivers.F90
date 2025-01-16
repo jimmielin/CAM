@@ -11,7 +11,7 @@ use crmdims,          only: crm_nx, crm_ny, crm_nz
 use radiation,        only: rad_out_t
 use physics_buffer,   only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
 use physics_types,    only: physics_state, physics_state_copy, physics_ptend
-use pkg_cldoptics,    only: cldems, cldovrlap, cldefr
+use cloud_optical_properties,    only: cldems, cldovrlap, cldefr
 use phys_grid,        only: get_rlat_all_p, get_rlon_all_p
 use cam_history,      only: outfld
 use cam_history_support, only : fillvalue
@@ -1631,6 +1631,8 @@ subroutine spcam_radiation_setup_sam1mom(cam_in, cldn, state, pbuf, rad_avgdata,
     use physics_buffer,  only: physics_buffer_desc, pbuf_get_field
     use physics_buffer,  only: pbuf_old_tim_idx
 
+    use physconst,       only: tmelt
+
     type(cam_in_t),                  intent(in)             :: cam_in
     real(r8), dimension(:,:),        intent(out)            :: cldn
     type(physics_state),             intent(in)             :: state
@@ -1797,7 +1799,7 @@ subroutine spcam_radiation_setup_sam1mom(cam_in, cldn, state, pbuf, rad_avgdata,
 
 
     ! Compute effective sizes
-    call cldefr(lchnk, ncol, cam_in%landfrac, state%t, rel, rei, state%ps, state%pmid, landm, cam_in%icefrac, cam_in%snowhland)
+    call cldefr(ncol, pver, tmelt, cam_in%landfrac, state%t, rel, rei, state%ps, state%pmid, landm, cam_in%icefrac, cam_in%snowhland)
 
     cicewp(1:ncol,1:pver) = 0._r8
     cliqwp(1:ncol,1:pver) = 0._r8
@@ -1899,9 +1901,9 @@ subroutine spcam_radiation_col_setup_sam1mom(ii, jj, state_loc, pbuf, rad_avgdat
     !  Cloud emissivity.
 
     tmp(:ncol,:) = cicewp(:ncol,:) + cliqwp(:ncol,:)
-    call cldems(lchnk, ncol, tmp, fice, rei, emis, cldtau)
+    call cldems(ncol, tmp, fice, rei, emis, cldtau)
 
-    call cldovrlap(lchnk, ncol, state_loc%pint, cld, nmxrgn, pmxrgn)
+    call cldovrlap(ncol, state_loc%pint, cld, nmxrgn, pmxrgn)
 
     ! Setup the trad and qvrad variables (now in state)
     do m=1,crm_nz
