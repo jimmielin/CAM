@@ -684,9 +684,6 @@ contains
 
     endif
 
-    cldice  (:,:)      = 0.0_r8
-    cldliq  (:,:)      = 0.0_r8
-
     stratochem: if ( has_strato_chem ) then
        !-----------------------------------------------------------------------
        !        ... initialize condensed and gas phases; all hno3 to gas
@@ -768,28 +765,29 @@ contains
        call outfld( 'GAMMA_HET6', gprob_hobr_hcl(:ncol,:), ncol, lchnk )
        call outfld( 'WTPER',      wtper         (:ncol,:), ncol, lchnk )
 
+       !rpf_CESM2_SLH
+       call icesad_trop_calc( lchnk, invariants(:ncol,:,indexm), pmb, tfld, h2o_cond, strato_sad(:ncol,:), &
+            radius_trop, sad_ice_trop, ncol, troplev, pbuf )
+       call icesad_trop_calc( lchnk, invariants(:ncol,:,indexm), pmb, tfld, h2o_liq,  strato_sad(:ncol,:), &
+            radius_trop, sad_liq_trop, ncol, troplev, pbuf )
+
+       sad_ice_trop_orig(:,:) = sad_ice_trop(:,:)
+       do k = 1,pver
+          do i = 1,ncol
+             !Check that we will not duplicate het reactions in the stratosphere and troposphere.
+             if( sad_strat(i,k,3) > 0._r8 .and. sad_ice_trop(i,k) > 0._r8 ) then
+                sad_ice_trop(i,k) = 0._r8
+             end if
+          end do
+       end do
+
+       call outfld( 'SAD_ICETROP',  sad_ice_trop(:,:),      ncol, lchnk )
+       call outfld( 'SAD_ICEORIG',  sad_ice_trop_orig(:,:), ncol, lchnk )
+       call outfld( 'SAD_LIQTROP',  sad_liq_trop(:,:),      ncol, lchnk )
+       !rpf_CESM2_SLH
+
     endif stratochem
 
-!rpf_CESM2_SLH
-    call icesad_trop_calc( lchnk, invariants(:ncol,:,indexm), pmb, tfld, h2o_cond, strato_sad(:ncol,:), &
-                           radius_trop, sad_ice_trop, ncol, troplev, pbuf )
-    call icesad_trop_calc( lchnk, invariants(:ncol,:,indexm), pmb, tfld, h2o_liq,  strato_sad(:ncol,:), &
-                           radius_trop, sad_liq_trop, ncol, troplev, pbuf )
-
-    sad_ice_trop_orig(:,:) = sad_ice_trop(:,:)
-    do k = 1,pver
-       do i = 1,ncol
-          !Check that we will not duplicate het reactions in the stratosphere and troposphere.
-          if( sad_strat(i,k,3) > 0._r8 .and. sad_ice_trop(i,k) > 0._r8 ) then
-             sad_ice_trop(i,k) = 0._r8
-          end if
-       end do
-    end do
-
-    call outfld( 'SAD_ICETROP',  sad_ice_trop(:,:),      ncol, lchnk )
-    call outfld( 'SAD_ICEORIG',  sad_ice_trop_orig(:,:), ncol, lchnk )
-    call outfld( 'SAD_LIQTROP',  sad_liq_trop(:,:),      ncol, lchnk )
-!rpf_CESM2_SLH
 
 !      NOTE: For gas-phase solver only.
 !            ratecon_sfstrat needs total hcl.

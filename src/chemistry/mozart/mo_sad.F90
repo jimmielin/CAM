@@ -598,7 +598,7 @@ sts_nat_sad : &
       real(r8), intent(in)    ::  sad_sage    (ncol,pver)    ! SAGEII surface area density (cm2 aer. cm-3 air)
       real(r8), intent(in)    ::  press       (ncol,pver)    ! Pressure, hPa
       real(r8), intent(in)    ::  temper      (pcols,pver)   ! Temperature (K)
-      real(r8), intent(inout) ::  h2o_cond    (ncol,pver)    ! H2O condensed phase  (mole fraction)
+      real(r8), intent(in)    ::  h2o_cond    (ncol,pver)    ! H2O condensed phase  (mole fraction)
       real(r8), intent(out)   ::  radius_trop (ncol,pver)    ! Radius of Sulfate, NAT, and ICE (cm)
       real(r8), intent(out)   ::  sad_trop    (ncol,pver)    ! Surface area density of Sulfate, NAT, ICE (cm2 cm-3)
       integer,  intent(in)    ::  troplev     (pcols)
