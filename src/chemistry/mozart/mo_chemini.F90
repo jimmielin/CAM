@@ -69,11 +69,12 @@ contains
     use mo_strato_rates,   only : init_strato_rates
     use mo_cph,            only : init_cph
     use mo_sad,            only : sad_inti
+    use mo_sad,            only : sadtrop_inti
     use euvac,             only : euvac_init
     use mo_heatnirco2,     only : heatnirco2_init
     use mo_waccm_hrates,   only : init_hrates
     use mo_aurora,         only : aurora_inti
-    use clybry_fam,        only : clybry_fam_init
+    use clybryiy_fam,        only : clybryiy_fam_init
     use mo_neu_wetdep,     only : neu_wetdep_init
     use physics_buffer,    only : physics_buffer_desc
     use cam_abortutils,    only : endrun
@@ -165,8 +166,10 @@ contains
     !-----------------------------------------------------------------------
     !	... initialize the sad module
     !-----------------------------------------------------------------------
-    call sad_inti(pbuf2d)
+    call sad_inti()
     if (masterproc) write(iulog,*) 'chemini: after sad_inti on node ',iam
+    call sadtrop_inti()
+    if (masterproc) write(iulog,*) 'chemini: after sadtrop_inti on node ',iam
 
     !-----------------------------------------------------------------------
     !	... initialize the dry deposition module
@@ -210,7 +213,7 @@ contains
     call neu_wetdep_init()
     if (masterproc) write(iulog,*) 'chemini: after wetdep_init'
 
-    call clybry_fam_init()
+    call clybryiy_fam_init()
 
     if (masterproc) write(iulog,*) 'chemini: finished on node ',iam
 
