@@ -453,7 +453,7 @@ contains
     integer :: beglev(ncol)
     integer :: endlev(ncol)
 
-    sad_ssa = nan
+    sad_ssa = -huge(1._r8)
 
     beglev(:ncol)=ltrop(:ncol)+1
     endlev(:ncol)=pver
