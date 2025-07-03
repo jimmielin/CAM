@@ -484,7 +484,6 @@ contains
     real(r8) :: sad_sslt_eff(ncol,pver)         ! surf area density of sea-salt ( cm^2/cm^3 )
     real(r8) :: clno2_yield (ncol,pver)         ! originally implemented by jfl
 
-    real(r8), dimension(ncol)  :: troplev_id
 !rpf_CESM2_SLH
 
 !
@@ -590,12 +589,6 @@ contains
     !        ... Xform from mmr to vmr
     !-----------------------------------------------------------------------
     call mmr2vmr( mmr(:ncol,:,:), vmr(:ncol,:,:), mbar(:ncol,:), ncol )
-
-!rpf_CESM2_SLH
-    do i = 1, ncol
-      troplev_id (i) = 1._r8 * troplev(i) !vertical index of tropopause level
-    end do
-!rpf_CESM2_SLH
 
 !
 ! CCMI
@@ -787,7 +780,6 @@ contains
        !rpf_CESM2_SLH
 
     endif stratochem
-
 
 !      NOTE: For gas-phase solver only.
 !            ratecon_sfstrat needs total hcl.
@@ -1197,6 +1189,8 @@ contains
                     nhx_nitrogen_flx(:ncol), noy_nitrogen_flx(:ncol) )
 
     call rate_diags_calc( reaction_rates(:,:,:), vmr(:,:,:), invariants(:,:,indexm), ncol, lchnk )
+
+    call outfld('TROPLEV', real(troplev(:ncol),r8), ncol, lchnk )
 !
 ! jfl
 !
