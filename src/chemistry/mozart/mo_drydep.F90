@@ -44,9 +44,9 @@ module mo_drydep
   integer :: pan_ndx, mpan_ndx, o3_ndx, ch4_ndx, co_ndx, h2_ndx, ch3cooh_ndx
   integer :: sogm_ndx, sogi_ndx, sogt_ndx, sogb_ndx, sogx_ndx
 
-!rpf_CESM2_SLH
-  integer :: o3s_ndx
-!rpf_CESM2_SLH
+!!$!rpf_CESM2_SLH
+!!$  integer :: o3s_ndx
+!!$!rpf_CESM2_SLH
 
   integer :: so2_ndx, ch3cn_ndx, hcn_ndx, hcooh_ndx
 
@@ -267,11 +267,11 @@ contains
 
 !rpf_CESM2_SLH
 ! rpf: Implemented here follwoing CCMI implementation in CESM1. Not sure if needed
-    if( o3s_ndx>0 .and. o3_ndx>0 ) then
-       if( has_dvel(o3s_ndx) ) then
-          dvelocity(:ncol,o3s_ndx) = dvelocity(:ncol,o3_ndx)
-       endif
-    endif
+!!$    if( o3s_ndx>0 .and. o3_ndx>0 ) then
+!!$       if( has_dvel(o3s_ndx) ) then
+!!$          dvelocity(:ncol,o3s_ndx) = dvelocity(:ncol,o3_ndx)
+!!$       endif
+!!$    endif
 !rpf_CESM2_SLH
        !
        ! ordc (May 17, 2012):
@@ -507,9 +507,9 @@ contains
        endif
     enddo
 
-!rpf_CESM2_SLH
-    o3s_ndx      = get_spc_ndx( 'O3S' )
-!rpf_CESM2_SLH
+!!$!rpf_CESM2_SLH
+!!$    o3s_ndx      = get_spc_ndx( 'O3S' )
+!!$!rpf_CESM2_SLH
 
     do i=1,nddvels
        if ( mapping(i) > 0 ) then

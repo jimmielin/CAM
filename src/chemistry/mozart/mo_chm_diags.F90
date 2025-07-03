@@ -48,8 +48,7 @@ module mo_chm_diags
 !rpf Now #_species(:) and #_specvsl(:) arrays are duplicated so we can use the same chm_diag routine independently of using VSLs or not
 !rpf #_species(:) arrays are the original ones, and #_specvsl(:) are the ones indluding VSL chemistry
   integer :: nox_species(3),  noy_species(56)
-! integer :: clox_species(6), cloy_species(9), tcly_species(21)
-  integer :: clox_species(6), cloy_species(10), tcly_species(22)
+  integer :: clox_species(6), cloy_species(9), tcly_species(21)
   integer :: brox_species(4), broy_species(6), tbry_species(13)
 !rpf_CESM2_SLH
   integer :: foy_species(4),  tfy_species(16)
@@ -375,10 +374,8 @@ contains
 !... CLOY species
     clox_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo /)
 !rpf_CESM2_SLH
-!   cloy_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl /)
-    cloy_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl, id_cofcl /)
-!   tcly_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl, &
-    tcly_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl, id_cofcl, &
+    cloy_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl /)
+    tcly_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl, &
                       id_ccl4, id_cfc11, id_cfc113, id_cfc114, id_cfc115, id_ch3ccl3, id_cfc12, id_ch3cl, &
                       id_hcfc22, id_hcfc141b, id_hcfc142b, id_cf2clbr /)
 !rpf_CESM2_SLH
