@@ -357,6 +357,10 @@
     <alias>FC2000climo_GC</alias>
     <lname>2000_CAM60%GEOSCHEM%HEMCO_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
+  <compset>
+    <alias>FC2000climo_SLH</alias>
+    <lname>2000_CAM60%CSLH_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
 
   <compset>
     <alias>FCARMA2000climo</alias>
@@ -579,6 +583,10 @@
   <compset>
     <alias>FW2000climo</alias>
     <lname>2000_CAM60%WCTS_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+  <compset>
+    <alias>FW2000climo_SLH</alias>
+    <lname>2000_CAM60%WSLH_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
 
   <compset>
