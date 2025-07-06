@@ -5,17 +5,17 @@
       use shr_kind_mod, only : r8 => shr_kind_r8
       implicit none
       save
-      integer, parameter :: phtcnt = 180, & ! number of photolysis reactions
-                            rxntot = 755, & ! number of total reactions
+      integer, parameter :: phtcnt = 179, & ! number of photolysis reactions
+                            rxntot = 754, & ! number of total reactions
                             gascnt = 575, & ! number of gas phase reactions
                             nabscol = 2, & ! number of absorbing column densities
-                            gas_pcnst = 274, & ! number of "gas phase" species
+                            gas_pcnst = 272, & ! number of "gas phase" species
                             nfs = 2, & ! number of "fixed" species
                             relcnt = 0, & ! number of relationship species
                             grpcnt = 0, & ! number of group members
                             nzcnt = 2868, & ! number of non-zero matrix entries
                             extcnt = 21, & ! number of species with external forcing
-                            clscnt1 = 4, & ! number of species in explicit class
+                            clscnt1 = 2, & ! number of species in explicit class
                             clscnt2 = 0, & ! number of species in hov class
                             clscnt3 = 0, & ! number of species in ebi class
                             clscnt4 = 270, & ! number of species in implicit class
@@ -23,7 +23,7 @@
                             indexm = 1, & ! index of total atm density in invariant array
                             indexh2o = 0, & ! index of water vapor density
                             clsze = 1, & ! loop length for implicit chemistry
-                            rxt_tag_cnt = 755, &
+                            rxt_tag_cnt = 754, &
                             enthalpy_cnt = 41, &
                             nslvd = 50
       integer :: clscnt(5) = 0

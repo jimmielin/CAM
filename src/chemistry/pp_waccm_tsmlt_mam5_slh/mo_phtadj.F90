@@ -20,6 +20,7 @@
       real(r8) :: im(ncol,nlev)
       do k = 1,nlev
          im(:ncol,k) = 1._r8 / m(:ncol,k)
+         p_rate(:,k,141) = p_rate(:,k,141) * inv(:,k, 2) * im(:,k)
          p_rate(:,k,142) = p_rate(:,k,142) * inv(:,k, 2) * im(:,k)
          p_rate(:,k,143) = p_rate(:,k,143) * inv(:,k, 2) * im(:,k)
          p_rate(:,k,144) = p_rate(:,k,144) * inv(:,k, 2) * im(:,k)
@@ -27,7 +28,6 @@
          p_rate(:,k,146) = p_rate(:,k,146) * inv(:,k, 2) * im(:,k)
          p_rate(:,k,147) = p_rate(:,k,147) * inv(:,k, 2) * im(:,k)
          p_rate(:,k,148) = p_rate(:,k,148) * inv(:,k, 2) * im(:,k)
-         p_rate(:,k,149) = p_rate(:,k,149) * inv(:,k, 2) * im(:,k)
       end do
       end subroutine phtadj
       end module mo_phtadj
