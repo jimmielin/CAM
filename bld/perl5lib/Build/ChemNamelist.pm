@@ -124,8 +124,8 @@ sub set_dep_lists
         }
     }
 
-    return ( $gas_wetdep_list, $gas_wetdep_ice_uptake_list, $aer_wetdep_list, $aer_drydep_list,
-	     $aer_sol_facti, $aer_sol_factb, $aer_scav_coef, $gas_drydep_list ) ;
+    return ( $gas_wetdep_list, $gas_wetdep_ice_uptake_list, $aer_wetdep_list,
+	     $aer_sol_facti, $aer_sol_factb, $aer_scav_coef, $gas_drydep_list, $aer_drydep_list ) ;
 
 }
 

@@ -584,7 +584,7 @@ if ( ($chem ne 'none') or ( $prog_species ) ){
     my $chem_src_dir = $cfg->get('chem_src_dir');
 
     my ( $gas_wetdep_list, $gas_wetdep_ice_uptake_list, $aer_wetdep_list,
-         $aer_sol_facti, $aer_sol_factb, $aer_scav_coef, $aer_drydep_list, $gas_drydep_list ) =
+	 $aer_sol_facti, $aer_sol_factb, $aer_scav_coef, $gas_drydep_list, $aer_drydep_list ) =
            set_dep_lists( $chem, $cfgdir, $chem_proc_src, $chem_src_dir, $nl, $print );
 
     if (length($gas_wetdep_list)>2){
