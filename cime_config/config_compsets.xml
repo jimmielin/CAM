@@ -469,9 +469,13 @@
     <alias>FCnudged</alias>
     <lname>HIST_CAM60%CT1S%NUDG_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
-    <compset>
+  <compset>
     <alias>FCnudged_GC</alias>
     <lname>HIST_CAM60%GEOSCHEM%NUDG%HEMCO_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+  <compset>
+    <alias>FCnudged_SLH</alias>
+    <lname>HIST_CAM60%CSLH%NUDG_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
 
   <compset>

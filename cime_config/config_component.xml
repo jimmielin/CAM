@@ -301,6 +301,7 @@
       <value compset="HIST[CE]?_CAM7.*CT4S"  >hist_trop_strat_t4s_cam7</value>
       <value compset="1850[CE]?_CAM7.*CT4S"  >1850_trop_strat_t4s_cam7</value>
       <value compset="HIST_CAM60%.*CT[12]S%NUDG">hist_trop_strat_nudged_cam6</value>
+      <value compset="HIST_CAM60%CSLH%NUDG">hist_trop_strat_nudged_cam6_slh</value>
       <value compset="HIST_CAM60%CARMATS">carma_trop_strat_hist_cam6</value>
       <value compset="HIST_CAM60%CARMATS%NUDG">carma_trop_strat_nudged_cam6</value>
       <value compset="HIST_CAM60%CARMAWM">carma_waccm_ma_hist_cam6</value>
