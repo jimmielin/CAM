@@ -32,7 +32,7 @@
 <csw_time_type>SERIAL</csw_time_type>
 
 <ext_frc_type>INTERP_MISSING_MONTHS</ext_frc_type>
-<ext_frc_specifier chem="trop_strat_mam5_vbs" hgrid="0.9x1.25">
+<ext_frc_specifier hgrid="0.9x1.25">
          'bc_a4  -> $INPUTDATA_ROOT/atm/cam/chem/emis/emissions_ssp585/emissions-cmip6-ScenarioMIP_IAMC-REMIND-MAGPIE-ssp585-1-1_bc_a4_aircraft_vertical_mol_175001-210101_0.9x1.25_c20190224.nc',
          'NO2    -> $INPUTDATA_ROOT/atm/cam/chem/emis/emissions_ssp585/emissions-cmip6-ScenarioMIP_IAMC-REMIND-MAGPIE-ssp585-1-1_NO2_aircraft_vertical_mol_175001-210101_0.9x1.25_c20190224.nc',
          'num_a1 -> $INPUTDATA_ROOT/atm/cam/chem/emis/emissions_ssp585/emissions-cmip6-ScenarioMIP_IAMC-REMIND-MAGPIE-ssp585-1-1_num_so4_a1_anthro-ene_vertical_mol_175001-210101_0.9x1.25_c20190224.nc',
@@ -48,7 +48,7 @@
 </ext_frc_specifier>
 
 <srf_emis_type>INTERP_MISSING_MONTHS</srf_emis_type>
-<srf_emis_specifier chem="trop_strat_mam5_vbs" hgrid="0.9x1.25">
+<srf_emis_specifier hgrid="0.9x1.25">
 	 'BENZENE  -> $INPUTDATA_ROOT/atm/cam/chem/emis/emissions_ssp585/emissions-cmip6-ScenarioMIP_IAMC-REMIND-MAGPIE-ssp585-1-1_BENZENE_anthro_surface_mol_175001-210101_0.9x1.25_c20190224.nc',
 	 'BENZENE  -> $INPUTDATA_ROOT/atm/cam/chem/emis/emissions_ssp585/emissions-cmip6-ScenarioMIP_IAMC-REMIND-MAGPIE-ssp585-1-1_BENZENE_bb_surface_mol_175001-210101_0.9x1.25_c20190224.nc',
          'BIGALK   -> $INPUTDATA_ROOT/atm/cam/chem/emis/emissions_ssp585/emissions-cmip6-ScenarioMIP_IAMC-REMIND-MAGPIE-ssp585-1-1_BIGALK_anthro_surface_mol_175001-210101_0.9x1.25_c20190224.nc',
