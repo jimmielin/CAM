@@ -218,6 +218,8 @@ sub get_gas_drydep_list
     my $master_file = '';
     if ($chem =~ /geoschem/) {
       $master_file = "$cfg_dir/namelist_files/geoschem_master_gas_drydep_list.xml";
+    } elsif ($chem =~ /_slh/) {
+      $master_file = "$cfg_dir/namelist_files/slh_master_gas_drydep_list.xml";
     } else {
       $master_file = "$cfg_dir/namelist_files/mozart_master_gas_drydep_list.xml";
     }
@@ -274,6 +276,8 @@ sub get_gas_wetdep_list
     my $master_file = '';
     if ($chem =~ /geoschem/) {
       $master_file = "$cfg_dir/namelist_files/geoschem_master_gas_wetdep_list.xml";
+    } elsif ($chem =~ /_slh/) {
+      $master_file = "$cfg_dir/namelist_files/slh_master_gas_wetdep_list.xml";
     } else {
       $master_file = "$cfg_dir/namelist_files/mozart_master_gas_wetdep_list.xml";
     }
