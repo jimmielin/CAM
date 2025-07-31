@@ -297,7 +297,7 @@ contains
     use mo_setrxt,         only : setrxt
     use mo_adjrxt,         only : adjrxt
     use mo_phtadj,         only : phtadj
-    use mo_usrrxt,         only : usrrxt
+    use mo_usrrxt,         only : usrrxt, has_ice_trp_rxts
     use mo_setinv,         only : setinv
     use mo_negtrc,         only : negtrc
     use mo_sulf,           only : sulf_interp
@@ -522,6 +522,10 @@ contains
 
     ! initialize to NaN to hopefully catch user defined rxts that go unset
     reaction_rates(:,:,:) = nan
+
+    sad_ice_trop_orig(:,:) = nan
+    sad_ice_trop(:,:) = nan
+    sad_liq_trop(:,:) = nan
 
     delt_inverse = 1._r8 / delt
     !-----------------------------------------------------------------------
@@ -758,7 +762,10 @@ contains
        call outfld( 'GAMMA_HET6', gprob_hobr_hcl(:ncol,:), ncol, lchnk )
        call outfld( 'WTPER',      wtper         (:ncol,:), ncol, lchnk )
 
-       !rpf_CESM2_SLH
+    endif stratochem
+
+    !rpf_CESM2_SLH
+    if ( has_ice_trp_rxts ) then
        call icesad_trop_calc( lchnk, invariants(:ncol,:,indexm), pmb, tfld, h2o_cond, strato_sad(:ncol,:), &
             radius_trop, sad_ice_trop, ncol, troplev, pbuf )
        call icesad_trop_calc( lchnk, invariants(:ncol,:,indexm), pmb, tfld, h2o_liq,  strato_sad(:ncol,:), &
@@ -777,9 +784,9 @@ contains
        call outfld( 'SAD_ICETROP',  sad_ice_trop(:,:),      ncol, lchnk )
        call outfld( 'SAD_ICEORIG',  sad_ice_trop_orig(:,:), ncol, lchnk )
        call outfld( 'SAD_LIQTROP',  sad_liq_trop(:,:),      ncol, lchnk )
-       !rpf_CESM2_SLH
+    endif
+    !rpf_CESM2_SLH
 
-    endif stratochem
 
 !      NOTE: For gas-phase solver only.
 !            ratecon_sfstrat needs total hcl.

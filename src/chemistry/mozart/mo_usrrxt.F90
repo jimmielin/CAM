@@ -9,6 +9,7 @@ module mo_usrrxt
 
   private
   public :: usrrxt, usrrxt_inti, usrrxt_hrates
+  public :: has_ice_trp_rxts
 
   save
 
@@ -299,7 +300,7 @@ module mo_usrrxt
   integer :: usr_I2O4_ndx
   integer :: usr_IONO2_ndx
 
-  logical :: has_ice_trp_rxts
+  logical, protected :: has_ice_trp_rxts
   logical :: has_het_ss_rxts
   logical :: has_ss_ixoy_rxts
   logical :: has_aerosols
