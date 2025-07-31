@@ -14,12 +14,7 @@
       public  :: sad_inti
       public  :: sad_strat_calc
       public  :: sad_top
-
-!rpf_CESM3_SLH - merging SLH halogen routines in a single module
-      public  :: sadtrop_inti
       public  :: icesad_trop_calc
-      public  :: trop_sad_top
-!rpf_CESM3_SLH - merging SLH halogen routines in a single module
 
       save
 
@@ -31,11 +26,6 @@
       integer :: sad_top
       integer :: sad_topp
 
-!rpf_CESM3_SLH - merging SLH halogen routines in a single module
-      integer :: trop_sad_top
-      integer :: trop_sad_topp
-!rpf_CESM3_SLH - merging SLH halogen routines in a single module
-
     contains
 
 
@@ -43,8 +33,9 @@
 !----------------------------------------------------------------------
 !     ... initialize the sad module
 !----------------------------------------------------------------------
-      use cam_history,  only : addfld
+
       use ref_pres,     only : pref_mid_norm
+      use cam_history,  only : addfld
 
 !----------------------------------------------------------------------
 !	... Local variables
@@ -70,39 +61,6 @@
       call addfld( 'H2SO4M_C',   (/ 'lev' /), 'I',  'ug/m3', 'chemical sulfate aerosol mass' )
 
       end subroutine sad_inti
-
-!rpf_CESM3_SLH - merging SLH halogen routines in a single module
-      subroutine sadtrop_inti()
-!----------------------------------------------------------------------
-!     ... initialize the sad module
-!----------------------------------------------------------------------
-
-      use ref_pres,     only : pref_mid_norm
-
-!----------------------------------------------------------------------
-!	... Local variables
-!----------------------------------------------------------------------
-      integer  ::  k
-
-!----------------------------------------------------------------------
-!	... find level where etamids are all > 1 hPa
-!----------------------------------------------------------------------
-      trop_sad_top = 0
-      do k = pver,1,-1
-	 if( (pref_mid_norm(k)) < .001_r8 ) then
-             trop_sad_top = k
-             exit
-         end if
-      end do
-      trop_sad_topp = trop_sad_top + 1
-      if (masterproc) then
-         write(iulog,*) 'sad_inti: sad capped at level ',trop_sad_top
-         write(iulog,*) '          whose midpoint is ',pref_mid_norm(trop_sad_topp)*1.e3_r8,' hPa'
-      endif
-
-      end subroutine sadtrop_inti
-!rpf_CESM3_SLH - merging SLH halogen routines in a single module
-
 !===============================================================================
 ! ROUTINE
 !   sad_strat_calc
@@ -580,7 +538,6 @@ sts_nat_sad : &
       end subroutine sad_strat_calc
 
 
-!rpf_CESM3_SLH - merging SLH halogen routines in a single module
       subroutine icesad_trop_calc( lchnk, m, press, temper, h2o_cond, sad_sage, &
                                    radius_trop, sad_trop, ncol, troplev, pbuf )
 
@@ -652,7 +609,7 @@ sts_nat_sad : &
 !         mask_ice  = true .... H2O_COND > 0.0
 !======================================================================
 !======================================================================
-      do k = trop_sad_topp,pver
+      do k = sad_topp,pver
 	 do i = 1,ncol
 	    if( .not. mask_lbs(i,k) ) then
                mask_ice(i,k) = h2o_cond(i,k) > 0._r8
@@ -673,8 +630,8 @@ sts_nat_sad : &
       enddo
 
 all_ice : &
-      if( any( mask_ice(:,trop_sad_topp:pver) ) ) then
-         do k = trop_sad_topp,pver
+      if( any( mask_ice(:,sad_topp:pver) ) ) then
+         do k = sad_topp,pver
             where( mask_ice(:,k) )
 	       lcl_h2o_avail(:,k) = h2o_cond(:,k)
             endwhere
@@ -685,7 +642,7 @@ all_ice : &
          call ice_sad_calc( ncol, press, temp, m, lcl_h2o_avail, &
 			    lcl_sad_ice, lcl_radius_ice, mask_ice )
 
-         do k = trop_sad_topp,pver
+         do k = sad_topp,pver
             where( mask_ice(:,k) )
                sad_trop   (:,k) = lcl_sad_ice       (:,k)
                radius_trop(:,k) = lcl_radius_ice    (:,k)
@@ -695,8 +652,6 @@ all_ice : &
 
 
       end subroutine icesad_trop_calc
-!rpf_CESM3_SLH - merging SLH halogen routines in a single module
-
 
       subroutine nat_sat_temp( ncol, hno3_total, h2o_avail, press, tsat_nat, mask )
 
@@ -862,72 +817,6 @@ all_ice : &
       end do
 
       end subroutine ice_sad_calc
-
-
-!rpf_CESM3_SLH - merging SLH halogen routines in a single module
-      subroutine ice_tropsad_calc( ncol, press, temp, m, h2o_avail, &
-			       sad_ice, radius_ice, mask )
-
-      implicit none
-
-!----------------------------------------------------------------------
-!	... dummy arguments
-!----------------------------------------------------------------------
-      integer, intent(in)   :: ncol
-      real(r8), intent(in)  :: press     (ncol,pver)
-      real(r8), intent(in)  :: temp      (pcols,pver)
-      real(r8), intent(in)  :: m         (ncol,pver)
-      real(r8), intent(in)  :: h2o_avail (ncol,pver)
-      real(r8), intent(out) :: sad_ice   (ncol,pver)
-      real(r8), intent(out) :: radius_ice(ncol,pver)
-      logical, intent(in)   :: mask      (ncol,pver)
-
-!----------------------------------------------------------------------
-!	... local variables
-!----------------------------------------------------------------------
-      real(r8), parameter :: &
-                 avo_num       = 6.02214e23_r8, &
-                 aconst        = -2663.5_r8, &
-                 bconst        = 12.537_r8, &
-                 ice_mass_dens = 1._r8, &
-                 ice_part_dens = 1.e-1_r8, &
-                 mwh2o         = 18._r8, &
-                 sigma_ice     = 1.6_r8, &
-                 ice_dens_aer  = ice_mass_dens / (mwh2o/avo_num), &
-                 ice_dens_aeri = 1._r8/ice_dens_aer
-
-      integer  :: k
-      real(r8) :: h2o_cond_ice(ncol)      ! Condensed phase H2O (from CAM)
-      real(r8) :: voldens_ice (ncol)      ! Volume Density, um3 cm-3
-
-      do k = trop_sad_topp,pver
-	 where( mask(:,k) )
-!----------------------------------------------------------------------
-!     .... Convert condensed phase to molecules cm-3 units
-!----------------------------------------------------------------------
-	   h2o_cond_ice(:) = h2o_avail(:,k) * m(:,k)
-!----------------------------------------------------------------------
-!     .... ICE volume density .....
-!----------------------------------------------------------------------
-           voldens_ice(:) = h2o_cond_ice(:)*ice_dens_aeri
-!----------------------------------------------------------------------
-!     .... Calculate the SAD from log normal distribution .....
-!----------------------------------------------------------------------
-           sad_ice(:,k) = (four_pi*ice_part_dens)**one_thrd &
-                         *(3._r8*voldens_ice(:))**two_thrd &
-                         *exp( -(log( sigma_ice ))**2 )
-!----------------------------------------------------------------------
-!    .... Calculate the radius from log normal distribution .....
-!----------------------------------------------------------------------
-           radius_ice(:,k) = (3._r8*h2o_cond_ice(:) &
-                              /(ice_dens_aer*four_pi*ice_part_dens))**one_thrd &
-                             *exp( -1.5_r8*(log( sigma_ice ))**2 )
-         endwhere
-      end do
-
-      end subroutine ice_tropsad_calc
-!rpf_CESM3_SLH - merging SLH halogen routines in a single module
-
 
       subroutine sulfate_sad_calc( ncol, press, temp, h2o_avail, hno3_avail, hcl_avail, &
                                    sad_sage, m, hno3_gas, hno3_cond, &
@@ -1187,11 +1076,6 @@ all_ice : &
       real(r8), parameter :: avo_num          = 6.02214e23_r8, &
                              nat_mass_dens    = 1.6_r8, &
                              nat_part_dens    = 5.0e-4_r8, &
-!!$!rpf_CESM2_SLH
-!!$!                            nat_part_dens    = 1.0e-2_r8, &
-!!$! updated for TS1.2          nat_part_dens    = 5.0e-4_r8, &
-!!$                             nat_part_dens    = 1.0e-5_r8, &   ! Changed to this value following Doug's e-mail Oct 7, 2020
-!!$!rpf_CESM2_SLH
                              mwnat            = 117._r8, &
                              sigma_nat        = 1.6_r8, &
                              nat_dens_aer     = nat_mass_dens / (mwnat/avo_num), &

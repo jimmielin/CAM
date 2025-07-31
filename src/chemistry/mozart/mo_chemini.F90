@@ -69,7 +69,6 @@ contains
     use mo_strato_rates,   only : init_strato_rates
     use mo_cph,            only : init_cph
     use mo_sad,            only : sad_inti
-    use mo_sad,            only : sadtrop_inti
     use euvac,             only : euvac_init
     use mo_heatnirco2,     only : heatnirco2_init
     use mo_waccm_hrates,   only : init_hrates
@@ -168,8 +167,6 @@ contains
     !-----------------------------------------------------------------------
     call sad_inti()
     if (masterproc) write(iulog,*) 'chemini: after sad_inti on node ',iam
-    call sadtrop_inti()
-    if (masterproc) write(iulog,*) 'chemini: after sadtrop_inti on node ',iam
 
     !-----------------------------------------------------------------------
     !	... initialize the dry deposition module
