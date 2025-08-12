@@ -31,7 +31,9 @@ module carma_model_flags_mod
                                                                           ! "Clarke",  "Caffrey", "CMS", "CONST", or "NONE"
   character(len=32), public, protected  :: carma_BCOCemissions = 'Yu2015'
   character(len=32), public, protected  :: carma_SO4elevemis   = 'NONE'
+  character(len=32), public, protected  :: carma_ALelevemis   = 'NONE'
   character(len=256), public, protected :: carma_soilerosion_file  = 'NONE'
+  character(len=256), public, protected :: al2o3sat_file = 'NONE'
   character(len=256), public, protected :: BC_GAINS_filename   = 'NONE'
   character(len=256), public, protected :: OC_GAINS_filename   = 'NONE'
   character(len=256), public, protected :: BC_ship_filename    = 'NONE'
@@ -70,6 +72,7 @@ contains
       carma_seasalt_emis, &
       carma_BCOCemissions, &
       carma_SO4elevemis, &
+      carma_ALelevemis, &
       carma_soilerosion_file, &
       BC_GAINS_filename, &
       OC_GAINS_filename, &
@@ -77,6 +80,7 @@ contains
       OC_ship_filename, &
       BC_GFEDv3_filename, &
       OC_GFEDv3_filename, &
+      al2o3sat_file, &
       carma_dustemisfactor
 
     if (masterproc) then
@@ -99,12 +103,14 @@ contains
     call mpibcast(carma_seasalt_emis, len(carma_seasalt_emis), mpichar, 0, mpicom)
     call mpibcast(carma_BCOCemissions,len(carma_BCOCemissions), mpichar, 0, mpicom)
     call mpibcast(carma_SO4elevemis,  len(carma_SO4elevemis), mpichar, 0, mpicom)
+    call mpibcast(carma_ALelevemis,  len(carma_ALelevemis), mpichar, 0, mpicom)
     call mpibcast(BC_GAINS_filename,  len(BC_GAINS_filename), mpichar, 0, mpicom)
     call mpibcast(OC_GAINS_filename,  len(OC_GAINS_filename), mpichar, 0, mpicom)
     call mpibcast(BC_ship_filename,   len(BC_ship_filename), mpichar, 0, mpicom)
     call mpibcast(OC_ship_filename,   len(OC_ship_filename), mpichar, 0, mpicom)
     call mpibcast(BC_GFEDv3_filename, len(BC_GFEDv3_filename), mpichar, 0, mpicom)
     call mpibcast(OC_GFEDv3_filename, len(OC_GFEDv3_filename), mpichar, 0, mpicom)
+    call mpibcast(al2o3sat_file,      len(al2o3sat_file), mpichar, 0, mpicom)
     call mpibcast(carma_dustemisfactor,1,                      mpir8, 0,mpicom)
 #endif
 

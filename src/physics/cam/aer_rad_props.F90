@@ -13,7 +13,8 @@ use physics_types,    only: physics_state
 use physics_buffer,   only: physics_buffer_desc
 use radconstants,     only: nrh, nswbands, nlwbands, idx_sw_diag, ot_length
 use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_aer_mmr, &
-                            rad_cnst_get_aer_props
+                            rad_cnst_get_aer_props, rad_cnst_get_bin_props, &
+                            rad_cnst_get_bin_props_by_idx,rad_cnst_get_bin_mmr_by_idx
 use wv_saturation,    only: qsat
 use modal_aer_opt,    only: modal_aero_sw, modal_aero_lw
 use coreshell_aer_opt,only: coreshell_aero_sw, coreshell_aero_lw
@@ -133,7 +134,7 @@ subroutine aer_rad_props_sw(list_idx, state, pbuf,  nnite, idxnite, &
 
    integer :: ncol
    integer :: lchnk
-   integer :: k       ! index
+   integer :: k, i, m, l      ! index
    integer :: troplev(pcols)
 
    ! optical props for each aerosol
@@ -161,8 +162,10 @@ subroutine aer_rad_props_sw(list_idx, state, pbuf,  nnite, idxnite, &
 
    ! aerosol masses
    real(r8), pointer :: aermmr(:,:)    ! mass mixing ratio of aerosols
+   real(r8), pointer :: specmmr(:,:)    ! mass mixing ratio of aerosols
    real(r8) :: mmr_to_mass(pcols,pver) ! conversion factor for mmr to mass
    real(r8) :: aermass(pcols,pver)     ! mass of aerosols
+   real(r8) :: specdens                ! species densities
 
    ! for table lookup into rh grid
    real(r8) :: es(pcols,pver)     ! saturation vapor pressure
@@ -225,6 +228,36 @@ subroutine aer_rad_props_sw(list_idx, state, pbuf,  nnite, idxnite, &
       call modal_aero_sw(list_idx, state, pbuf, nnite, idxnite, &
                          tau, tau_w, tau_w_g, tau_w_f)
    end if
+
+   if (nbins > 0) then
+     do m = 1, nbins
+      ! get optics type
+      call rad_cnst_get_bin_props(list_idx, m, opticstype=opticstype)
+      select case (trim(opticstype))
+       case('insoluble')
+       ! get aerosol mass
+       ! one species for pure group
+          l = 1 
+          call rad_cnst_get_bin_mmr_by_idx(list_idx, m, l, 'a', state, pbuf, specmmr)
+          call rad_cnst_get_bin_props_by_idx(list_idx, m, l, density_aer=specdens, &
+                  sw_nonhygro_ext=n_ext, sw_nonhygro_ssa=n_ssa, sw_nonhygro_asm=n_asm)
+             do i = 1, ncol
+               do k = 1, pver
+                 aermass(i,k) = specmmr(i,k)/specdens
+               end do
+              end do
+
+          ! get optical properties for non-hygroscopic aerosols
+          !call rad_cnst_get_bin_props_by_idx(list_idx, m, sw_nonhygro_ext=n_ext, sw_nonhygro_ssa=n_ssa, &
+          !                           sw_nonhygro_asm=n_asm)
+          call get_nonhygro_rad_props(ncol, aermass, n_ext, n_ssa, n_asm, ta, tw, twg, twf)
+          tau    (1:ncol,1:pver,:) = tau    (1:ncol,1:pver,:) + ta (1:ncol,:,:)
+          tau_w  (1:ncol,1:pver,:) = tau_w  (1:ncol,1:pver,:) + tw (1:ncol,:,:)
+          tau_w_g(1:ncol,1:pver,:) = tau_w_g(1:ncol,1:pver,:) + twg(1:ncol,:,:)
+          tau_w_f(1:ncol,1:pver,:) = tau_w_f(1:ncol,1:pver,:) + twf(1:ncol,:,:)
+      end select 
+     end do
+   end if 
 
    if (nbins > 0) then
       call coreshell_aero_sw(list_idx, state, pbuf, nnite, idxnite, &
@@ -333,6 +366,7 @@ subroutine aer_rad_props_lw(list_idx, state, pbuf,  odap_aer)
    integer :: bnd_idx     ! LW band index
    integer :: i           ! column index
    integer :: k           ! lev index
+   integer :: m, l        ! bin index , species index
    integer :: ncol        ! number of columns
    integer :: numaerosols ! number of bulk aerosols in climate/diagnostic list
    integer :: nmodes      ! number of aerosol modes in climate/diagnostic list
@@ -364,8 +398,10 @@ subroutine aer_rad_props_lw(list_idx, state, pbuf,  odap_aer)
    ! aerosol (vertical) mass path and extinction
    ! aerosol masses
    real(r8), pointer :: aermmr(:,:)    ! mass mixing ratio of aerosols
+   real(r8), pointer :: specmmr(:,:)    ! mass mixing ratio of aerosols
    real(r8) :: mmr_to_mass(pcols,pver) ! conversion factor for mmr to mass
    real(r8) :: aermass(pcols,pver)     ! mass of aerosols
+   real(r8) :: specdens                ! species densities
 
    character(len=16) :: pbuf_fld
    !-----------------------------------------------------------------------------
@@ -380,6 +416,36 @@ subroutine aer_rad_props_lw(list_idx, state, pbuf,  odap_aer)
 
    if (nmodes > 0) then
       call modal_aero_lw(list_idx, state, pbuf, odap_aer)
+   end if
+
+   if (nbins > 0) then
+     do m = 1, nbins
+      ! get optics type
+      call rad_cnst_get_bin_props(list_idx, m, opticstype=opticstype)
+      select case (trim(opticstype))
+       case('insoluble')
+
+       ! get aerosol mass
+       ! one species for pure group
+          l = 1
+          call rad_cnst_get_bin_mmr_by_idx(list_idx, m, l, 'a', state, pbuf, specmmr)
+          ! get optical properties for non-hygroscopic aerosols
+          call rad_cnst_get_bin_props_by_idx(list_idx, m, l, density_aer=specdens, lw_ext=lw_abs)
+          do i = 1, ncol
+             do k = 1, pver
+                 aermass(i,k) = specmmr(i,k)/specdens
+             end do
+          end do
+
+          do bnd_idx = 1, nlwbands
+            do k = 1, pver
+               do i = 1, ncol
+                  odap_aer(i,k,bnd_idx) = odap_aer(i,k,bnd_idx) + lw_abs(bnd_idx)*aermass(i,k)
+               end do
+            end do
+         end do
+      end select
+     end do
    end if
 
    if (nbins > 0) then

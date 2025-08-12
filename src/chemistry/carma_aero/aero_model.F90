@@ -906,6 +906,18 @@ contains
                          solmmr =  solmmr + raer(mm)%fld(i,k)*0.8_r8
                          specmmr = specmmr + raer(mm)%fld(i,k)
                       end if
+                      if (trim(spectype) == 'aluminum') then
+                         solmmr =  solmmr + raer(mm)%fld(i,k)*0.1_r8
+                         specmmr = specmmr + raer(mm)%fld(i,k)
+                      end if
+                      if (trim(spectype) == 'calcite') then
+                         solmmr =  solmmr + raer(mm)%fld(i,k)*0.1_r8
+                         specmmr = specmmr + raer(mm)%fld(i,k)
+                      end if
+                      if (trim(spectype) == 'diamond') then
+                         solmmr =  solmmr + raer(mm)%fld(i,k)*0.1_r8
+                         specmmr = specmmr + raer(mm)%fld(i,k)
+                      end if
 
                    end do   !nspec
                    if (totalmmr(i,k) .gt. 0._r8) then
@@ -1595,6 +1607,15 @@ contains
              end if
              if (trim(spectype) == 'seasalt') then
                 mw_carma(mm) = 57._r8
+             end if
+             if (trim(spectype) == 'aluminum') then
+                mw_carma(mm) = 102._r8
+             end if
+             if (trim(spectype) == 'calcite') then
+                mw_carma(mm) = 100.1_r8
+             end if
+             if (trim(spectype) == 'diamond') then
+                mw_carma(mm) = 12._r8
              end if
           end if
           if (l == nspec(m)+1) then
