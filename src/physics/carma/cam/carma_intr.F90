@@ -3075,7 +3075,7 @@ contains
         do irh = 1, nrh
 
           ! Determine the wet radius.
-          call getwetr(carma, igroup, mie_rh(irh), r(ibin), rwet, rho(ibin), rhopwet, rc)
+          call getwetr(carma, igroup, ibin, mie_rh(irh), r(ibin), rwet, rho(ibin), rhopwet, rc)
           if (rc < 0) call endrun('carma_CreateOpticsFile::wetr failed.')
 
           ! Calculate at each wavelength.
@@ -3423,7 +3423,7 @@ contains
           ! NOTE: Weight percent is normal a result of the getwetr calculation. To build the
           ! table based upon weight percent, we need to pass in the desired value and a
           ! reference temperature. In that case, the RH is ignored.
-          call getwetr(carma, igroup, mie_rh(1), r(ibin), rwet, rho(ibin), rhopwet, rc, wgtpct=mie_wtp(iwtp)*100._f, temp=270._f)
+          call getwetr(carma, igroup, ibin, mie_rh(1), r(ibin), rwet, rho(ibin), rhopwet, rc, wgtpct=mie_wtp(iwtp)*100._f, temp=270._f)
           if (rc < 0) call endrun('carma_CreateOpticsFile::wetr failed.')
 
           ! This is not in Yu (2015), but rather than using the refractive
