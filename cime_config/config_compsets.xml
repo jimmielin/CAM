@@ -415,9 +415,13 @@
     <alias>FCHIST</alias>
     <lname>HIST_CAM60%CT1S_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
-    <compset>
+  <compset>
     <alias>FCHIST_GC</alias>
     <lname>HIST_CAM60%GEOSCHEM%HEMCO_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_CISM2%NOEVOLVE_SWAV</lname>
+  </compset>
+  <compset>
+    <alias>FCHIST_slh</alias>
+    <lname>HIST_CAM60%CSLH_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
 
   <compset>
@@ -537,6 +541,15 @@
     <alias>FWHIST</alias>
     <lname>HIST_CAM60%WCTS_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
     <science_support grid="f09_f09_mg17"/>
+  </compset>
+
+  <compset>
+    <alias>FWHIST_SLH</alias>
+    <lname>HIST_CAM60%WSLH_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+  <compset>
+    <alias>FWnudged_SLH</alias>
+    <lname>HIST_CAM60%WSLH%NUDG_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
 
   <compset>
@@ -688,6 +701,7 @@
 	<value  compset="HIST_CAM60%CFIRE">1995-01-01</value>
 	<value  compset="RCP[2468]_CAM\d+">2005-01-01</value>
  	<value  compset="_CAM.*%NUDG"                   >2010-01-01</value>
+	<value  compset="_CAM60%(C|W)SLH%NUDG"          >1980-01-01</value>
  	<value  compset="CAM60%CARMA.*%NUDG"            >1990-01-01</value>
  	<value  compset="_CAM.*%SDYN"                   >2005-01-01</value>
  	<value  compset="_CAM.*%SDYN" grid="a%0.47x0.63">2010-01-01</value>

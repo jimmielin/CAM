@@ -2,19 +2,20 @@
 
 <namelist_defaults>
 
-<start_ymd>00010101</start_ymd>
+<start_ymd>19900101</start_ymd>
 
-<!-- Initial conditions -->
-<ncdata dyn="fv" hgrid="1.9x2.5">atm/cam/inic/fv/FC.f19_f19_mg17.L32.cesm2.2-asdbranch_vsl03_CSIC.Testing_USR_v2jv1.FCHISTslhvbs.cam.i.2000-01-01-00000_c240525.nc</ncdata>
-
-<!-- Solar data -->
+<!-- Solar data from NRL -->
 <solar_irrad_data_file>atm/cam/solar/SolarForcingCMIP6_18491230-23000102_c20200615.nc</solar_irrad_data_file>
 
-<!-- WACCM GW Settings -->
-<use_gw_front>.true.</use_gw_front>
-<use_gw_convect_dp>.true.</use_gw_convect_dp>
-<tau_0_ubc>.false.</tau_0_ubc>
-<gw_qbo_hdepth_scaling>0.25D0</gw_qbo_hdepth_scaling>
+<!-- Kp and F10.7 -->
+<solar_parms_data_file>atm/cam/solar/SolarForcingCMIP6_18491230-23000102_c20200615.nc</solar_parms_data_file>
+
+<!-- Energetic Particle Precipitation -->
+<epp_all_filepath>atm/cam/solar/SolarForcingCMIP6_18491230-23000102_c20200615.nc</epp_all_filepath>
+<epp_all_varname>'epp_ion_rates'</epp_all_varname>
+
+<!--Species IC -->
+<ncdata dyn="fv"  hgrid="1.9x2.5"  nlev="70">atm/waccm/ic/FW.f19_f19_mg17.L70.cesm2.2-asdbranch_vsl03_CSIC_mdz.FW_nudged_test7_gI_sc1_lghtNO4.5.FWnudged_slh.cam.i.1998-01-01-00000_c240618.nc</ncdata>
 
 <!-- LBC, UBC Files -->
 <flbc_type>SERIAL</flbc_type>
@@ -146,58 +147,12 @@
 <dep_data_file>atm/cam/chem/trop_mozart/dvel/dep_data_c20221208_SLH_char16_c20240925.nc</dep_data_file>
 
 <!-- slh_nl -->
-<SSAdehal_ScalingFactor     hgrid="1.9x2.5">  1.40D0  </SSAdehal_ScalingFactor>
+<SSAdehal_ScalingFactor     hgrid="1.9x2.5">  1.70D0  </SSAdehal_ScalingFactor>
 <SSAhno3_ScalingFactor      hgrid="1.9x2.5">  1.00D0  </SSAhno3_ScalingFactor>
 <SSAn2o5_ScalingFactor      hgrid="1.9x2.5">  1.00D0  </SSAn2o5_ScalingFactor>
-<LIQfraprx_ScalingFactor_I  hgrid="1.9x2.5">  1.50D0  </LIQfraprx_ScalingFactor_I>
-<ICEfraprx_ScalingFactor_I  hgrid="1.9x2.5">  1.30D0  </ICEfraprx_ScalingFactor_I>
-<ICEfraprx_ScalingFactor_Br hgrid="1.9x2.5">  1.00D0  </ICEfraprx_ScalingFactor_Br>
-
-<SSAdehal_ScalingFactor     hgrid="0.9x1.25"> 1.50D0  </SSAdehal_ScalingFactor>
-<SSAhno3_ScalingFactor      hgrid="0.9x1.25"> 1.00D0  </SSAhno3_ScalingFactor>
-<SSAn2o5_ScalingFactor      hgrid="0.9x1.25"> 1.00D0  </SSAn2o5_ScalingFactor>
-<LIQfraprx_ScalingFactor_I  hgrid="0.9x1.25"> 1.50D0  </LIQfraprx_ScalingFactor_I>
-<ICEfraprx_ScalingFactor_I  hgrid="0.9x1.25"> 0.90D0  </ICEfraprx_ScalingFactor_I>
-<ICEfraprx_ScalingFactor_Br hgrid="0.9x1.25"> 1.00D0  </ICEfraprx_ScalingFactor_Br>
-
-<!-- nudging -->
-<Nudge_Model>.true.</Nudge_Model>
-<Nudge_Path hgrid="0.9x1.25" nlev="32">'atm/cam/met/nudging/MERRA2_fv09_32L/'</Nudge_Path>
-<Nudge_Path hgrid="1.9x2.5"  nlev="32">'atm/cam/met/nudging/MERRA2_fv19_32L/'</Nudge_Path>
-<Nudge_File_Template hgrid="0.9x1.25" nlev="32">'%y/MERRA2_fv09.cam2.i.%y-%m-%d-%s.nc'</Nudge_File_Template>
-<Nudge_File_Template hgrid="1.9x2.5"  nlev="32">'%y/MERRA2_fv19.cam2.i.%y-%m-%d-%s.nc'</Nudge_File_Template>
-<Nudge_Force_Opt>0</Nudge_Force_Opt>
-<Nudge_TimeScale_Opt>0</Nudge_TimeScale_Opt>
-<Nudge_Times_Per_Day>8</Nudge_Times_Per_Day>
-<Model_Times_Per_Day>48</Model_Times_Per_Day>
-<Nudge_Uprof>1</Nudge_Uprof>
-<Nudge_Ucoef>0.25</Nudge_Ucoef>
-<Nudge_Vprof>1</Nudge_Vprof>
-<Nudge_Vcoef>0.25</Nudge_Vcoef>
-<Nudge_Tprof>1</Nudge_Tprof>
-<Nudge_Tcoef>0.25</Nudge_Tcoef>
-<Nudge_Qprof>0</Nudge_Qprof>
-<Nudge_Qcoef>0.00</Nudge_Qcoef>
-<Nudge_PSprof>0</Nudge_PSprof>
-<Nudge_PScoef>0.00</Nudge_PScoef>
-<Nudge_Beg_Year>1980</Nudge_Beg_Year>
-<Nudge_Beg_Month>1</Nudge_Beg_Month>
-<Nudge_Beg_Day>1</Nudge_Beg_Day>
-<Nudge_End_Year>2023</Nudge_End_Year>
-<Nudge_End_Month>12</Nudge_End_Month>
-<Nudge_End_Day>31</Nudge_End_Day>
-<Nudge_Hwin_lat0>0.0</Nudge_Hwin_lat0>
-<Nudge_Hwin_latWidth>9999.</Nudge_Hwin_latWidth>
-<Nudge_Hwin_latDelta>1.</Nudge_Hwin_latDelta>
-<Nudge_Hwin_lon0>180.</Nudge_Hwin_lon0>
-<Nudge_Hwin_lonWidth>9999.</Nudge_Hwin_lonWidth>
-<Nudge_Hwin_lonDelta>1.</Nudge_Hwin_lonDelta>
-<Nudge_Hwin_Invert>.false.</Nudge_Hwin_Invert>
-<Nudge_Vwin_Hindex>33.</Nudge_Vwin_Hindex>
-<Nudge_Vwin_Hdelta>0.001</Nudge_Vwin_Hdelta>
-<Nudge_Vwin_Lindex>0.</Nudge_Vwin_Lindex>
-<Nudge_Vwin_Ldelta>0.1</Nudge_Vwin_Ldelta>
-<Nudge_Vwin_Invert>.false.</Nudge_Vwin_Invert>
+<LIQfraprx_ScalingFactor_I  hgrid="1.9x2.5">  1.00D0  </LIQfraprx_ScalingFactor_I>
+<ICEfraprx_ScalingFactor_I  hgrid="1.9x2.5">  2.80D0  </ICEfraprx_ScalingFactor_I>
+<ICEfraprx_ScalingFactor_Br hgrid="1.9x2.5">  3.00D0  </ICEfraprx_ScalingFactor_Br>
 
 <!-- History Files -->
 
