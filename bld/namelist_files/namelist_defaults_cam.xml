@@ -840,6 +840,7 @@
 <gw_limit_tau_without_eff chem="trop_strat_mam4_vbsext">.true. </gw_limit_tau_without_eff>
 <gw_limit_tau_without_eff chem="trop_strat_mam5_vbs">.true. </gw_limit_tau_without_eff>
 <gw_limit_tau_without_eff chem="trop_strat_mam5_vbsext">.true. </gw_limit_tau_without_eff>
+<gw_limit_tau_without_eff chem="trop_strat_mam4_slh">.true. </gw_limit_tau_without_eff>
 <gw_limit_tau_without_eff chem="trop_strat_mam5_slh">.true. </gw_limit_tau_without_eff>
 <gw_limit_tau_without_eff carma="trop_strat_soa1">.true. </gw_limit_tau_without_eff>
 <gw_limit_tau_without_eff carma="trop_strat_soa5">.true. </gw_limit_tau_without_eff>
@@ -2028,8 +2029,8 @@
 
 <!-- photolysis inputs -->
 <xs_coef_file>atm/waccm/phot/effxstex.txt</xs_coef_file>
-<xs_short_file>atm/waccm/phot/xs_short_c221005mm.nc</xs_short_file>
-<xs_long_file >atm/waccm/phot/temp_prs_GT200nm_c221005mm.nc</xs_long_file>
+<xs_short_file>atm/waccm/phot/xs_short_c221005mm_slh_c250930.nc</xs_short_file>
+<xs_long_file >atm/waccm/phot/temp_prs_GT200nm_c221005mm_slh_c250930.nc</xs_long_file>
 <rsf_file     >atm/waccm/phot/RSF_GT200nm_v3.0_c080811.nc</rsf_file>
 <exo_coldens_file>atm/cam/chem/trop_mozart/phot/exo_coldens.nc</exo_coldens_file>
 
