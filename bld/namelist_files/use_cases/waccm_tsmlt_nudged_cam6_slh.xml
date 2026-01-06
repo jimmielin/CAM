@@ -22,15 +22,31 @@
 <flbc_file>atm/waccm/lb/LBC_1750-2014_CMIP6_0p5degLat_HIST_c170126_VSL_Cl_CHCL3x1p15_C2H4CL2x1p15_c20251117.nc</flbc_file>
 <flbc_list>'CCL4', 'CF2CLBR', 'CF3BR', 'CFC11', 'CFC113', 'CFC12', 'CH3BR', 'CH3CCL3', 'CH3CL', 'CH4', 'CO2', 'H2', 'HCFC22',
            'N2O', 'CFC114', 'CFC115', 'HCFC141B', 'HCFC142B', 'H2402', 'OCS', 'SF6', 'CHCL3', 'C2H4CL2'</flbc_list>
+<!-- RPF: 'CFC11eq' is included in default WACCM namelists ... should we include it for SLH? -->
+<!-- RPF: Not sure why we did not include it so far -->
 
-<prescribed_strataero_type>SERIAL</prescribed_strataero_type>
+<!-- Upper Boundary -->
+<!-- RPF: These variables are defined in default WACCM namelist -->
+<!-- RPF: Should we include them for SLH? (2deg 70L). We never used befpre -->      
+<!--<tgcm_ubc_file>atm/waccm/ub/tgcm_ubc_1850-2100_c100204.nc</tgcm_ubc_file>
+<tgcm_ubc_data_type>'INTERP_MISSING_MONTHS'</tgcm_ubc_data_type>-->
+
+
+<!-- RPF: I understand prescribed aerosol is not longer needed with MAM. -->
+<!-- RPF: Should we remove it? it is not included in default WACCM namelists -->
+<!-- <prescribed_strataero_type>SERIAL</prescribed_strataero_type> -->
 
 <!-- emissions -->
 
 <!-- <lght_no_prd_factor hgrid="0.9x1.25">2.70D0</lght_no_prd_factor> -->
+<!-- RPF: We need to run simulations with CAM6dev to be sure about the -->
+<!-- RPF: best valur for lght_no_prd_factor for 1deg and 2deg -->
 <lght_no_prd_factor hgrid="1.9x2.5">4.50D0</lght_no_prd_factor>
 <dust_emis_fact hgrid="0.9x1.25"> 0.38D0</dust_emis_fact>
-<csw_time_type>SERIAL</csw_time_type>
+
+<!-- RPF: Same here ... this is not included in default WACCM namelists -->
+<!-- RPF: Should we remove it? -->
+<!-- <csw_time_type>SERIAL</csw_time_type> -->
 
 <ext_frc_type>INTERP_MISSING_MONTHS</ext_frc_type>
 
@@ -45,6 +61,8 @@
 <LIQfraprx_ScalingFactor_I  hgrid="1.9x2.5">  1.00D0  </LIQfraprx_ScalingFactor_I>
 <ICEfraprx_ScalingFactor_I  hgrid="1.9x2.5">  1.90D0  </ICEfraprx_ScalingFactor_I>
 <ICEfraprx_ScalingFactor_Br hgrid="1.9x2.5">  3.00D0  </ICEfraprx_ScalingFactor_Br>
+<!-- RPF: Similar to Lightning NOx, We need to run simulations with CAM6dev -->
+<!-- RPF: to obtain the best ScalingFactors for SLH species using 1deg and 2deg -->
 
 <!-- nudging -->
 <Nudge_Model>.true.</Nudge_Model>
@@ -97,6 +115,8 @@
 <history_chemistry>.true.</history_chemistry>
 <history_chemspecies_srf>.false.</history_chemspecies_srf>
 <history_clubb>.false.</history_clubb>
+<!-- RPF: The tree history_variables below are defined true in default WACCM namelist -->
+<!-- RPF: Should we change them to true? -->
 <history_waccm>.false.</history_waccm>
 <history_cesm_forcing>.false.</history_cesm_forcing>
 <history_scwaccm_forcing>.false.</history_scwaccm_forcing>
