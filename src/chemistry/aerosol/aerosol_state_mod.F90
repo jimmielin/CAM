@@ -845,10 +845,10 @@ contains
 
     crefin(:ncol) = (0._r8, 0._r8)
 
-    do ispec = 1, aero_props%nspecies(self%list_idx_,ibin)
+    do ispec = 1, aero_props%nspecies(ibin)
 
        call self%get_ambient_mmr(ispec,ibin,specmmr)
-       call aero_props%get(ibin, ispec, list_ndx=self%list_idx_, density=specdens,  refindex_sw=specrefindex)
+       call aero_props%get(ibin, ispec, density=specdens,  refindex_sw=specrefindex)
 
        do icol = 1, ncol
           vol(icol) = specmmr(icol,ilev)/specdens
@@ -880,10 +880,10 @@ contains
 
     crefin(:ncol) = (0._r8, 0._r8)
 
-    do ispec = 1, aero_props%nspecies(self%list_idx_,ibin)
+    do ispec = 1, aero_props%nspecies(ibin)
 
        call self%get_ambient_mmr(ispec,ibin,specmmr)
-       call aero_props%get(ibin, ispec, list_ndx=self%list_idx_, density=specdens,  refindex_lw=specrefindex)
+       call aero_props%get(ibin, ispec, density=specdens,  refindex_lw=specrefindex)
 
        do icol = 1, ncol
           vol(icol) = specmmr(icol,ilev)/specdens

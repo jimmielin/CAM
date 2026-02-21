@@ -104,7 +104,7 @@ contains
     end if
 
     ! get mode properties
-    call aero_props%optics_params(aero_state%list_idx(), ibin, &
+    call aero_props%optics_params(ibin, &
          refrtabsw=newobj%refrtabsw, refitabsw=newobj%refitabsw, &
          refrtablw=newobj%refrtablw, refitablw=newobj%refitablw,&
          extpsw=newobj%extpsw, abspsw=newobj%abspsw, asmpsw=newobj%asmpsw, &
@@ -152,9 +152,9 @@ contains
 
     call aero_state%water_uptake(aero_props, ibin,  ncol, nlev, dgnumwet, qaerwat)
 
-    nspec = aero_props%nspecies(aero_state%list_idx(),ibin)
+    nspec = aero_props%nspecies(ibin)
 
-    logsigma=aero_props%alogsig(aero_state%list_idx(),ibin)
+    logsigma=aero_props%alogsig(ibin)
 
     ! calc size parameter for all columns
     call modal_size_parameters(newobj%ncoef, ncol, nlev, logsigma, dgnumwet, &
@@ -164,7 +164,7 @@ contains
        dryvol(:ncol) = 0._r8
        do ispec = 1, nspec
           call aero_state%get_ambient_mmr(ispec,ibin,specmmr)
-          call aero_props%get(ibin, ispec, list_ndx=aero_state%list_idx(), density=specdens)
+          call aero_props%get(ibin, ispec, density=specdens)
 
           do icol = 1, ncol
              vol(icol) = specmmr(icol,ilev)/specdens

@@ -33,27 +33,22 @@ module aerosol_properties_mod
      ! 1, Singleaerosoltype. J. Geophys. Res., 103, 6123-6132, 1998.
      real(r8) :: soa_equivso4_factor_ = -huge(1._r8)
      real(r8) :: pom_equivso4_factor_ = -huge(1._r8)
-     integer :: list_idx_ = 0 ! radiation list index (0=climate)
+     integer, public:: list_idx_ = 0 ! radiation list index (0=climate)
    contains
      procedure :: list_idx => get_list_idx
      procedure :: initialize => aero_props_init
-     procedure,private :: nbins_0list
-     procedure(aero_nbins_rlist), deferred :: nbins_rlist
-     generic :: nbins => nbins_0list,nbins_rlist
+     procedure :: nbins => nbins_0list
      procedure :: ncnst_tot
      procedure,private :: nspecies_per_bin
-     procedure(aero_nspecies_rlist), deferred :: nspecies_per_bin_rlist
      procedure,private :: nspecies_all_bins
-     generic :: nspecies => nspecies_all_bins,nspecies_per_bin,nspecies_per_bin_rlist
+     generic :: nspecies => nspecies_all_bins,nspecies_per_bin
      procedure,private :: n_masses_all_bins
      procedure,private :: n_masses_per_bin
      generic :: nmasses => n_masses_all_bins,n_masses_per_bin
      procedure :: indexer
      procedure :: maxsat
      procedure(aero_amcube), deferred :: amcube
-     procedure :: alogsig_0list
-     procedure(aero_alogsig_rlist), deferred :: alogsig_rlist
-     generic :: alogsig =>  alogsig_0list,alogsig_rlist
+     procedure :: alogsig => alogsig_0list
      procedure(aero_number_transported), deferred :: number_transported
      procedure(aero_props_get), deferred :: get
      procedure(aero_actfracs), deferred :: actfracs
@@ -103,13 +98,12 @@ module aerosol_properties_mod
      !  long wave species refractive indices
      !  species morphology
      !------------------------------------------------------------------------
-     subroutine aero_props_get(self, bin_ndx, species_ndx, list_ndx, density, hygro, &
+     subroutine aero_props_get(self, bin_ndx, species_ndx, density, hygro, &
           spectype, specname, specmorph, refindex_sw, refindex_lw)
        import :: aerosol_properties, r8
        class(aerosol_properties), intent(in) :: self
        integer, intent(in) :: bin_ndx             ! bin index
        integer, intent(in) :: species_ndx         ! species index
-       integer, optional, intent(in) :: list_ndx  ! climate or a diagnostic list number
        real(r8), optional, intent(out) :: density ! density (kg/m3)
        real(r8), optional, intent(out) :: hygro   ! hygroscopicity
        character(len=*), optional, intent(out) :: spectype  ! species type
@@ -123,7 +117,7 @@ module aerosol_properties_mod
      !------------------------------------------------------------------------
      ! returns optics type and table parameters
      !------------------------------------------------------------------------
-     subroutine aero_optics_params(self, list_ndx, bin_ndx, opticstype, extpsw, abspsw, asmpsw, absplw, &
+     subroutine aero_optics_params(self, bin_ndx, opticstype, extpsw, abspsw, asmpsw, absplw, &
           refrtabsw, refitabsw, refrtablw, refitablw, ncoef, prefr, prefi, sw_hygro_ext_wtp, &
           sw_hygro_ssa_wtp, sw_hygro_asm_wtp, lw_hygro_ext_wtp, wgtpct, nwtp, &
           sw_hygro_coreshell_ext, sw_hygro_coreshell_ssa, sw_hygro_coreshell_asm, lw_hygro_coreshell_ext, &
@@ -136,7 +130,6 @@ module aerosol_properties_mod
 
        class(aerosol_properties), intent(in) :: self
        integer, intent(in) :: bin_ndx             ! bin index
-       integer, optional, intent(in) :: list_ndx  ! rad climate/diags list
 
        character(len=*), optional, intent(out) :: opticstype
 
@@ -358,51 +351,11 @@ module aerosol_properties_mod
      end function aero_soluble
 
      !------------------------------------------------------------------------------
-     ! returns the total number of bins for a given radiation list index
+     ! returns name for a given aerosol bin
      !------------------------------------------------------------------------------
-     function aero_nbins_rlist(self, list_ndx)  result(res)
-       import :: aerosol_properties
-       class(aerosol_properties), intent(in) :: self
-       integer, intent(in) :: list_ndx  ! radiation list number
-
-       integer :: res
-
-     end function aero_nbins_rlist
-
-     !------------------------------------------------------------------------------
-     ! returns number of species in a bin for a given radiation list index
-     !------------------------------------------------------------------------------
-     function aero_nspecies_rlist(self, list_ndx,  bin_ndx)  result(res)
-       import :: aerosol_properties
-       class(aerosol_properties), intent(in) :: self
-       integer, intent(in) :: list_ndx ! radiation list number
-       integer, intent(in) :: bin_ndx  ! bin number
-
-       integer :: res
-
-     end function aero_nspecies_rlist
-
-     !------------------------------------------------------------------------------
-     ! returns the natural log of geometric standard deviation of the number
-     ! distribution for radiation list number and aerosol bin
-     !------------------------------------------------------------------------------
-     function aero_alogsig_rlist(self, list_ndx,  bin_ndx)  result(res)
-       import :: aerosol_properties, r8
-       class(aerosol_properties), intent(in) :: self
-       integer, intent(in) :: list_ndx ! radiation list number
-       integer, intent(in) :: bin_ndx  ! bin number
-
-       real(r8) :: res
-
-     end function aero_alogsig_rlist
-
-     !------------------------------------------------------------------------------
-     ! returns name for a given radiation list number and aerosol bin
-     !------------------------------------------------------------------------------
-     function aero_bin_name(self, list_ndx,  bin_ndx) result(name)
+     function aero_bin_name(self, bin_ndx) result(name)
        import :: aerosol_properties, r8, aero_name_len
        class(aerosol_properties), intent(in) :: self
-       integer, optional, intent(in) :: list_ndx ! radiation list number
        integer, intent(in) :: bin_ndx  ! bin number
 
        character(len=aero_name_len) :: name

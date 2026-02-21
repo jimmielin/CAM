@@ -531,9 +531,9 @@ contains
 
     vol(:,:) = 0._r8
 
-    do ispec = 1, aero_props%nspecies(self%list_idx_,bin_idx)
+    do ispec = 1, aero_props%nspecies(bin_idx)
        call self%get_ambient_mmr(ispec, bin_idx, mmr)
-       call aero_props%get(bin_idx, ispec, list_ndx=self%list_idx_, density=specdens)
+       call aero_props%get(bin_idx, ispec, density=specdens)
        vol(:ncol,:) = vol(:ncol,:) + mmr(:ncol,:)/specdens
     end do
 

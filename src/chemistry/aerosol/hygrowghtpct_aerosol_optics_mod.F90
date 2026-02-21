@@ -83,9 +83,9 @@ contains
     ! weight precent of H2SO4/H2O solution
     newobj%wgtpct(:ncol,:nlev) = wgtpct_in(:ncol,:nlev)
 
-    call aero_props%optics_params(aero_state%list_idx(), ibin, wgtpct=newobj%tbl_wgtpct, nwtp=newobj%nwtp)
+    call aero_props%optics_params(ibin, wgtpct=newobj%tbl_wgtpct, nwtp=newobj%nwtp)
 
-    nspec = aero_props%nspecies(aero_state%list_idx(), ibin)
+    nspec = aero_props%nspecies(ibin)
 
     newobj%totalmmr(:,:) = 0._r8
 
@@ -96,7 +96,7 @@ contains
 
     end do
 
-    call aero_props%optics_params(aero_state%list_idx(), ibin,  &
+    call aero_props%optics_params(ibin,  &
          sw_hygro_ext_wtp=newobj%sw_hygro_ext_wtp, &
          sw_hygro_ssa_wtp=newobj%sw_hygro_ssa_wtp, &
          sw_hygro_asm_wtp=newobj%sw_hygro_asm_wtp, &

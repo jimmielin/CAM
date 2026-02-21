@@ -57,7 +57,7 @@ contains
     end if
 
     ! get mode properties
-    call aero_props%optics_params(aero_state%list_idx(), ibin, &
+    call aero_props%optics_params(ibin, &
          sw_insoluble_ext=newobj%sw_ext, &
          sw_insoluble_ssa=newobj%sw_ssa, &
          sw_insoluble_asm=newobj%sw_asm, &

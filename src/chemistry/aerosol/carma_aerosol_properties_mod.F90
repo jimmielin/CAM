@@ -30,9 +30,6 @@ module carma_aerosol_properties_mod
      procedure :: apply_number_limits
      procedure :: hetfrz_species
      procedure :: optics_params
-     procedure :: nbins_rlist
-     procedure :: nspecies_per_bin_rlist
-     procedure :: alogsig_rlist
      procedure :: soluble
      procedure :: min_mass_mean_rad
      procedure :: bin_name
@@ -172,10 +169,10 @@ contains
     ipr_num = 0
 
     do m = 1,nbins
-       bin_name = newobj%bin_name(list_idx_loc,m)
+       bin_name = newobj%bin_name(m)
        bin_name_l = ' '
        if (m<nbins) then
-          bin_name_l = newobj%bin_name(list_idx_loc,m+1)
+          bin_name_l = newobj%bin_name(m+1)
        end if
 
        do l = 0,newobj%nspecies(m)
@@ -266,13 +263,12 @@ contains
   !  long wave species refractive indices
   !  species morphology
   !------------------------------------------------------------------------
-  subroutine get(self, bin_ndx, species_ndx, list_ndx, density, hygro, &
+  subroutine get(self, bin_ndx, species_ndx, density, hygro, &
                  spectype, specname, specmorph, refindex_sw, refindex_lw)
 
     class(carma_aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx             ! bin index
     integer, intent(in) :: species_ndx         ! species index
-    integer, optional, intent(in) :: list_ndx  ! climate or a diagnostic list number
     real(r8), optional, intent(out) :: density ! density (kg/m3)
     real(r8), optional, intent(out) :: hygro   ! hygroscopicity
     character(len=*), optional, intent(out) :: spectype  ! species type
@@ -281,37 +277,30 @@ contains
     complex(r8), pointer, optional, intent(out) :: refindex_sw(:) ! short wave species refractive indices
     complex(r8), pointer, optional, intent(out) :: refindex_lw(:) ! long wave species refractive indices
 
-    integer :: ilist
-
-    if (present(list_ndx)) then
-       ilist = list_ndx
-    else
-       ilist = self%list_idx()
-    end if
-
     if (present(density)) then
-       call rad_cnst_get_bin_props_by_idx(ilist, bin_ndx, species_ndx, density_aer=density)
+       call rad_cnst_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, density_aer=density)
     end if
     if (present(hygro)) then
-       call rad_cnst_get_bin_props_by_idx(ilist, bin_ndx, species_ndx, hygro_aer=hygro)
+       call rad_cnst_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, hygro_aer=hygro)
     end if
     if (present(spectype)) then
-       call rad_cnst_get_bin_props_by_idx(ilist, bin_ndx, species_ndx, spectype=spectype)
+       call rad_cnst_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, spectype=spectype)
     end if
     if (present(refindex_sw)) then
-       call rad_cnst_get_bin_props_by_idx(ilist, bin_ndx, species_ndx, refindex_aer_sw=refindex_sw)
+       call rad_cnst_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, refindex_aer_sw=refindex_sw)
     end if
     if (present(refindex_lw)) then
-       call rad_cnst_get_bin_props_by_idx(ilist, bin_ndx, species_ndx, refindex_aer_lw=refindex_lw)
+       call rad_cnst_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, refindex_aer_lw=refindex_lw)
     end if
     if (present(specmorph)) then
-       call rad_cnst_get_bin_props_by_idx(ilist, bin_ndx, species_ndx, specmorph=specmorph)
+       call rad_cnst_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, specmorph=specmorph)
     end if
     if (present(specname)) then
        if (species_ndx>self%nspecies(bin_ndx)) then
+          ! TODO - this uses climate list because ...?
           call rad_cnst_get_info_by_bin(0, bin_ndx,  mmr_name=specname)
        else
-          call rad_cnst_get_info_by_bin_spec(ilist, bin_ndx, species_ndx, spec_name=specname)
+          call rad_cnst_get_info_by_bin_spec(self%list_idx_, bin_ndx, species_ndx, spec_name=specname)
        end if
     end if
 
@@ -320,7 +309,7 @@ contains
   !------------------------------------------------------------------------
   ! returns optics type and table parameters
   !------------------------------------------------------------------------
-  subroutine optics_params(self, list_ndx, bin_ndx, opticstype, extpsw, abspsw, asmpsw, absplw, &
+  subroutine optics_params(self, bin_ndx, opticstype, extpsw, abspsw, asmpsw, absplw, &
        refrtabsw, refitabsw, refrtablw, refitablw, ncoef, prefr, prefi, sw_hygro_ext_wtp, &
        sw_hygro_ssa_wtp, sw_hygro_asm_wtp, lw_hygro_ext_wtp, wgtpct, nwtp, &
        sw_hygro_coreshell_ext, sw_hygro_coreshell_ssa, sw_hygro_coreshell_asm, lw_hygro_coreshell_ext, &
@@ -331,7 +320,6 @@ contains
 
     class(carma_aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx             ! bin index
-    integer, optional, intent(in) :: list_ndx  ! rad climate/diags list
 
     character(len=*), optional, intent(out) :: opticstype
 
@@ -389,10 +377,6 @@ contains
     real(r8),  optional, pointer :: r_mu(:)
     real(r8),  optional, pointer :: r_lw_abs(:,:)
 
-    integer :: list_ndx_loc
-    list_ndx_loc = self%list_idx()
-    if (present(list_ndx)) list_ndx_loc = list_ndx
-
     if (present(extpsw)) then
        nullify(extpsw)
     end if
@@ -427,7 +411,7 @@ contains
        prefi = huge(1)
     end if
 
-    call rad_cnst_get_bin_props(list_ndx_loc,bin_ndx, &
+    call rad_cnst_get_bin_props(self%list_idx_,bin_ndx, &
                                 opticstype=opticstype, &
                                 sw_hygro_ext_wtp=sw_hygro_ext_wtp, &
                                 sw_hygro_ssa_wtp=sw_hygro_ssa_wtp, &
@@ -711,62 +695,15 @@ contains
   end function min_mass_mean_rad
 
   !------------------------------------------------------------------------------
-  ! returns the total number of bins for a given radiation list index
+  ! returns name for a given aerosol bin
   !------------------------------------------------------------------------------
-  function nbins_rlist(self, list_ndx)  result(res)
+  function bin_name(self, bin_ndx) result(name)
     class(carma_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: list_ndx  ! radiation list number
-
-    integer :: res
-
-    call rad_cnst_get_info(list_ndx, nbins=res)
-
-  end function nbins_rlist
-
-  !------------------------------------------------------------------------------
-  ! returns number of species in a bin for a given radiation list index
-  !------------------------------------------------------------------------------
-  function nspecies_per_bin_rlist(self, list_ndx,  bin_ndx)  result(res)
-    class(carma_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: list_ndx ! radiation list number
-    integer, intent(in) :: bin_ndx  ! bin number
-
-    integer :: res
-
-    call rad_cnst_get_info_by_bin(list_ndx, bin_ndx, nspec=res)
-
-  end function nspecies_per_bin_rlist
-
-  !------------------------------------------------------------------------------
-  ! returns the natural log of geometric standard deviation of the number
-  ! distribution for radiation list number and aerosol bin
-  !------------------------------------------------------------------------------
-  function alogsig_rlist(self, list_ndx,  bin_ndx)  result(res)
-    class(carma_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: list_ndx ! radiation list number
-    integer, intent(in) :: bin_ndx  ! bin number
-
-    real(r8) :: res
-
-    res = self%alogsig(bin_ndx)
-
-  end function alogsig_rlist
-
-  !------------------------------------------------------------------------------
-  ! returns name for a given radiation list number and aerosol bin
-  !------------------------------------------------------------------------------
-  function bin_name(self, list_ndx,  bin_ndx) result(name)
-    class(carma_aerosol_properties), intent(in) :: self
-    integer, optional, intent(in) :: list_ndx ! radiation list number
     integer, intent(in) :: bin_ndx  ! bin number
 
     character(len=32) name
-    integer :: list_ndx_loc
 
-    list_ndx_loc = self%list_idx()
-    if (present(list_ndx)) list_ndx_loc = list_ndx
-
-    call rad_cnst_get_info_by_bin(list_ndx_loc, bin_ndx, bin_name=name)
+    call rad_cnst_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=name)
 
   end function bin_name
 

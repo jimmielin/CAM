@@ -80,7 +80,7 @@ contains
     end if
 
     ! optical properties tables
-    call aero_props%optics_params(aero_state%list_idx(), ibin, &
+    call aero_props%optics_params(ibin, &
          r_sw_ext=newobj%r_sw_ext, &
          r_sw_scat=newobj%r_sw_scat, &
          r_sw_ascat=newobj%r_sw_ascat, &

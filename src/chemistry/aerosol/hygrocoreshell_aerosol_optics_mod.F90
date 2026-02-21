@@ -116,7 +116,7 @@ contains
        return
     end if
 
-    nspec = aero_props%nspecies(aero_state%list_idx(),ibin)
+    nspec = aero_props%nspecies(ibin)
 
     coremmr(:,:) = 0._r8
     coredustmmr(:,:) = 0._r8
@@ -127,7 +127,7 @@ contains
 
        call aero_state%get_ambient_mmr(ispec,ibin,specmmr)
 
-       call aero_props%get(ibin, ispec, list_ndx=aero_state%list_idx(), density=specdens, &
+       call aero_props%get(ibin, ispec, density=specdens, &
                            spectype=spectype, specmorph=specmorph)
 
        if (trim(specmorph) == 'core') then
@@ -172,7 +172,7 @@ contains
 
     call aero_state%hygroscopicity(ibin, newobj%kappa)
 
-    call aero_props%optics_params(aero_state%list_idx(), ibin, &
+    call aero_props%optics_params(ibin, &
          corefrac=newobj%tbl_corefrac, kap=newobj%tbl_kap, &
          bcdust=newobj%tbl_bcdust, relh=newobj%tbl_relh, &
          nfrac=newobj%nfrac, nbcdust=newobj%nbcdust, &
@@ -181,7 +181,7 @@ contains
     newobj%relh(:ncol,:) = relhum(:ncol,:)
 
     ! long wave optical properties table
-    call aero_props%optics_params(aero_state%list_idx(), ibin,  &
+    call aero_props%optics_params(ibin,  &
          sw_hygro_coreshell_ext=newobj%sw_hygro_coreshell_ext, &
          sw_hygro_coreshell_ssa=newobj%sw_hygro_coreshell_ssa, &
          sw_hygro_coreshell_asm=newobj%sw_hygro_coreshell_asm, &

@@ -84,7 +84,7 @@ contains
     newobj%wrh(1:ncols,1:nlevs) = rhtrunc(1:ncols,1:nlevs) * numrh - newobj%krh(1:ncols,1:nlevs) ! (-) weighting on left side values
 
     ! optical properties tables
-    call aero_props%optics_params(aero_state%list_idx(), ibin, &
+    call aero_props%optics_params(ibin, &
          sw_hygroscopic_ext=newobj%ext_sw, &
          sw_hygroscopic_ssa=newobj%ssa_sw, &
          sw_hygroscopic_asm=newobj%asm_sw, &
