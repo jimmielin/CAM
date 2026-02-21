@@ -16,7 +16,7 @@ module aero_wetdep_cam
   use cam_history,   only: addfld, add_default, horiz_only, outfld
   use wetdep,        only: wetdep_init
 
-  use rad_constituents, only: rad_cnst_get_info
+  use radiative_aerosol, only: rad_aer_get_info
 
   use aerosol_properties_mod, only: aero_name_len
   use aerosol_properties_mod, only: aerosol_properties
@@ -172,7 +172,7 @@ contains
                       history_chemistry_out=history_chemistry, &
                       convproc_do_aer_out = convproc_do_aer)
 
-    call rad_cnst_get_info(0, nmodes=nmodes, nbins=nbins)
+    call rad_aer_get_info(0, nmodes=nmodes, nbins=nbins)
 
     if (nmodes>0) then
        aero_props => modal_aerosol_properties()

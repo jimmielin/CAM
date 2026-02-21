@@ -13,7 +13,7 @@ module fire_emissions
   use cam_logfile,       only : iulog
   use ppgrid,            only : pver, pverp
   use constituents,      only : cnst_get_ind
-  use rad_constituents,  only : rad_cnst_get_aer_props, rad_cnst_num_name
+  use radiative_aerosol,  only : rad_aer_get_props, rad_aer_num_name
   use mo_chem_utls,      only : get_spc_ndx, get_extfrc_ndx
   use chem_mods,         only : adv_mass ! g/mole
   use infnan,            only : nan, assignment(=)
@@ -118,13 +118,13 @@ contains
 
           ! for MAM need to include cooresponding forcings of number densities
 
-          found = rad_cnst_num_name(0, name, num_name, mode_out=mode, spec_out=spec )
+          found = rad_aer_num_name(0, name, num_name, mode_out=mode, spec_out=spec )
 
           if ( found ) then
 
              frc_ndx = get_extfrc_ndx( num_name )
 
-             call rad_cnst_get_aer_props(0, mode, spec, density_aer=specdens)
+             call rad_aer_get_props(0, mode, spec, density_aer=specdens)
              frc_num_map(n) = frc_ndx
              num_mass_factor(n) = x_numfact / specdens
 

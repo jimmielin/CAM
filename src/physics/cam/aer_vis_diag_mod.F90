@@ -5,7 +5,7 @@ module aer_vis_diag_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
   use cam_history, only: fieldname_len, addfld, outfld, add_default, horiz_only, hist_fld_active
   use cam_history_support, only : fillvalue
-  use rad_constituents, only: rad_cnst_get_info
+  use radiative_aerosol, only: rad_aer_get_info
   use ppgrid, only: pcols, pver
   use phys_control, only: phys_getopts
   use cam_abortutils, only: endrun
@@ -29,7 +29,7 @@ contains
     logical :: history_aero_optics  ! Output aerosol optics diagnostics
 
     ! number of bulk aerosols in climate list
-    call rad_cnst_get_info(0, naero=numaerosols)
+    call rad_aer_get_info(0, naero=numaerosols)
 
     if (numaerosols<1) return
 
@@ -37,7 +37,7 @@ contains
     allocate(aernames(numaerosols),stat=astat)
     if( astat/= 0 ) call endrun('aer_vis_diag_init: aernames allocate error')
 
-    call rad_cnst_get_info(0, aernames=aernames)
+    call rad_aer_get_info(0, aernames=aernames)
 
     call phys_getopts( history_aero_optics_out = history_aero_optics )
 

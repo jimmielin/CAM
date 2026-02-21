@@ -12,7 +12,7 @@ use ppgrid,           only: pcols, pver, pverp
 use physconst,        only: gravit, rair, tmelt, cpair, rh2o, &
      r_universal, mwh2o, rhoh2o, latvap
 
-use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_aer_props
+use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props
 
 use shr_spfn_mod,     only: erf => shr_spfn_erf, &
                             erfc => shr_spfn_erfc
@@ -90,7 +90,7 @@ subroutine ndrop_bam_init
    ! Access the physical properties of the bulk aerosols that are affecting the climate
    ! by using routines from the rad_constituents module.
 
-   call rad_cnst_get_info(0, naero=naer_all)
+   call rad_aer_get_info(0, naero=naer_all)
    allocate( &
       aername(naer_all),        &
       dryrad_aer(naer_all),     &
@@ -100,7 +100,7 @@ subroutine ndrop_bam_init
       num_to_mass_aer(naer_all) )
 
    do iaer = 1, naer_all
-      call rad_cnst_get_aer_props(0, iaer, &
+      call rad_aer_get_props(0, iaer, &
          aername         = aername(iaer), &
          dryrad_aer      = dryrad_aer(iaer), &
          density_aer     = density_aer(iaer), &
