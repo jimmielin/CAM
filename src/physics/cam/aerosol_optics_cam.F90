@@ -20,9 +20,9 @@ module aerosol_optics_cam
   use wv_saturation, only: qsat
 
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
-  use modal_aerosol_properties_mod, only: modal_aerosol_properties
-  use carma_aerosol_properties_mod, only: carma_aerosol_properties
-  use bulk_aerosol_properties_mod, only: bulk_aerosol_properties
+  use aerosol_instances_mod,  only: aerosol_instances_init, aerosol_instances_get_props, &
+                                    aerosol_instances_get_num_models, aerosol_instances_is_active, &
+                                    aerosol_instances_final
 
   use aerosol_state_mod,      only: aerosol_state
   use modal_aerosol_state_mod,only: modal_aerosol_state
@@ -33,7 +33,6 @@ module aerosol_optics_cam
   use refractive_aerosol_optics_mod, only: refractive_aerosol_optics
   use hygrocoreshell_aerosol_optics_mod, only: hygrocoreshell_aerosol_optics
   use hygrowghtpct_aerosol_optics_mod, only: hygrowghtpct_aerosol_optics
-  use rad_constituents, only: rad_cnst_get_info
   use hygroscopic_aerosol_optics_mod, only: hygroscopic_aerosol_optics
   use hygro_aerosol_optics_mod, only: hygro_aerosol_optics
   use insoluble_aerosol_optics_mod, only: insoluble_aerosol_optics
@@ -51,27 +50,14 @@ module aerosol_optics_cam
   public :: aerosol_optics_cam_sw
   public :: aerosol_optics_cam_lw
 
-  type aero_props_t
-     class(aerosol_properties), pointer :: obj => null()
-  end type aero_props_t
   type aero_state_t
      class(aerosol_state), pointer :: obj => null()
   end type aero_state_t
-
-  type(aero_props_t), allocatable :: aero_props(:) ! array of aerosol properties objects to allow for
-                                                   ! multiple aerosol representations in the same sim
-                                                   ! such as MAM and CARMA
 
   ! refractive index for water read in read_water_refindex
   complex(r8) :: crefwsw(nswbands) = -huge(1._r8) ! complex refractive index for water visible
   complex(r8) :: crefwlw(nlwbands) = -huge(1._r8) ! complex refractive index for water infrared
   character(len=cl) :: water_refindex_file = 'NONE' ! full pathname for water refractive index dataset
-
-  logical :: carma_active = .false.
-  logical :: modal_active = .false.
-  logical :: bulk_active = .false.
-
-  integer :: num_aero_models = 0
   integer :: lw10um_indx = -1            ! wavelength index corresponding to 10 microns
   real(r8), parameter :: lw10um = 10._r8 ! microns
 
@@ -144,8 +130,8 @@ contains
     use ioFileMod,        only: getfil
 
     character(len=*), parameter :: prefix = 'aerosol_optics_cam_init: '
-    integer :: nmodes=0, nbins=0, iaermod, istat, ilist, i
-    integer :: nbulk_aerosols=0
+    integer :: iaermod, istat, ilist, i
+    integer :: num_aero_models
 
     logical :: call_list(0:n_diag)
     real(r8) :: lwavlen_lo(nlwbands), lwavlen_hi(nlwbands)
@@ -157,6 +143,8 @@ contains
     logical :: history_amwg            ! output the variables used by the AMWG diag package
     logical :: history_dust            ! output dust diagnostics
     logical :: prog_modal_aero         ! prognostic modal aerosols present
+
+    class(aerosol_properties), pointer :: aprops
 
     character(len=cl) :: locfile
 
@@ -172,48 +160,11 @@ contains
        top_lev = 1
     endif
 
-    num_aero_models = 0
-
-    call rad_cnst_get_info(0, nmodes=nmodes, nbins=nbins, naero=nbulk_aerosols)
-    modal_active = nmodes>0
-    carma_active = nbins>0
-    bulk_active = nbulk_aerosols>0
-
-    ! count aerosol models
-    if (modal_active) then
-       num_aero_models = num_aero_models+1
-    end if
-    if (carma_active) then
-       num_aero_models = num_aero_models+1
-    end if
-    if (bulk_active) then
-       num_aero_models = num_aero_models+1
-    end if
-
-    if (num_aero_models>0) then
-       allocate(aero_props(num_aero_models), stat=istat)
-       if (istat/=0) then
-          call endrun(prefix//'array allocation error: aero_props')
-       end if
-    end if
-
-    iaermod = 0
-
-    if (modal_active) then
-       iaermod = iaermod+1
-       aero_props(iaermod)%obj => modal_aerosol_properties()
-    end if
-    if (carma_active) then
-       iaermod = iaermod+1
-       aero_props(iaermod)%obj => carma_aerosol_properties()
-    end if
-    if (bulk_active) then
-       iaermod = iaermod+1
-       aero_props(iaermod)%obj => bulk_aerosol_properties()
-    end if
+    call aerosol_instances_init()
+    num_aero_models = aerosol_instances_get_num_models()
 
     if (water_refindex_file=='NONE') then
-       if (modal_active .or. carma_active) then
+       if (aerosol_instances_is_active('modal') .or. aerosol_instances_is_active('carma')) then
           call endrun(prefix//'water_refindex_file must be specified')
        end if
     else
@@ -339,33 +290,36 @@ contains
 
        do n = 1,num_aero_models
 
-          allocate(burden_fields(n)%name(aero_props(n)%obj%nbins()), stat=istat)
+          ! for history output use the climate list.
+          aprops => aerosol_instances_get_props(n, list_idx=0)
+
+          allocate(burden_fields(n)%name(aprops%nbins()), stat=istat)
           if (istat/=0) then
              call endrun(prefix//'array allocation error: burden_fields(n)%name')
           end if
-          allocate(aodbin_fields(n)%name(aero_props(n)%obj%nbins()), stat=istat)
+          allocate(aodbin_fields(n)%name(aprops%nbins()), stat=istat)
           if (istat/=0) then
              call endrun(prefix//'array allocation error: aodbin_fields(n)%name')
           end if
-          allocate(aoddust_fields(n)%name(aero_props(n)%obj%nbins()), stat=istat)
+          allocate(aoddust_fields(n)%name(aprops%nbins()), stat=istat)
           if (istat/=0) then
              call endrun(prefix//'array allocation error: aoddust_fields(n)%name')
           end if
 
-          allocate(burdendn_fields(n)%name(aero_props(n)%obj%nbins()), stat=istat)
+          allocate(burdendn_fields(n)%name(aprops%nbins()), stat=istat)
           if (istat/=0) then
              call endrun(prefix//'array allocation error: burdendn_fields(n)%name')
           end if
-          allocate(aodbindn_fields(n)%name(aero_props(n)%obj%nbins()), stat=istat)
+          allocate(aodbindn_fields(n)%name(aprops%nbins()), stat=istat)
           if (istat/=0) then
              call endrun(prefix//'array allocation error: aodbindn_fields(n)%name')
           end if
-          allocate(aoddustdn_fields(n)%name(aero_props(n)%obj%nbins()), stat=istat)
+          allocate(aoddustdn_fields(n)%name(aprops%nbins()), stat=istat)
           if (istat/=0) then
              call endrun(prefix//'array allocation error: aoddustdn_fields(n)%name')
           end if
 
-          do m = 1, aero_props(n)%obj%nbins()
+          do m = 1, aprops%nbins()
 
              cnt = cnt+1
 
@@ -377,9 +331,9 @@ contains
                 call add_default (fldname, 1, ' ')
              end if
 
-             fldname = 'AOD_'//trim(aero_props(n)%obj%bin_name(0,m))
+             fldname = 'AOD_'//trim(aprops%bin_name(bin_ndx=m))
              aodbin_fields(n)%name(m) = fldname
-             lngname = 'Aerosol optical depth, day only, 550 nm, '//trim(aero_props(n)%obj%bin_name(0,m))
+             lngname = 'Aerosol optical depth, day only, 550 nm, '//trim(aprops%bin_name(bin_ndx=m))
              call addfld (aodbin_fields(n)%name(m), horiz_only, 'A', '  ', lngname, flag_xyfill=.true.)
              if (history_aero_optics) then
                 call add_default (fldname, 1, ' ')
@@ -401,9 +355,9 @@ contains
                 call add_default (fldname, 1, ' ')
              end if
 
-             fldname = 'AODdn_'//trim(aero_props(n)%obj%bin_name(0,m))
+             fldname = 'AODdn_'//trim(aprops%bin_name(bin_ndx=m))
              aodbindn_fields(n)%name(m) = fldname
-             lngname = 'Aerosol optical depth 550 nm, day night, '//trim(aero_props(n)%obj%bin_name(0,m))
+             lngname = 'Aerosol optical depth 550 nm, day night, '//trim(aprops%bin_name(bin_ndx=m))
              call addfld (aodbindn_fields(n)%name(m), horiz_only, 'A', '  ', lngname, flag_xyfill=.true.)
              if (history_aero_optics) then
                 call add_default (fldname, 1, ' ')
@@ -559,18 +513,7 @@ contains
   !===============================================================================
   subroutine aerosol_optics_cam_final
 
-    integer :: iaermod
-
-    do iaermod = 1,num_aero_models
-       if (associated(aero_props(iaermod)%obj)) then
-          deallocate(aero_props(iaermod)%obj)
-          nullify(aero_props(iaermod)%obj)
-       end if
-    end do
-
-    if (allocated(aero_props)) then
-       deallocate(aero_props)
-    endif
+    call aerosol_instances_final()
 
   end subroutine aerosol_optics_cam_final
 
@@ -598,8 +541,8 @@ contains
     integer :: iwav, ilev
     integer :: icol, istat
     integer :: lchnk, ncol
+    integer :: num_aero_models
 
-    integer :: nmodes=0
     character(len=aero_name_len) :: modetype
     logical :: coarse_dust_mode ! coarse dust mode for different MAM versions
 
@@ -768,6 +711,7 @@ contains
     dopaer0 = 0.0_r8
     ! dmleung --
 
+    num_aero_models = aerosol_instances_get_num_models()
     if (num_aero_models<1) return
 
     allocate(aero_state(num_aero_models), stat=istat)
@@ -776,15 +720,15 @@ contains
     end if
 
     iaermod = 0
-    if (modal_active) then
+    if (aerosol_instances_is_active('modal')) then
        iaermod = iaermod+1
        aero_state(iaermod)%obj => modal_aerosol_state( state, pbuf )
     end if
-    if (carma_active) then
+    if (aerosol_instances_is_active('carma')) then
        iaermod = iaermod+1
        aero_state(iaermod)%obj => carma_aerosol_state( state, pbuf )
     end if
-    if (bulk_active) then
+    if (aerosol_instances_is_active('bulk')) then
        iaermod = iaermod+1
        aero_state(iaermod)%obj => bulk_aerosol_state( state, pbuf )
     end if
@@ -815,10 +759,11 @@ contains
 
     aeromodel: do iaermod = 1,num_aero_models
 
-       aeroprops => aero_props(iaermod)%obj
+       aeroprops => aerosol_instances_get_props(iaermod, list_idx)
+       if (.not. associated(aeroprops)) cycle aeromodel
        aerostate => aero_state(iaermod)%obj
 
-       nbins=aeroprops%nbins(list_idx)
+       nbins=aeroprops%nbins()
 
        sulfwtpct(:ncol,:pver) = aerostate%wgtpct(ncol,pver)
        call outfld('SULFWTPCT', sulfwtpct(1:ncol,:), ncol, lchnk)
@@ -827,7 +772,7 @@ contains
 
           ! MAM coarse mode
           if (aeroprops%model_is('MAM')) then
-             modetype = aeroprops%bin_name(list_idx, ibin)
+             modetype = aeroprops%bin_name(bin_ndx=ibin)
              coarse_dust_mode = (modetype=='coarse' .or. modetype=='coarse_dust')
           else
              coarse_dust_mode = .false.
@@ -838,29 +783,35 @@ contains
           aodbin(:) = 0.0_r8
           taubam(:,:) = 0._r8
 
-          call aeroprops%optics_params(list_idx, ibin, opticstype=opticstype)
+          call aeroprops%optics_params(bin_ndx=ibin, opticstype=opticstype)
 
           select case (trim(opticstype))
           case('modal') ! refractive method
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>refractive_aerosol_optics(aeroprops, aerostate, list_idx, ibin, &
                                                     ncol, pver, nswbands, nlwbands, crefwsw, crefwlw)
           case('hygroscopic_coreshell')
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>hygrocoreshell_aerosol_optics(aeroprops, aerostate, list_idx, &
                                                         ibin, ncol, pver, relh(:ncol,:))
           case('hygroscopic_wtp')
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>hygrowghtpct_aerosol_optics(aeroprops, aerostate, list_idx, &
                                                       ibin, ncol, pver, sulfwtpct(:ncol,:))
           case('hygro')
              ! Short-wave hygroscopic aerosol, Long-wave non-hygroscopic
              ! aerosol optical properties
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>hygro_aerosol_optics(aeroprops, aerostate, list_idx, &
                                                ibin, ncol, pver, numrh, relh(:ncol,:))
           case('hygroscopic')
              ! Short-wave and long-wave hygroscopic aerosol properties
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>hygroscopic_aerosol_optics(aeroprops, aerostate, list_idx, &
                                                      ibin, ncol, pver, numrh, relh(:ncol,:))
 
           case('nonhygro', 'insoluble')
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>insoluble_aerosol_optics(aeroprops, aerostate, list_idx, ibin)
 
           case('volcanic_radius','volcanic_radius1','volcanic_radius2','volcanic_radius3')
@@ -872,6 +823,7 @@ contains
              idx = pbuf_get_index(pbuf_fld)
              call pbuf_get_field(pbuf, idx, geometric_radius )
 
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>volcrad_aerosol_optics(aeroprops, aerostate, list_idx, &
                   ibin, ncol, pver, geometric_radius(:ncol,:))
 
@@ -881,6 +833,7 @@ contains
 
           if (associated(aero_optics)) then
 
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              wetvol(:ncol,:pver) = aerostate%wet_volume(aeroprops, list_idx, ibin, ncol, pver)
              watervol(:ncol,:pver) = aerostate%water_volume(aeroprops, list_idx, ibin, ncol, pver)
 
@@ -1005,9 +958,10 @@ contains
 
          ! loop over species ...
 
-         do ispec = 1, aeroprops%nspecies(list_idx,ibin)
-            call aeroprops%get(ibin, ispec, list_ndx=list_idx, density=specdens, &
+         do ispec = 1, aeroprops%nspecies(ibin)
+            call aeroprops%get(ibin, ispec, density=specdens, &
                  spectype=spectype, refindex_sw=specrefindex, hygro=hygro_aer)
+            ! TODO (2/20/26): remove list_idx once state refactoring is complete
             call aerostate%get_ambient_mmr(list_idx, ispec, ibin, specmmr)
 
             burden(icol) = burden(icol) + specmmr(icol,ilev)*mass(icol,ilev)
@@ -1335,6 +1289,7 @@ contains
     integer :: ibin, nbins
     integer :: iwav, ilev
     integer :: ncol, icol, istat
+    integer :: num_aero_models
 
     type(aero_state_t), allocatable :: aero_state(:) ! array of aerosol state objects to allow for
                                                      ! multiple aerosol representations in the same sim
@@ -1364,21 +1319,23 @@ contains
 
     nullify(aero_optics)
 
+    num_aero_models = aerosol_instances_get_num_models()
+
     allocate(aero_state(num_aero_models), stat=istat)
     if (istat/=0) then
        call endrun(prefix//'array allocation error: aero_state')
     end if
 
     iaermod = 0
-    if (modal_active) then
+    if (aerosol_instances_is_active('modal')) then
        iaermod = iaermod+1
        aero_state(iaermod)%obj => modal_aerosol_state( state, pbuf )
     end if
-    if (carma_active) then
+    if (aerosol_instances_is_active('carma')) then
        iaermod = iaermod+1
        aero_state(iaermod)%obj => carma_aerosol_state( state, pbuf )
     end if
-    if (bulk_active) then
+    if (aerosol_instances_is_active('bulk')) then
        iaermod = iaermod+1
        aero_state(iaermod)%obj => bulk_aerosol_state( state, pbuf )
     end if
@@ -1399,37 +1356,44 @@ contains
 
     aeromodel: do iaermod = 1,num_aero_models
 
-       aeroprops => aero_props(iaermod)%obj
+       aeroprops => aerosol_instances_get_props(iaermod, list_idx)
+       if (.not. associated(aeroprops)) cycle aeromodel
        aerostate => aero_state(iaermod)%obj
 
-       nbins=aero_props(iaermod)%obj%nbins(list_idx)
+       nbins=aeroprops%nbins()
 
        sulfwtpct(:ncol,:pver) = aerostate%wgtpct(ncol,pver)
 
        binloop: do ibin = 1, nbins
 
-          call aeroprops%optics_params(list_idx, ibin, opticstype=opticstype)
+          call aeroprops%optics_params(bin_ndx=ibin, opticstype=opticstype)
 
           select case (trim(opticstype))
           case('modal') ! refractive method
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>refractive_aerosol_optics(aeroprops, aerostate, list_idx, ibin, &
                                                     ncol, pver, nswbands, nlwbands, crefwsw, crefwlw)
           case('hygroscopic_coreshell')
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>hygrocoreshell_aerosol_optics(aeroprops, aerostate, list_idx, &
                                                         ibin, ncol, pver, relh(:ncol,:))
           case('hygroscopic_wtp')
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>hygrowghtpct_aerosol_optics(aeroprops, aerostate, list_idx, &
                                                       ibin, ncol, pver, sulfwtpct(:ncol,:))
 
           case('hygroscopic')
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>hygroscopic_aerosol_optics(aeroprops, aerostate, list_idx, ibin, &
                                                      ncol, pver, numrh, relh(:ncol,:))
 
           case('hygro')
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>hygro_aerosol_optics(aeroprops, aerostate, list_idx, ibin, &
                                                      ncol, pver, numrh, relh(:ncol,:))
 
           case('nonhygro', 'insoluble')
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>insoluble_aerosol_optics(aeroprops, aerostate, list_idx, ibin)
 
           case('volcanic_radius','volcanic_radius1','volcanic_radius2','volcanic_radius3')
@@ -1441,6 +1405,7 @@ contains
              idx = pbuf_get_index(pbuf_fld)
              call pbuf_get_field(pbuf, idx, geometric_radius )
 
+             ! TODO (2/20/26): remove list_idx once state refactoring is complete
              aero_optics=>volcrad_aerosol_optics(aeroprops, aerostate, list_idx, &
                   ibin, ncol, pver, geometric_radius(:ncol,:))
 

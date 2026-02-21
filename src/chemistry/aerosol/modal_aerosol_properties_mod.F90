@@ -67,11 +67,13 @@ contains
 
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
-  function constructor() result(newobj)
+  function constructor(list_idx) result(newobj)
 
+    integer, optional, intent(in) :: list_idx ! radiation list index (0=climate)
     type(modal_aerosol_properties), pointer :: newobj
 
     integer :: l, m, nmodes, ncnst_tot, mm
+    integer :: list_idx_loc
     real(r8) :: dgnumlo
     real(r8) :: dgnumhi
     integer,allocatable :: nspecies(:)
@@ -85,13 +87,16 @@ contains
 
     integer :: npoa, nsoa, nbc
 
+    list_idx_loc = 0
+    if (present(list_idx)) list_idx_loc = list_idx
+
     allocate(newobj,stat=ierr)
     if( ierr /= 0 ) then
        nullify(newobj)
        return
     end if
 
-    call rad_cnst_get_info(0, nmodes=nmodes)
+    call rad_cnst_get_info(list_idx_loc, nmodes=nmodes)
 
     allocate(nspecies(nmodes),stat=ierr)
     if( ierr /= 0 ) then
@@ -138,11 +143,11 @@ contains
     ncnst_tot = 0
 
     do m = 1, nmodes
-       call rad_cnst_get_info(0, m, nspec=nspecies(m))
+       call rad_cnst_get_info(list_idx_loc, m, nspec=nspecies(m))
 
        ncnst_tot =  ncnst_tot + nspecies(m) + 1
 
-       call rad_cnst_get_mode_props(0, m, sigmag=sigmag(m), &
+       call rad_cnst_get_mode_props(list_idx_loc, m, sigmag=sigmag(m), &
                                     dgnumhi=dgnumhi, dgnumlo=dgnumlo )
 
        alogsig(m) = log(sigmag(m))
@@ -159,7 +164,7 @@ contains
 
     end do
 
-    call newobj%initialize(nmodes,ncnst_tot,nspecies,nspecies,alogsig,f1,f2,ierr)
+    call newobj%initialize(nmodes,ncnst_tot,nspecies,nspecies,alogsig,f1,f2,ierr,list_idx_loc)
 
     npoa = 0
     nsoa = 0
@@ -375,7 +380,7 @@ contains
     if (present(list_ndx)) then
        ilist = list_ndx
     else
-       ilist = 0
+       ilist = self%list_idx()
     end if
 
     call rad_cnst_get_aer_props(ilist, bin_ndx, species_ndx, &
@@ -406,7 +411,7 @@ contains
 
     class(modal_aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx             ! bin index
-    integer, intent(in) :: list_ndx            ! rad climate/diags list
+    integer, optional, intent(in) :: list_ndx  ! rad climate/diags list
 
     character(len=*), optional, intent(out) :: opticstype
 
@@ -464,8 +469,12 @@ contains
     real(r8),  optional, pointer :: r_mu(:)
     real(r8),  optional, pointer :: r_lw_abs(:,:)
 
+    integer :: list_ndx_loc
+    list_ndx_loc = self%list_idx()
+    if (present(list_ndx)) list_ndx_loc = list_ndx
+
     ! refactive index table parameters
-    call rad_cnst_get_mode_props(list_ndx, bin_ndx, &
+    call rad_cnst_get_mode_props(list_ndx_loc, bin_ndx, &
                                  opticstype=opticstype, &
                                  extpsw=extpsw, &
                                  abspsw=abspsw, &
@@ -897,12 +906,16 @@ contains
   !------------------------------------------------------------------------------
   function bin_name(self, list_ndx,  bin_ndx) result(name)
     class(modal_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: list_ndx ! radiation list number
+    integer, optional, intent(in) :: list_ndx ! radiation list number
     integer, intent(in) :: bin_ndx  ! bin number
 
     character(len=32) name
+    integer :: list_ndx_loc
 
-    call rad_cnst_get_info(list_ndx, bin_ndx, mode_type=name)
+    list_ndx_loc = self%list_idx()
+    if (present(list_ndx)) list_ndx_loc = list_ndx
+
+    call rad_cnst_get_info(list_ndx_loc, bin_ndx, mode_type=name)
 
   end function bin_name
 

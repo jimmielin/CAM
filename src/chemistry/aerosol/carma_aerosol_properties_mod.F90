@@ -55,11 +55,13 @@ contains
 
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
-  function constructor() result(newobj)
+  function constructor(list_idx) result(newobj)
 
+    integer, optional, intent(in) :: list_idx ! radiation list index (0=climate)
     type(carma_aerosol_properties), pointer :: newobj
 
     integer :: l, m, nbins, ncnst_tot
+    integer :: list_idx_loc
     integer,allocatable :: nspecies(:)
     integer,allocatable :: nmasses(:)
     real(r8),allocatable :: alogsig(:)
@@ -77,13 +79,16 @@ contains
     integer, allocatable :: imx_mmr_bl(:) ! index used to map pure sulfate bin to mixed sulfate bin for mmr
     integer, allocatable :: imx_num_bl(:) ! index used to map pure sulfate bin to mixed sulfate bin for num
 
+    list_idx_loc = 0
+    if (present(list_idx)) list_idx_loc = list_idx
+
     allocate(newobj,stat=ierr)
     if( ierr /= 0 ) then
        nullify(newobj)
        return
     end if
 
-    call rad_cnst_get_info( 0, nbins=nbins)
+    call rad_cnst_get_info( list_idx_loc, nbins=nbins)
 
     allocate( nspecies(nbins),stat=ierr )
     if( ierr /= 0 ) then
@@ -114,7 +119,7 @@ contains
     ncnst_tot = 0
 
     do m = 1, nbins
-       call rad_cnst_get_info_by_bin(0, m, nspec=nspecies(m))
+       call rad_cnst_get_info_by_bin(list_idx_loc, m, nspec=nspecies(m))
        ncnst_tot = ncnst_tot + nspecies(m) + 1
        nmasses(m) = nspecies(m)
     end do
@@ -123,7 +128,7 @@ contains
     f1 = 1._r8
     f2 = 1._r8
 
-    call newobj%initialize(nbins,ncnst_tot,nspecies,nmasses,alogsig,f1,f2,ierr)
+    call newobj%initialize(nbins,ncnst_tot,nspecies,nmasses,alogsig,f1,f2,ierr,list_idx_loc)
     if( ierr /= 0 ) then
        nullify(newobj)
        return
@@ -167,10 +172,10 @@ contains
     ipr_num = 0
 
     do m = 1,nbins
-       bin_name = newobj%bin_name(0,m)
+       bin_name = newobj%bin_name(list_idx_loc,m)
        bin_name_l = ' '
        if (m<nbins) then
-          bin_name_l = newobj%bin_name(0,m+1)
+          bin_name_l = newobj%bin_name(list_idx_loc,m+1)
        end if
 
        do l = 0,newobj%nspecies(m)
@@ -281,7 +286,7 @@ contains
     if (present(list_ndx)) then
        ilist = list_ndx
     else
-       ilist = 0
+       ilist = self%list_idx()
     end if
 
     if (present(density)) then
@@ -326,7 +331,7 @@ contains
 
     class(carma_aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx             ! bin index
-    integer, intent(in) :: list_ndx            ! rad climate/diags list
+    integer, optional, intent(in) :: list_ndx  ! rad climate/diags list
 
     character(len=*), optional, intent(out) :: opticstype
 
@@ -384,6 +389,10 @@ contains
     real(r8),  optional, pointer :: r_mu(:)
     real(r8),  optional, pointer :: r_lw_abs(:,:)
 
+    integer :: list_ndx_loc
+    list_ndx_loc = self%list_idx()
+    if (present(list_ndx)) list_ndx_loc = list_ndx
+
     if (present(extpsw)) then
        nullify(extpsw)
     end if
@@ -418,7 +427,7 @@ contains
        prefi = huge(1)
     end if
 
-    call rad_cnst_get_bin_props(list_ndx,bin_ndx, &
+    call rad_cnst_get_bin_props(list_ndx_loc,bin_ndx, &
                                 opticstype=opticstype, &
                                 sw_hygro_ext_wtp=sw_hygro_ext_wtp, &
                                 sw_hygro_ssa_wtp=sw_hygro_ssa_wtp, &
@@ -748,12 +757,16 @@ contains
   !------------------------------------------------------------------------------
   function bin_name(self, list_ndx,  bin_ndx) result(name)
     class(carma_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: list_ndx ! radiation list number
+    integer, optional, intent(in) :: list_ndx ! radiation list number
     integer, intent(in) :: bin_ndx  ! bin number
 
     character(len=32) name
+    integer :: list_ndx_loc
 
-    call rad_cnst_get_info_by_bin(list_ndx, bin_ndx, bin_name=name)
+    list_ndx_loc = self%list_idx()
+    if (present(list_ndx)) list_ndx_loc = list_ndx
+
+    call rad_cnst_get_info_by_bin(list_ndx_loc, bin_ndx, bin_name=name)
 
   end function bin_name
 

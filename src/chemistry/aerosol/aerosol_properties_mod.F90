@@ -33,7 +33,9 @@ module aerosol_properties_mod
      ! 1, Singleaerosoltype. J. Geophys. Res., 103, 6123-6132, 1998.
      real(r8) :: soa_equivso4_factor_ = -huge(1._r8)
      real(r8) :: pom_equivso4_factor_ = -huge(1._r8)
+     integer :: list_idx_ = 0 ! radiation list index (0=climate)
    contains
+     procedure :: list_idx => get_list_idx
      procedure :: initialize => aero_props_init
      procedure,private :: nbins_0list
      procedure(aero_nbins_rlist), deferred :: nbins_rlist
@@ -134,7 +136,7 @@ module aerosol_properties_mod
 
        class(aerosol_properties), intent(in) :: self
        integer, intent(in) :: bin_ndx             ! bin index
-       integer, intent(in) :: list_ndx            ! rad climate/diags list
+       integer, optional, intent(in) :: list_ndx  ! rad climate/diags list
 
        character(len=*), optional, intent(out) :: opticstype
 
@@ -400,7 +402,7 @@ module aerosol_properties_mod
      function aero_bin_name(self, list_ndx,  bin_ndx) result(name)
        import :: aerosol_properties, r8, aero_name_len
        class(aerosol_properties), intent(in) :: self
-       integer, intent(in) :: list_ndx ! radiation list number
+       integer, optional, intent(in) :: list_ndx ! radiation list number
        integer, intent(in) :: bin_ndx  ! bin number
 
        character(len=aero_name_len) :: name
@@ -473,7 +475,7 @@ contains
   !------------------------------------------------------------------------------
   ! object initializer
   !------------------------------------------------------------------------------
-  subroutine aero_props_init(self, nbin, ncnst, nspec, nmasses, alogsig, f1,f2, ierr )
+  subroutine aero_props_init(self, nbin, ncnst, nspec, nmasses, alogsig, f1,f2, ierr, list_idx )
     class(aerosol_properties), intent(inout) :: self
     integer, intent(in) :: nbin               ! number of bins
     integer, intent(in) :: ncnst              ! total number of constituents
@@ -483,6 +485,7 @@ contains
     real(r8),intent(in) :: f1(nbin)           ! eq 28 Abdul-Razzak et al 1998
     real(r8),intent(in) :: f2(nbin)           ! eq 29 Abdul-Razzak et al 1998
     integer,intent(out) :: ierr
+    integer, optional, intent(in) :: list_idx ! radiation list index (0=climate)
 
     integer :: imas,ibin,indx
     character(len=*),parameter :: prefix = 'aerosol_properties::aero_props_init: '
@@ -545,6 +548,12 @@ contains
     self%soa_equivso4_factor_ = spechygro_soa/spechygro_so4
     self%pom_equivso4_factor_ = spechygro_pom/spechygro_so4
 
+    if (present(list_idx)) then
+       self%list_idx_ = list_idx
+    else
+       self%list_idx_ = 0
+    end if
+
   end subroutine aero_props_init
 
   !------------------------------------------------------------------------------
@@ -574,6 +583,7 @@ contains
 
     self%nbins_ = 0
     self%ncnst_tot_ = 0
+    self%list_idx_ = 0
 
   end subroutine aero_props_final
 
@@ -741,5 +751,15 @@ contains
     pom_equivso4_factor = self%pom_equivso4_factor_
 
   end function pom_equivso4_factor
+
+  !------------------------------------------------------------------------------
+  ! returns the radiation list index
+  !------------------------------------------------------------------------------
+  pure integer function get_list_idx(self)
+    class(aerosol_properties), intent(in) :: self
+
+    get_list_idx = self%list_idx_
+
+  end function get_list_idx
 
 end module aerosol_properties_mod

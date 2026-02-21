@@ -62,14 +62,19 @@ contains
 
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
-  function constructor() result(newobj)
+  function constructor(list_idx) result(newobj)
 
+    integer, optional, intent(in) :: list_idx ! radiation list index (0=climate)
     type(bulk_aerosol_properties), pointer :: newobj
 
     integer,allocatable :: nspecies(:)
     real(r8),allocatable :: alogsig(:)
     real(r8),allocatable :: f1(:)
     integer :: ierr, naero
+    integer :: list_idx_loc
+
+    list_idx_loc = 0
+    if (present(list_idx)) list_idx_loc = list_idx
 
     allocate(newobj,stat=ierr)
     if( ierr /= 0 ) then
@@ -77,7 +82,7 @@ contains
        return
     end if
 
-    call rad_cnst_get_info(0, naero=naero)
+    call rad_cnst_get_info(list_idx_loc, naero=naero)
 
     ! Here treat each aerosol as a separate bin
     allocate( nspecies(naero),stat=ierr )
@@ -106,7 +111,7 @@ contains
     ! For bulk aerosols, the number of bins and total number of constituents are
     ! the same (naero) -- one constituent (species and mass) per bin.
     call newobj%initialize(nbin=naero, ncnst=naero, nspec=nspecies, nmasses=nspecies, &
-                           alogsig=alogsig, f1=f1, f2=f1, ierr=ierr)
+                           alogsig=alogsig, f1=f1, f2=f1, ierr=ierr, list_idx=list_idx_loc)
 
     deallocate(nspecies)
     deallocate(alogsig)
@@ -167,7 +172,7 @@ contains
     if (present(list_ndx)) then
        ilist = list_ndx
     else
-       ilist = 0
+       ilist = self%list_idx()
     end if
 
     if (present(density)) then
@@ -228,7 +233,7 @@ contains
 
     class(bulk_aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx             ! bin index
-    integer, intent(in) :: list_ndx            ! rad climate/diags list
+    integer, optional, intent(in) :: list_ndx  ! rad climate/diags list
 
     character(len=*), optional, intent(out) :: opticstype
 
@@ -286,8 +291,12 @@ contains
     real(r8),  optional, pointer :: r_mu(:)
     real(r8),  optional, pointer :: r_lw_abs(:,:)
 
+    integer :: list_ndx_loc
+    list_ndx_loc = self%list_idx()
+    if (present(list_ndx)) list_ndx_loc = list_ndx
+
     ! refactive index table parameters
-    call rad_cnst_get_aer_props(list_ndx, bin_ndx, &
+    call rad_cnst_get_aer_props(list_ndx_loc, bin_ndx, &
          opticstype=opticstype, &
          sw_hygro_ext=sw_hygroscopic_ext, &
          sw_hygro_ssa=sw_hygroscopic_ssa, &
@@ -630,20 +639,23 @@ contains
   !------------------------------------------------------------------------------
   function bin_name(self, list_ndx,  bin_ndx) result(name)
     class(bulk_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: list_ndx ! radiation list number
+    integer, optional, intent(in) :: list_ndx ! radiation list number
     integer, intent(in) :: bin_ndx  ! bin number
 
     character(len=aero_name_len) :: name
     character(len=64), allocatable :: names(:)
     integer :: naer, astat
+    integer :: list_ndx_loc
 
+    list_ndx_loc = self%list_idx()
+    if (present(list_ndx)) list_ndx_loc = list_ndx
 
-    call rad_cnst_get_info(list_ndx, naero=naer)
+    call rad_cnst_get_info(list_ndx_loc, naero=naer)
 
     allocate( names(naer), stat=astat)
     if( astat/= 0 ) call endrun('bulk_aerosol_properties_mod%bin_name: names allocate error')
 
-    call rad_cnst_get_info(list_ndx, aernames=names)
+    call rad_cnst_get_info(list_ndx_loc, aernames=names)
 
     name = names(bin_ndx)
 
