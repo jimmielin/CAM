@@ -24,13 +24,14 @@ module aerosol_state_mod
   !! Please see the modal_aerosol_state module for an example of how the aerosol_state
   !! class can be extended for a specific aerosol package.
   type, abstract :: aerosol_state
+     integer :: list_idx_ = 0 ! radiation climate/diagnostic list index
    contains
+     procedure :: list_idx => get_list_idx
+     procedure :: set_list_idx
      procedure(aero_get_transported), deferred :: get_transported
      procedure(aero_set_transported), deferred :: set_transported
      procedure(aero_get_amb_total_bin_mmr), deferred :: ambient_total_bin_mmr
-     procedure(aero_get_state_mmr), deferred :: get_ambient_mmr_0list
-     procedure(aero_get_list_mmr), deferred :: get_ambient_mmr_rlist
-     generic :: get_ambient_mmr=>get_ambient_mmr_0list,get_ambient_mmr_rlist
+     procedure(aero_get_state_mmr), deferred :: get_ambient_mmr
      procedure(aero_get_state_mmr), deferred :: get_cldbrne_mmr
      procedure(aero_get_state_num), deferred :: get_ambient_num
      procedure(aero_get_state_num), deferred :: get_cldbrne_num
@@ -98,19 +99,6 @@ module aerosol_state_mod
        integer, intent(in) :: bin_ndx      ! bin index
        real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
      end subroutine aero_get_state_mmr
-
-     !------------------------------------------------------------------------
-     ! returns aerosol mass mixing ratio for a given species index, bin index
-     ! and raditaion climate or diagnsotic list number
-     !------------------------------------------------------------------------
-     subroutine aero_get_list_mmr(self, list_ndx, species_ndx, bin_ndx, mmr)
-       import :: aerosol_state, r8
-       class(aerosol_state), intent(in) :: self
-       integer, intent(in) :: list_ndx     ! rad climate/diagnostic list index
-       integer, intent(in) :: species_ndx  ! species index
-       integer, intent(in) :: bin_ndx      ! bin index
-       real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
-     end subroutine aero_get_list_mmr
 
      !------------------------------------------------------------------------
      ! returns aerosol number mixing ratio for a given species index and bin index
@@ -223,10 +211,9 @@ module aerosol_state_mod
      ! returns hygroscopicity for a given radiation diagnostic list number and
      ! bin number
      !------------------------------------------------------------------------------
-     subroutine aero_hygroscopicity(self, list_ndx, bin_ndx, kappa)
+     subroutine aero_hygroscopicity(self, bin_ndx, kappa)
        import :: aerosol_state, r8
        class(aerosol_state), intent(in) :: self
-       integer, intent(in) :: list_ndx     ! rad climate/diagnostic list index
        integer, intent(in) :: bin_ndx      ! bin number
 
        real(r8), intent(out) :: kappa(:,:)              ! hygroscopicity (ncol,nlev)
@@ -237,12 +224,11 @@ module aerosol_state_mod
      ! returns aerosol wet diameter and aerosol water concentration for a given
      ! radiation diagnostic list number and bin number
      !------------------------------------------------------------------------------
-     subroutine aero_water_uptake(self, aero_props, list_idx, bin_idx, ncol, nlev, dgnumwet, qaerwat)
+     subroutine aero_water_uptake(self, aero_props, bin_idx, ncol, nlev, dgnumwet, qaerwat)
        import :: aerosol_state, aerosol_properties, r8
 
        class(aerosol_state), intent(in) :: self
        class(aerosol_properties), intent(in) :: aero_props
-       integer, intent(in) :: list_idx             ! rad climate/diags list number
        integer, intent(in) :: bin_idx              ! bin number
        integer, intent(in) :: ncol                 ! number of columns
        integer, intent(in) :: nlev                 ! number of levels
@@ -265,12 +251,11 @@ module aerosol_state_mod
      !------------------------------------------------------------------------------
      ! aerosol volume interface
      !------------------------------------------------------------------------------
-     function aero_volume(self, aero_props, list_idx, bin_idx, ncol, nlev) result(vol)
+     function aero_volume(self, aero_props, bin_idx, ncol, nlev) result(vol)
        import :: aerosol_state, aerosol_properties, r8
 
        class(aerosol_state), intent(in) :: self
        class(aerosol_properties), intent(in) :: aero_props
-       integer, intent(in) :: list_idx  ! rad climate/diags list number
        integer, intent(in) :: bin_idx   ! bin number
        integer, intent(in) :: ncol      ! number of columns
        integer, intent(in) :: nlev      ! number of levels
@@ -297,6 +282,23 @@ module aerosol_state_mod
   end interface
 
 contains
+
+  !------------------------------------------------------------------------------
+  ! returns the radiation climate/diagnostic list index
+  !------------------------------------------------------------------------------
+  pure integer function get_list_idx(self)
+    class(aerosol_state), intent(in) :: self
+    get_list_idx = self%list_idx_
+  end function get_list_idx
+
+  !------------------------------------------------------------------------------
+  ! sets the radiation climate/diagnostic list index
+  !------------------------------------------------------------------------------
+  subroutine set_list_idx(self, list_idx)
+    class(aerosol_state), intent(inout) :: self
+    integer, intent(in) :: list_idx
+    self%list_idx_ = list_idx
+  end subroutine set_list_idx
 
   !------------------------------------------------------------------------------
   ! returns aerosol number, volume concentrations, and bulk hygroscopicity
@@ -824,12 +826,11 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol short wave refactive index
   !------------------------------------------------------------------------------
-  function refractive_index_sw(self, ncol, ilev, ilist, ibin, iwav, aero_props) result(crefin)
+  function refractive_index_sw(self, ncol, ilev, ibin, iwav, aero_props) result(crefin)
 
     class(aerosol_state), intent(in) :: self
     integer, intent(in) :: ncol   ! number of columes
     integer, intent(in) :: ilev   ! level index
-    integer, intent(in) :: ilist  ! radiation diagnostics list index
     integer, intent(in) :: ibin   ! bin index
     integer, intent(in) :: iwav   ! wave length index
     class(aerosol_properties), intent(in) :: aero_props ! aerosol properties object
@@ -844,10 +845,10 @@ contains
 
     crefin(:ncol) = (0._r8, 0._r8)
 
-    do ispec = 1, aero_props%nspecies(ilist,ibin)
+    do ispec = 1, aero_props%nspecies(self%list_idx_,ibin)
 
-       call self%get_ambient_mmr(ilist,ispec,ibin,specmmr)
-       call aero_props%get(ibin, ispec, list_ndx=ilist, density=specdens,  refindex_sw=specrefindex)
+       call self%get_ambient_mmr(ispec,ibin,specmmr)
+       call aero_props%get(ibin, ispec, list_ndx=self%list_idx_, density=specdens,  refindex_sw=specrefindex)
 
        do icol = 1, ncol
           vol(icol) = specmmr(icol,ilev)/specdens
@@ -860,12 +861,11 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol long wave refactive index
   !------------------------------------------------------------------------------
-  function refractive_index_lw(self, ncol, ilev, ilist, ibin, iwav, aero_props) result(crefin)
+  function refractive_index_lw(self, ncol, ilev, ibin, iwav, aero_props) result(crefin)
 
     class(aerosol_state), intent(in) :: self
     integer, intent(in) :: ncol   ! number of columes
     integer, intent(in) :: ilev   ! level index
-    integer, intent(in) :: ilist  ! radiation diagnostics list index
     integer, intent(in) :: ibin   ! bin index
     integer, intent(in) :: iwav   ! wave length index
     class(aerosol_properties), intent(in) :: aero_props ! aerosol properties object
@@ -880,10 +880,10 @@ contains
 
     crefin(:ncol) = (0._r8, 0._r8)
 
-    do ispec = 1, aero_props%nspecies(ilist,ibin)
+    do ispec = 1, aero_props%nspecies(self%list_idx_,ibin)
 
-       call self%get_ambient_mmr(ilist,ispec,ibin,specmmr)
-       call aero_props%get(ibin, ispec, list_ndx=ilist, density=specdens,  refindex_lw=specrefindex)
+       call self%get_ambient_mmr(ispec,ibin,specmmr)
+       call aero_props%get(ibin, ispec, list_ndx=self%list_idx_, density=specdens,  refindex_lw=specrefindex)
 
        do icol = 1, ncol
           vol(icol) = specmmr(icol,ilev)/specdens

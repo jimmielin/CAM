@@ -8,6 +8,7 @@ module modal_aerosol_state_mod
   use physics_types, only: physics_state
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
   use physconst,  only: rhoh2o
+  use cam_abortutils, only: endrun
 
   implicit none
 
@@ -24,8 +25,7 @@ module modal_aerosol_state_mod
      procedure :: get_transported
      procedure :: set_transported
      procedure :: ambient_total_bin_mmr
-     procedure :: get_ambient_mmr_0list
-     procedure :: get_ambient_mmr_rlist
+     procedure :: get_ambient_mmr
      procedure :: get_cldbrne_mmr
      procedure :: get_ambient_num
      procedure :: get_cldbrne_num
@@ -58,9 +58,10 @@ contains
 
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
-  function constructor(state,pbuf) result(newobj)
+  function constructor(state,pbuf,list_idx) result(newobj)
     type(physics_state), target :: state
     type(physics_buffer_desc), pointer :: pbuf(:)
+    integer, intent(in), optional :: list_idx
 
     type(modal_aerosol_state), pointer :: newobj
 
@@ -74,6 +75,8 @@ contains
 
     newobj%state => state
     newobj%pbuf => pbuf
+
+    if (present(list_idx)) call newobj%set_list_idx(list_idx)
 
   end function constructor
 
@@ -123,6 +126,8 @@ contains
     real(r8),pointer :: mmrptr(:,:)
     integer :: spec_ndx
 
+    if (self%list_idx_ > 0) call endrun('modal_aerosol_state::ambient_total_bin_mmr: only valid for climate list (list_idx=0)')
+
     mmr_tot = 0._r8
 
     do spec_ndx=1,aero_props%nspecies(bin_ndx)
@@ -135,28 +140,14 @@ contains
   !------------------------------------------------------------------------------
   ! returns ambient aerosol mass mixing ratio for a given species index and bin index
   !------------------------------------------------------------------------------
-  subroutine get_ambient_mmr_0list(self, species_ndx, bin_ndx, mmr)
+  subroutine get_ambient_mmr(self, species_ndx, bin_ndx, mmr)
     class(modal_aerosol_state), intent(in) :: self
     integer, intent(in) :: species_ndx  ! species index
     integer, intent(in) :: bin_ndx      ! bin index
     real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
 
-    call rad_cnst_get_aer_mmr(0, bin_ndx, species_ndx, 'a', self%state, self%pbuf, mmr)
-  end subroutine get_ambient_mmr_0list
-
-  !------------------------------------------------------------------------------
-  ! returns ambient aerosol mass mixing ratio for a given radiation diagnostics
-  ! list index, species index and bin index
-  !------------------------------------------------------------------------------
-  subroutine get_ambient_mmr_rlist(self, list_ndx, species_ndx, bin_ndx, mmr)
-    class(modal_aerosol_state), intent(in) :: self
-    integer, intent(in) :: list_ndx     ! rad climate list index
-    integer, intent(in) :: species_ndx  ! species index
-    integer, intent(in) :: bin_ndx      ! bin index
-    real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
-
-    call rad_cnst_get_aer_mmr(list_ndx, bin_ndx, species_ndx, 'a', self%state, self%pbuf, mmr)
-  end subroutine get_ambient_mmr_rlist
+    call rad_cnst_get_aer_mmr(self%list_idx_, bin_ndx, species_ndx, 'a', self%state, self%pbuf, mmr)
+  end subroutine get_ambient_mmr
 
   !------------------------------------------------------------------------------
   ! returns cloud-borne aerosol number mixing ratio for a given species index and bin index
@@ -166,6 +157,8 @@ contains
     integer, intent(in) :: species_ndx  ! species index
     integer, intent(in) :: bin_ndx      ! bin index
     real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
+
+    if (self%list_idx_ > 0) call endrun('modal_aerosol_state::get_cldbrne_mmr: only valid for climate list (list_idx=0)')
 
     call rad_cnst_get_aer_mmr(0, bin_ndx, species_ndx, 'c', self%state, self%pbuf, mmr)
   end subroutine get_cldbrne_mmr
@@ -178,6 +171,8 @@ contains
     integer, intent(in) :: bin_ndx     ! bin index
     real(r8), pointer   :: num(:,:)    ! number densities
 
+    if (self%list_idx_ > 0) call endrun('modal_aerosol_state::get_ambient_num: only valid for climate list (list_idx=0)')
+
     call rad_cnst_get_mode_num(0, bin_ndx, 'a', self%state, self%pbuf, num)
   end subroutine get_ambient_num
 
@@ -188,6 +183,8 @@ contains
     class(modal_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_ndx             ! bin index
     real(r8), pointer :: num(:,:)
+
+    if (self%list_idx_ > 0) call endrun('modal_aerosol_state::get_cldbrne_num: only valid for climate list (list_idx=0)')
 
     call rad_cnst_get_mode_num(0, bin_ndx, 'c', self%state, self%pbuf, num)
   end subroutine get_cldbrne_num
@@ -429,9 +426,8 @@ contains
   ! returns hygroscopicity for a given radiation diagnostic list number and
   ! bin number
   !------------------------------------------------------------------------------
-  subroutine hygroscopicity(self, list_ndx, bin_ndx, kappa)
+  subroutine hygroscopicity(self, bin_ndx, kappa)
     class(modal_aerosol_state), intent(in) :: self
-    integer, intent(in) :: list_ndx        ! rad climate list number
     integer, intent(in) :: bin_ndx         ! bin number
     real(r8), intent(out) :: kappa(:,:)    ! hygroscopicity (ncol,nlev)
 
@@ -443,13 +439,12 @@ contains
   ! returns aerosol wet diameter and aerosol water concentration for a given
   ! radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  subroutine water_uptake(self, aero_props, list_idx, bin_idx, ncol, nlev, dgnumwet, qaerwat)
+  subroutine water_uptake(self, aero_props, bin_idx, ncol, nlev, dgnumwet, qaerwat)
     use modal_aero_wateruptake, only: modal_aero_wateruptake_dr
     use modal_aero_calcsize,    only: modal_aero_calcsize_diag
 
     class(modal_aerosol_state), intent(in) :: self
     class(aerosol_properties), intent(in) :: aero_props
-    integer, intent(in) :: list_idx             ! rad climate/diags list number
     integer, intent(in) :: bin_idx              ! bin number
     integer, intent(in) :: ncol                 ! number of columns
     integer, intent(in) :: nlev                 ! number of levels
@@ -470,7 +465,7 @@ contains
 
     nmodes = aero_props%nbins()
 
-    if (list_idx == 0) then
+    if (self%list_idx_ == 0) then
        ! water uptake and wet radius for the climate list has already been calculated
        call pbuf_get_field(self%pbuf, pbuf_get_index('DGNUMWET'), dgnumwet_m)
        call pbuf_get_field(self%pbuf, pbuf_get_index('QAERWAT'),  qaerwat_m)
@@ -491,9 +486,9 @@ contains
           qaerwat = -huge(1._r8)
           return
        end if
-       call modal_aero_calcsize_diag(self%state, self%pbuf, list_idx, dgnumdry_m, hygro_m, &
+       call modal_aero_calcsize_diag(self%state, self%pbuf, self%list_idx_, dgnumdry_m, hygro_m, &
                                      dryvol_m, dryrad_m, drymass_m, so4dryvol_m, naer_m)
-       call modal_aero_wateruptake_dr(self%state, self%pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
+       call modal_aero_wateruptake_dr(self%state, self%pbuf, self%list_idx_, dgnumdry_m, dgnumwet_m, &
                                       qaerwat_m, wetdens_m,  hygro_m, dryvol_m, dryrad_m, &
                                       drymass_m, so4dryvol_m, naer_m)
 
@@ -518,12 +513,11 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol dry volume (m3/kg) for given radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  function dry_volume(self, aero_props, list_idx, bin_idx, ncol, nlev) result(vol)
+  function dry_volume(self, aero_props, bin_idx, ncol, nlev) result(vol)
 
     class(modal_aerosol_state), intent(in) :: self
     class(aerosol_properties), intent(in) :: aero_props
 
-    integer, intent(in) :: list_idx  ! rad climate/diags list number
     integer, intent(in) :: bin_idx   ! bin number
     integer, intent(in) :: ncol      ! number of columns
     integer, intent(in) :: nlev      ! number of levels
@@ -537,9 +531,9 @@ contains
 
     vol(:,:) = 0._r8
 
-    do ispec = 1, aero_props%nspecies(list_idx,bin_idx)
-       call self%get_ambient_mmr(list_idx, ispec, bin_idx, mmr)
-       call aero_props%get(bin_idx, ispec, list_ndx=list_idx, density=specdens)
+    do ispec = 1, aero_props%nspecies(self%list_idx_,bin_idx)
+       call self%get_ambient_mmr(ispec, bin_idx, mmr)
+       call aero_props%get(bin_idx, ispec, list_ndx=self%list_idx_, density=specdens)
        vol(:ncol,:) = vol(:ncol,:) + mmr(:ncol,:)/specdens
     end do
 
@@ -548,12 +542,11 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol wet volume (m3/kg) for given radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  function wet_volume(self, aero_props, list_idx, bin_idx, ncol, nlev) result(vol)
+  function wet_volume(self, aero_props, bin_idx, ncol, nlev) result(vol)
 
     class(modal_aerosol_state), intent(in) :: self
     class(aerosol_properties), intent(in) :: aero_props
 
-    integer, intent(in) :: list_idx  ! rad climate/diags list number
     integer, intent(in) :: bin_idx   ! bin number
     integer, intent(in) :: ncol      ! number of columns
     integer, intent(in) :: nlev      ! number of levels
@@ -563,8 +556,8 @@ contains
     real(r8) :: dryvol(ncol,nlev)
     real(r8) :: watervol(ncol,nlev)
 
-    dryvol = self%dry_volume(aero_props, list_idx, bin_idx, ncol, nlev)
-    watervol = self%water_volume(aero_props, list_idx, bin_idx, ncol, nlev)
+    dryvol = self%dry_volume(aero_props, bin_idx, ncol, nlev)
+    watervol = self%water_volume(aero_props, bin_idx, ncol, nlev)
 
     vol = watervol + dryvol
 
@@ -573,12 +566,11 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol water volume (m3/kg) for given radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  function water_volume(self, aero_props, list_idx, bin_idx, ncol, nlev) result(vol)
+  function water_volume(self, aero_props, bin_idx, ncol, nlev) result(vol)
 
     class(modal_aerosol_state), intent(in) :: self
     class(aerosol_properties), intent(in) :: aero_props
 
-    integer, intent(in) :: list_idx  ! rad climate/diags list number
     integer, intent(in) :: bin_idx   ! bin number
     integer, intent(in) :: ncol      ! number of columns
     integer, intent(in) :: nlev      ! number of levels
@@ -588,7 +580,7 @@ contains
     real(r8) :: dgnumwet(ncol,nlev)
     real(r8) :: qaerwat(ncol,nlev)
 
-    call self%water_uptake(aero_props, list_idx, bin_idx, ncol, nlev, dgnumwet, qaerwat)
+    call self%water_uptake(aero_props, bin_idx, ncol, nlev, dgnumwet, qaerwat)
 
     vol(:ncol,:nlev) = qaerwat(:ncol,:nlev)*rh2odens
     where (vol<0._r8)

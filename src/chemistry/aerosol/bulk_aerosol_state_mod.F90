@@ -22,8 +22,7 @@ module bulk_aerosol_state_mod
      procedure :: get_transported
      procedure :: set_transported
      procedure :: ambient_total_bin_mmr
-     procedure :: get_ambient_mmr_0list
-     procedure :: get_ambient_mmr_rlist
+     procedure :: get_ambient_mmr
      procedure :: get_cldbrne_mmr
      procedure :: get_ambient_num
      procedure :: get_cldbrne_num
@@ -54,9 +53,10 @@ contains
 
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
-  function constructor(state,pbuf) result(newobj)
+  function constructor(state,pbuf,list_idx) result(newobj)
     type(physics_state), target :: state
     type(physics_buffer_desc), pointer :: pbuf(:)
+    integer, intent(in), optional :: list_idx
     type(bulk_aerosol_state), pointer :: newobj
 
     integer :: ierr
@@ -69,6 +69,8 @@ contains
 
     newobj%state => state
     newobj%pbuf => pbuf
+
+    if (present(list_idx)) call newobj%set_list_idx(list_idx)
 
   end function constructor
 
@@ -117,6 +119,7 @@ contains
     real(r8) :: mmr_tot                 ! mass mixing ratios totaled for all species
     real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
 
+    if (self%list_idx_ > 0) call endrun('bulk_aerosol_state::ambient_total_bin_mmr: only valid for climate list (list_idx=0)')
     call self%get_ambient_mmr(1, bin_ndx, mmr)
 
     mmr_tot = mmr(col_ndx, lyr_ndx)
@@ -126,30 +129,15 @@ contains
   !------------------------------------------------------------------------------
   ! returns ambient aerosol mass mixing ratio for a given species index and bin index
   !------------------------------------------------------------------------------
-  subroutine get_ambient_mmr_0list(self, species_ndx, bin_ndx, mmr)
+  subroutine get_ambient_mmr(self, species_ndx, bin_ndx, mmr)
     class(bulk_aerosol_state), intent(in) :: self
     integer, intent(in) :: species_ndx  ! species index
     integer, intent(in) :: bin_ndx      ! bin index
     real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
 
-    call self%get_ambient_mmr(0, species_ndx, bin_ndx, mmr)
+    call rad_cnst_get_aer_mmr(self%list_idx_, bin_ndx, self%state, self%pbuf, mmr)
 
-  end subroutine get_ambient_mmr_0list
-
-  !------------------------------------------------------------------------------
-  ! returns ambient aerosol mass mixing ratio for a given radiation diagnostics
-  ! list index, species index and bin index
-  !------------------------------------------------------------------------------
-  subroutine get_ambient_mmr_rlist(self, list_ndx, species_ndx, bin_ndx, mmr)
-    class(bulk_aerosol_state), intent(in) :: self
-    integer, intent(in) :: list_ndx     ! rad climate list index
-    integer, intent(in) :: species_ndx  ! species index
-    integer, intent(in) :: bin_ndx      ! bin index
-    real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
-
-    call rad_cnst_get_aer_mmr(list_ndx, bin_ndx, self%state, self%pbuf, mmr)
-
-  end subroutine get_ambient_mmr_rlist
+  end subroutine get_ambient_mmr
 
   !------------------------------------------------------------------------------
   ! returns cloud-borne aerosol number mixing ratio for a given species index and bin index
@@ -160,6 +148,7 @@ contains
     integer, intent(in) :: bin_ndx      ! bin index
     real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
 
+    if (self%list_idx_ > 0) call endrun('bulk_aerosol_state::get_cldbrne_mmr: only valid for climate list (list_idx=0)')
     call endrun('ERROR: bulk_aerosol_state_mod%get_cldbrne_mmr not yet implemented')
 
   end subroutine get_cldbrne_mmr
@@ -172,6 +161,7 @@ contains
     integer, intent(in) :: bin_ndx     ! bin index
     real(r8), pointer   :: num(:,:)    ! number densities
 
+    if (self%list_idx_ > 0) call endrun('bulk_aerosol_state::get_ambient_num: only valid for climate list (list_idx=0)')
     nullify(num)
 
     call endrun('ERROR: bulk_aerosol_state_mod%get_ambient_num not yet implemented')
@@ -186,6 +176,7 @@ contains
     integer, intent(in) :: bin_ndx             ! bin index
     real(r8), pointer :: num(:,:)
 
+    if (self%list_idx_ > 0) call endrun('bulk_aerosol_state::get_cldbrne_num: only valid for climate list (list_idx=0)')
     nullify(num)
 
     call endrun('ERROR: bulk_aerosol_state_mod%get_cldbrne_num not yet implemented')
@@ -293,9 +284,8 @@ contains
   ! returns hygroscopicity for a given radiation diagnostic list number and
   ! bin number
   !------------------------------------------------------------------------------
-  subroutine hygroscopicity(self, list_ndx, bin_ndx, kappa)
+  subroutine hygroscopicity(self, bin_ndx, kappa)
     class(bulk_aerosol_state), intent(in) :: self
-    integer, intent(in) :: list_ndx        ! rad climate list number
     integer, intent(in) :: bin_ndx         ! bin number
     real(r8), intent(out) :: kappa(:,:)    ! hygroscopicity (ncol,nlev)
 
@@ -307,11 +297,10 @@ contains
   ! returns aerosol wet diameter and aerosol water concentration for a given
   ! radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  subroutine water_uptake(self, aero_props, list_idx, bin_idx, ncol, nlev, dgnumwet, qaerwat)
+  subroutine water_uptake(self, aero_props, bin_idx, ncol, nlev, dgnumwet, qaerwat)
 
     class(bulk_aerosol_state), intent(in) :: self
     class(aerosol_properties), intent(in) :: aero_props
-    integer, intent(in) :: list_idx             ! rad climate/diags list number
     integer, intent(in) :: bin_idx              ! bin number
     integer, intent(in) :: ncol                 ! number of columns
     integer, intent(in) :: nlev                 ! number of levels
@@ -325,12 +314,11 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol dry volume (m3/kg) for given radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  function dry_volume(self, aero_props, list_idx, bin_idx, ncol, nlev) result(vol)
+  function dry_volume(self, aero_props, bin_idx, ncol, nlev) result(vol)
 
     class(bulk_aerosol_state), intent(in) :: self
     class(aerosol_properties), intent(in) :: aero_props
 
-    integer, intent(in) :: list_idx  ! rad climate/diags list number
     integer, intent(in) :: bin_idx   ! bin number
     integer, intent(in) :: ncol      ! number of columns
     integer, intent(in) :: nlev      ! number of levels
@@ -344,12 +332,11 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol wet volume (m3/kg) for given radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  function wet_volume(self, aero_props, list_idx, bin_idx, ncol, nlev) result(vol)
+  function wet_volume(self, aero_props, bin_idx, ncol, nlev) result(vol)
 
     class(bulk_aerosol_state), intent(in) :: self
     class(aerosol_properties), intent(in) :: aero_props
 
-    integer, intent(in) :: list_idx  ! rad climate/diags list number
     integer, intent(in) :: bin_idx   ! bin number
     integer, intent(in) :: ncol      ! number of columns
     integer, intent(in) :: nlev      ! number of levels
@@ -363,12 +350,11 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol water volume (m3/kg) for given radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  function water_volume(self, aero_props, list_idx, bin_idx, ncol, nlev) result(vol)
+  function water_volume(self, aero_props, bin_idx, ncol, nlev) result(vol)
 
     class(bulk_aerosol_state), intent(in) :: self
     class(aerosol_properties), intent(in) :: aero_props
 
-    integer, intent(in) :: list_idx  ! rad climate/diags list number
     integer, intent(in) :: bin_idx   ! bin number
     integer, intent(in) :: ncol      ! number of columns
     integer, intent(in) :: nlev      ! number of levels

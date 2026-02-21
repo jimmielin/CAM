@@ -1,5 +1,6 @@
 module aerosol_instances_mod
   use aerosol_properties_mod, only: aerosol_properties
+  use aerosol_state_mod, only: aerosol_state
   use rad_constituents, only: N_DIAG, rad_cnst_get_info, rad_cnst_get_call_list
 
   implicit none
@@ -10,10 +11,17 @@ module aerosol_instances_mod
   public :: aerosol_instances_get_num_models
   public :: aerosol_instances_is_active
   public :: aerosol_instances_final
+  public :: aerosol_instances_create_states
+  public :: aerosol_instances_destroy_states
+  public :: aero_state_entry_t
 
   type :: aero_props_entry_t
      class(aerosol_properties), pointer :: obj => null()
   end type aero_props_entry_t
+
+  type :: aero_state_entry_t
+     class(aerosol_state), pointer :: obj => null()
+  end type aero_state_entry_t
 
   type(aero_props_entry_t), allocatable, target :: aero_props_all(:,:) ! (iaermod, 0:N_DIAG)
   integer :: num_aero_models_ = 0
@@ -134,5 +142,70 @@ contains
     num_aero_models_ = 0
 
   end subroutine aerosol_instances_final
+
+  !------------------------------------------------------------------------------
+  !> Creates aerosol state objects for all active aerosol models.
+  !! Unlike aerosol properties (pre-allocated as shared module data), state objects
+  !! are created per-call because they hold mutable per-chunk state/pbuf pointers.
+  !! Since aerosol_optics_cam_sw/lw runs inside an OMP chunk-parallel loop,
+  !! shared mutable state objects would have race conditions.
+  subroutine aerosol_instances_create_states(list_idx, state, pbuf, aero_states, nstates)
+    use modal_aerosol_state_mod, only: modal_aerosol_state
+    use carma_aerosol_state_mod, only: carma_aerosol_state
+    use bulk_aerosol_state_mod,  only: bulk_aerosol_state
+    use physics_types,  only: physics_state
+    use physics_buffer, only: physics_buffer_desc
+    use cam_abortutils, only: endrun
+
+    integer, intent(in) :: list_idx
+    type(physics_state), intent(in), target :: state
+    type(physics_buffer_desc), pointer :: pbuf(:)
+    type(aero_state_entry_t), allocatable, intent(out) :: aero_states(:)
+    integer, intent(out) :: nstates
+
+    integer :: iaermod, istat
+    character(len=*), parameter :: prefix = 'aerosol_instances_create_states: '
+
+    nstates = num_aero_models_
+    if (nstates < 1) return
+
+    allocate(aero_states(nstates), stat=istat)
+    if (istat /= 0) then
+       call endrun(prefix//'allocation error: aero_states')
+    end if
+
+    iaermod = 0
+    if (modal_active_) then
+       iaermod = iaermod + 1
+       aero_states(iaermod)%obj => modal_aerosol_state(state, pbuf, list_idx)
+    end if
+    if (carma_active_) then
+       iaermod = iaermod + 1
+       aero_states(iaermod)%obj => carma_aerosol_state(state, pbuf, list_idx)
+    end if
+    if (bulk_active_) then
+       iaermod = iaermod + 1
+       aero_states(iaermod)%obj => bulk_aerosol_state(state, pbuf, list_idx)
+    end if
+
+  end subroutine aerosol_instances_create_states
+
+  !------------------------------------------------------------------------------
+  subroutine aerosol_instances_destroy_states(aero_states)
+    type(aero_state_entry_t), allocatable, intent(inout) :: aero_states(:)
+    integer :: i
+
+    if (.not. allocated(aero_states)) return
+
+    do i = 1, size(aero_states)
+       if (associated(aero_states(i)%obj)) then
+          deallocate(aero_states(i)%obj)
+          nullify(aero_states(i)%obj)
+       end if
+    end do
+
+    deallocate(aero_states)
+
+  end subroutine aerosol_instances_destroy_states
 
 end module aerosol_instances_mod
