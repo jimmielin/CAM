@@ -9,7 +9,7 @@ module bulk_aerosol_properties_mod
 
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
 
-  use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_aer_props, rad_cnst_get_aer_mmr
+  use aerosol_definition_mod, only: rad_cnst_get_info, rad_cnst_get_aer_props
   use infnan, only: nan, assignment(=)
 
   implicit none
@@ -554,7 +554,7 @@ contains
     character(len=20) :: aername
     logical :: primary_carbon ! primary carbons (CB1 and OC1) are hydrophobic
 
-    call rad_cnst_get_aer_props(0, bin_ndx, aername=aername)
+    call rad_cnst_get_aer_props(self%list_idx_, bin_ndx, aername=aername)
 
     aername = to_lower(aername)
 

@@ -1,7 +1,7 @@
 module aerosol_instances_mod
   use aerosol_properties_mod, only: aerosol_properties
   use aerosol_state_mod, only: aerosol_state
-  use rad_constituents, only: N_DIAG, rad_cnst_get_info, rad_cnst_get_call_list
+  use aerosol_definition_mod, only: N_DIAG, rad_cnst_get_info, rad_cnst_get_call_list
 
   implicit none
   private

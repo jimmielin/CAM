@@ -2,7 +2,7 @@ module modal_aerosol_properties_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
   use physconst, only: pi
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
-  use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_mode_props, rad_cnst_get_aer_props
+  use aerosol_definition_mod, only: rad_cnst_get_info, rad_cnst_get_mode_props, rad_cnst_get_aer_props
 
   implicit none
 
@@ -24,6 +24,8 @@ module modal_aerosol_properties_mod
      integer,  allocatable :: bcarbon_mode_ndxs_(:,:)
      integer,  allocatable :: porganic_mode_ndxs_(:,:)
      integer,  allocatable :: sorganic_mode_ndxs_(:,:)
+     real(r8), allocatable :: dgnum_(:)
+     integer,  allocatable :: mode_size_order_(:)
      integer :: num_soa_ = 0
      integer :: num_poa_ = 0
      integer :: num_bc_ = 0
@@ -69,10 +71,11 @@ contains
     integer, optional, intent(in) :: list_idx ! radiation list index (0=climate)
     type(modal_aerosol_properties), pointer :: newobj
 
-    integer :: l, m, nmodes, ncnst_tot, mm
+    integer :: l, m, nmodes, ncnst_tot, mm, itmp
     integer :: list_idx_loc
     real(r8) :: dgnumlo
     real(r8) :: dgnumhi
+    real(r8) :: dgnum
     integer,allocatable :: nspecies(:)
     real(r8),allocatable :: sigmag(:)
     real(r8),allocatable :: alogsig(:)
@@ -136,6 +139,16 @@ contains
        nullify(newobj)
        return
     end if
+    allocate(newobj%dgnum_(nmodes),stat=ierr)
+    if( ierr /= 0 ) then
+       nullify(newobj)
+       return
+    end if
+    allocate(newobj%mode_size_order_(nmodes),stat=ierr)
+    if( ierr /= 0 ) then
+       nullify(newobj)
+       return
+    end if
 
     ncnst_tot = 0
 
@@ -145,7 +158,9 @@ contains
        ncnst_tot =  ncnst_tot + nspecies(m) + 1
 
        call rad_cnst_get_mode_props(list_idx_loc, m, sigmag=sigmag(m), &
-                                    dgnumhi=dgnumhi, dgnumlo=dgnumlo )
+                                    dgnum=dgnum, dgnumhi=dgnumhi, dgnumlo=dgnumlo )
+
+       newobj%dgnum_(m) = dgnum
 
        alogsig(m) = log(sigmag(m))
 
@@ -159,6 +174,20 @@ contains
        newobj%voltonumbhi_(m) = 1._r8 / ( (pi/6._r8)* &
             (dgnumhi**3._r8)*exp(4.5_r8*alogsig(m)**2._r8) )
 
+    end do
+
+    ! compute mode_size_order_: indices sorted by dgnum_ descending (largest first)
+    do m = 1, nmodes
+       newobj%mode_size_order_(m) = m
+    end do
+    do m = 1, nmodes-1
+       do l = m+1, nmodes
+          if (newobj%dgnum_(newobj%mode_size_order_(l)) > newobj%dgnum_(newobj%mode_size_order_(m))) then
+             itmp = newobj%mode_size_order_(m)
+             newobj%mode_size_order_(m) = newobj%mode_size_order_(l)
+             newobj%mode_size_order_(l) = itmp
+          end if
+       end do
     end do
 
     call newobj%initialize(nmodes,ncnst_tot,nspecies,nspecies,alogsig,f1,f2,ierr,list_idx_loc)
@@ -304,6 +333,12 @@ contains
     end if
     if (allocated(self%voltonumbhi_)) then
        deallocate(self%voltonumbhi_)
+    end if
+    if (allocated(self%dgnum_)) then
+       deallocate(self%dgnum_)
+    end if
+    if (allocated(self%mode_size_order_)) then
+       deallocate(self%mode_size_order_)
     end if
 
     if (allocated(self%sulfate_mode_ndxs_)) then
@@ -623,7 +658,7 @@ contains
     character(len=*), intent(out) :: name_a ! constituent name of ambient aerosol number dens
     character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol number dens
 
-    call rad_cnst_get_info(0,bin_ndx, num_name=name_a, num_name_cw=name_c)
+    call rad_cnst_get_info(self%list_idx_,bin_ndx, num_name=name_a, num_name_cw=name_c)
   end subroutine num_names
 
   !------------------------------------------------------------------------
@@ -636,7 +671,7 @@ contains
     character(len=*), intent(out) :: name_a ! constituent name of ambient aerosol MMR
     character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol MMR
 
-    call rad_cnst_get_info(0, bin_ndx, species_ndx, spec_name=name_a, spec_name_cw=name_c)
+    call rad_cnst_get_info(self%list_idx_, bin_ndx, species_ndx, spec_name=name_a, spec_name_cw=name_c)
   end subroutine mmr_names
 
   !------------------------------------------------------------------------
@@ -647,7 +682,7 @@ contains
     integer, intent(in) :: bin_ndx           ! bin number
     character(len=*), intent(out) :: name   ! constituent name of ambient aerosol number dens
 
-    call rad_cnst_get_info(0,bin_ndx, num_name=name)
+    call rad_cnst_get_info(self%list_idx_,bin_ndx, num_name=name)
 
   end subroutine amb_num_name
 
@@ -660,7 +695,7 @@ contains
     integer, intent(in) :: species_ndx       ! species number
     character(len=*), intent(out) :: name   ! constituent name of ambient aerosol MMR
 
-    call rad_cnst_get_info(0, bin_ndx, species_ndx, spec_name=name)
+    call rad_cnst_get_info(self%list_idx_, bin_ndx, species_ndx, spec_name=name)
 
   end subroutine amb_mmr_name
 
@@ -673,7 +708,7 @@ contains
     integer, intent(in) :: species_ndx       ! species number
     character(len=*), intent(out) :: spectype ! species type
 
-    call rad_cnst_get_info(0, bin_ndx, species_ndx, spec_type=spectype)
+    call rad_cnst_get_info(self%list_idx_, bin_ndx, species_ndx, spec_type=spectype)
 
   end subroutine species_type
 
@@ -692,7 +727,7 @@ contains
 
     res = .false.
 
-    call rad_cnst_get_info(0, bin_ndx, mode_type=modetype)
+    call rad_cnst_get_info(self%list_idx_, bin_ndx, mode_type=modetype)
     if (.not.(modetype=='coarse' .or. modetype=='coarse_dust')) then
        return
     end if
@@ -721,7 +756,7 @@ contains
 
     if (species_ndx>0) then
 
-       call rad_cnst_get_info(0, bin_ndx, mode_type=modetype)
+       call rad_cnst_get_info(self%list_idx_, bin_ndx, mode_type=modetype)
        if (.not.(modetype=='coarse' .or. modetype=='coarse_dust')) then
           return
        end if
@@ -770,7 +805,7 @@ contains
 
     res = .false.
 
-    call rad_cnst_get_info(0, bin_ndx, mode_type=mode_name)
+    call rad_cnst_get_info(self%list_idx_, bin_ndx, mode_type=mode_name)
 
     if ((trim(mode_name)/='aitken')) then
 
@@ -795,7 +830,7 @@ contains
 
     character(len=aero_name_len) :: mode_name
 
-    call rad_cnst_get_info(0, bin_ndx, mode_type=mode_name)
+    call rad_cnst_get_info(self%list_idx_, bin_ndx, mode_type=mode_name)
 
     soluble = trim(mode_name)/='primary_carbon'
 
@@ -817,7 +852,7 @@ contains
     call self%species_type(bin_ndx, species_ndx, spectype=species_type)
     select case ( trim(species_type) )
     case('dust')
-       call rad_cnst_get_info(0, bin_ndx, mode_type=mode_type)
+       call rad_cnst_get_info(self%list_idx_, bin_ndx, mode_type=mode_type)
        select case ( trim(mode_type) )
        case ('accum','fine_dust')
           minrad = 0.258e-6_r8
@@ -827,7 +862,7 @@ contains
           minrad = -huge(1._r8)
        end select
     case('black-c')
-       call rad_cnst_get_info(0, nmodes=nmodes)
+       call rad_cnst_get_info(self%list_idx_, nmodes=nmodes)
        if (nmodes==3) then
           minrad = 0.04e-6_r8
        else
@@ -856,14 +891,12 @@ contains
   ! returns scavenging diameter (cm) for a given aerosol bin number
   !------------------------------------------------------------------------------
   function scav_diam(self, bin_ndx) result(diam)
-    use modal_aero_data, only: dgnum_amode
-
     class(modal_aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx  ! bin number
 
     real(r8) :: diam
 
-    diam = dgnum_amode(bin_ndx)
+    diam = self%dgnum_(bin_ndx)
 
   end function scav_diam
 
@@ -872,8 +905,6 @@ contains
   ! during resuspension
   !------------------------------------------------------------------------------
   subroutine resuspension_resize(self, dcondt)
-
-    use modal_aero_data, only:  mode_size_order
 
     class(modal_aerosol_properties), intent(in) :: self
     real(r8), intent(inout) :: dcondt(:)
@@ -922,7 +953,7 @@ contains
 
       ! find constituent index of the largest mode for the species
       loop1: do m = 1,self%nbins()-1
-         nl = lptr(mode_size_order(m))
+         nl = lptr(self%mode_size_order_(m))
          if (nl>0) exit loop1
       end do loop1
 
@@ -930,7 +961,7 @@ contains
 
       ! accumulate the smaller modes into the largest mode
       do n = m+1,self%nbins()
-         ns = lptr(mode_size_order(n))
+         ns = lptr(self%mode_size_order_(n))
          if (ns>0) then
             prevap(nl) = prevap(nl) + prevap(ns)
             prevap(ns) = 0._r8
@@ -1001,10 +1032,10 @@ contains
           Mtotal = Mtotal + dep_fluxes(mm) ! kg/m2
        end do
        mode_has_type: if (has_type) then
-          call rad_cnst_get_info(0, m, mode_type=modetype)
+          call rad_cnst_get_info(self%list_idx_, m, mode_type=modetype)
           if (Ntot>1.e-40_r8 .and. Mtype>1.e-40_r8 .and. Mtotal>1.e-40_r8) then
 
-             call rad_cnst_get_mode_props(0, m, sigmag=sigma_g)
+             call rad_cnst_get_mode_props(self%list_idx_, m, sigmag=sigma_g)
              tmp = sqrtwo*log(sigma_g)
 
              ! type number concentration
@@ -1049,7 +1080,7 @@ contains
 
     character(len=aero_name_len) :: modetype
 
-    call rad_cnst_get_info(0, bin_ndx, mode_type=modetype)
+    call rad_cnst_get_info(self%list_idx_, bin_ndx, mode_type=modetype)
 
     hydrophilic = (trim(modetype) == 'accum')
 
