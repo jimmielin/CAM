@@ -23,8 +23,7 @@ use physics_types,  only: physics_state
 use phys_control,   only: use_simple_phys
 use constituents,   only: cnst_get_ind
 use radconstants,   only: nradgas, rad_gas_index
-use phys_prop,      only: physprop_accum_unique_files, physprop_init, &
-                          physprop_get_id, ot_length
+use phys_prop,      only: physprop_accum_unique_files, physprop_init
 use cam_history,    only: addfld, fieldname_len, outfld, horiz_only
 use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
 
@@ -34,25 +33,74 @@ use cam_logfile,    only: iulog
 ! Import structural types, data, query & property-access routines from aerosol_definition_mod
 ! and re-export for backward compatibility
 use aerosol_definition_mod, only: &
-   cs1, N_DIAG, n_mode_str, n_bin_str, n_rad_cnst, &
+   n_mode_str, n_bin_str, n_rad_cnst, &
    mode_component_t, modes_t, bin_component_t, bins_t, &
-   rad_cnst_namelist_t, gas_t, gaslist_t, aerosol_t, aerlist_t, &
+   aerosol_t, aerlist_t, &
    modelist_t, binlist_t, &
-   modes, bins, radcnst_namelist, active_calls, &
-   gaslist, aerosollist, ma_list, sa_list, &
+   modes, bins, &
+   aerosollist, ma_list, sa_list, &
    mode_type_names, spec_type_names, num_mode_types, num_spec_types, &
-   num_bin_morphs, bin_morph_names, verbose, nl, &
-   rad_cnst_get_info, rad_cnst_get_info_by_bin, rad_cnst_get_info_by_bin_spec, &
+   num_bin_morphs, bin_morph_names, &
+   rad_cnst_get_aer_info, &
+   rad_cnst_get_info_by_mode, rad_cnst_get_info_by_mode_spec, &
+   rad_cnst_get_info_by_spectype, &
+   rad_cnst_get_info_by_bin, rad_cnst_get_info_by_bin_spec, &
    rad_cnst_get_mode_idx, rad_cnst_get_spec_idx, &
    rad_cnst_get_call_list, rad_cnst_num_name, &
    rad_cnst_get_mode_props, rad_cnst_get_aer_props, &
    rad_cnst_get_bin_props_by_idx, rad_cnst_get_bin_props, &
    rad_cnst_get_aer_idx, &
-   init_mode_comps, init_bin_comps, list_init1, list_init2, get_cam_idx
+   init_mode_comps, init_bin_comps, list_init1, list_init2
 
 implicit none
 private
 save
+
+integer, public, parameter :: cs1 = 256
+integer, public, parameter :: N_DIAG = 10
+
+logical, public :: verbose = .true.
+character(len=1), public, parameter :: nl = achar(10)
+
+! max number of externally mixed entities in the climate/diag lists
+integer, parameter :: n_rad_cnst = N_RAD_CNST
+
+! type to provide access to the data parsed from the rad_climate and rad_diag_* strings
+type, public :: rad_cnst_namelist_t
+   integer :: ncnst
+   character(len=  1), pointer :: source(:)  ! 'A' for state (advected), 'N' for pbuf (non-advected),
+                                             ! 'M' for mode, 'Z' for zero
+   character(len= 64), pointer :: camname(:) ! name registered in pbuf or constituents
+   character(len=cs1), pointer :: radname(:) ! radname is the name as identfied in radiation,
+                                             ! must be one of (rgaslist if a gas) or
+                                             ! (/fullpath/filename.nc if an aerosol)
+   character(len=  1), pointer :: type(:)    ! 'A' if aerosol, 'G' if gas, 'M' if mode
+end type rad_cnst_namelist_t
+
+type(rad_cnst_namelist_t), public :: radcnst_namelist(0:N_DIAG) ! gas, bulk aerosol, and modal components used in
+                                                        ! climate/diagnostic calculations
+
+logical, public :: active_calls(0:N_DIAG)     ! active_calls(i) is true if the i-th call to radiation is
+                                      ! specified.  Note that the 0th call is for the climate
+                                      ! calculation which is always made.
+
+! Storage for gas components in the climate/diagnostic lists
+
+type :: gas_t
+   character(len=1)  :: source       ! A for state (advected), N for pbuf (non-advected), Z for zero
+   character(len=64) :: camname      ! name of constituent in physics state or buffer
+   character(len=32) :: mass_name    ! name for mass per layer field in history output
+   integer           :: idx          ! index from constituents or from pbuf
+end type gas_t
+
+type :: gaslist_t
+   integer                :: ngas
+   character(len=2)       :: list_id  ! set to "  " for climate list, or two character integer
+                                      ! (include leading zero) to identify diagnostic list
+   type(gas_t), pointer   :: gas(:)   ! dimension(ngas) where ngas = nradgas is from radconstants
+end type gaslist_t
+
+type(gaslist_t), target :: gaslist(0:N_DIAG)  ! gasses used in climate/diagnostic calculations
 
 ! Public interfaces — routines kept in this module
 public :: &
@@ -68,10 +116,10 @@ public :: &
    rad_cnst_get_bin_num, &
    rad_cnst_get_bin_num_idx, &
    rad_cnst_get_carma_mmr_idx, &
-   rad_cnst_get_bin_mmr
+   rad_cnst_get_bin_mmr, &
+   get_cam_idx
 
 ! Re-exported public interfaces from aerosol_definition_mod (backward compatibility)
-public :: N_DIAG
 public :: &
    rad_cnst_get_info,           &
    rad_cnst_get_mode_idx,       &
@@ -84,6 +132,15 @@ public :: &
    rad_cnst_get_info_by_bin_spec, &
    rad_cnst_get_bin_props, &
    rad_cnst_num_name
+
+! Generic interface for rad_cnst_get_info — the wrapper handles gas+aerosol args,
+! while mode/spec overloads are imported from aerosol_definition_mod.
+interface rad_cnst_get_info
+   module procedure rad_cnst_get_info_wrap
+   module procedure rad_cnst_get_info_by_mode
+   module procedure rad_cnst_get_info_by_mode_spec
+   module procedure rad_cnst_get_info_by_spectype
+end interface
 
 character(len=cs1), public :: iceopticsfile, liqopticsfile
 character(len=32),  public :: icecldoptics,liqcldoptics
@@ -283,7 +340,8 @@ subroutine rad_cnst_readnl(nlfile)
    if (masterproc) write(iulog,*) nl//subname//': Radiation constituent lists:'
    do i = 0, N_DIAG
       if (active_calls(i)) then
-         call list_init1(radcnst_namelist(i), gaslist(i), aerosollist(i), ma_list(i), sa_list(i))
+         call gas_list_init1(radcnst_namelist(i), gaslist(i))
+         call list_init1(radcnst_namelist(i), aerosollist(i), ma_list(i), sa_list(i))
 
          if (masterproc .and. verbose) then
             call print_lists(gaslist(i), aerosollist(i), ma_list(i), sa_list(i))
@@ -328,10 +386,17 @@ subroutine rad_cnst_init()
    ! Finish initializing the bin definitions.
    call init_bin_comps(bins)
 
-   ! Finish initializing the gas, bulk aerosol, and mode lists.
+   ! Finish initializing the aerosol lists.
    do i = 0, N_DIAG
       if (active_calls(i)) then
-         call list_init2(gaslist(i), aerosollist(i), ma_list(i), sa_list(i))
+         call list_init2(aerosollist(i), ma_list(i), sa_list(i))
+      end if
+   end do
+
+   ! Finish initializing the gas lists (resolve constituent indices).
+   do i = 0, N_DIAG
+      if (active_calls(i)) then
+         call gas_list_init2(gaslist(i))
       end if
    end do
 
@@ -350,6 +415,127 @@ subroutine rad_cnst_init()
 
 
 end subroutine rad_cnst_init
+
+subroutine gas_list_init1(namelist, gaslist)
+
+   ! Initialize gas list from parsed namelist data.
+   ! Extracted from the former gas branch of list_init1 in aerosol_definition_mod.
+
+   type(rad_cnst_namelist_t), intent(in)    :: namelist
+   type(gaslist_t),           intent(inout) :: gaslist
+
+   ! Local variables
+   integer :: ii, igas, istat
+   character(len=*), parameter :: routine = 'gas_list_init1'
+   !-----------------------------------------------------------------------------
+
+   ! nradgas is set by the radiative transfer code
+   gaslist%ngas = nradgas
+
+   allocate(gaslist%gas(gaslist%ngas), stat=istat)
+   if (istat /= 0) call endrun(routine//': allocate ERROR; gas list components')
+
+   ! Initialize sources to zero (default for unspecified gases)
+   do igas = 1, gaslist%ngas
+      gaslist%gas(igas)%source  = 'Z'
+      gaslist%gas(igas)%camname = ' '
+   end do
+
+   ! Populate gas entries from 'G' type namelist entries
+   do ii = 1, namelist%ncnst
+      if (namelist%type(ii) /= 'G') cycle
+
+      if (masterproc .and. verbose) &
+         write(iulog,*) "  rad namelist spec: "// trim(namelist%source(ii)) &
+         //":"//trim(namelist%camname(ii))//":"//trim(namelist%radname(ii))
+
+      ! rad_gas_index will abort on illegal names
+      igas = rad_gas_index(namelist%radname(ii))
+
+      gaslist%gas(igas)%source  = namelist%source(ii)
+      gaslist%gas(igas)%camname = namelist%camname(ii)
+   end do
+
+end subroutine gas_list_init1
+
+!================================================================================================
+
+subroutine gas_list_init2(gaslist)
+
+   ! Resolve constituent indices for gas list entries.
+   ! Extracted from the former gas loop of list_init2 in aerosol_definition_mod.
+
+   type(gaslist_t), intent(inout) :: gaslist
+
+   ! Local variables
+   integer :: i
+   character(len=*), parameter :: routine = 'gas_list_init2'
+   !-----------------------------------------------------------------------------
+
+   do i = 1, gaslist%ngas
+      gaslist%gas(i)%idx = get_cam_idx(gaslist%gas(i)%source, gaslist%gas(i)%camname, routine)
+   end do
+
+end subroutine gas_list_init2
+
+!================================================================================================
+
+subroutine rad_cnst_get_info_wrap(list_idx, gasnames, aernames, &
+                                  use_data_o3, ngas, naero, nmodes, nbins)
+
+   ! Wrapper that provides the original rad_cnst_get_info interface.
+   ! Gas arguments are handled locally; aerosol arguments are delegated
+   ! to rad_cnst_get_aer_info in aerosol_definition_mod.
+
+   ! Arguments
+   integer,                     intent(in)  :: list_idx
+   character(len=64), optional, intent(out) :: gasnames(:)
+   character(len=64), optional, intent(out) :: aernames(:)
+   logical,           optional, intent(out) :: use_data_o3
+   integer,           optional, intent(out) :: naero
+   integer,           optional, intent(out) :: ngas
+   integer,           optional, intent(out) :: nmodes
+   integer,           optional, intent(out) :: nbins
+
+   ! Local variables
+   type(gaslist_t),  pointer :: g_list
+   integer          :: i, igas, gaslen
+   character(len=1) :: source
+   character(len=*), parameter :: subname = 'rad_cnst_get_info'
+   !-----------------------------------------------------------------------------
+
+   ! Delegate aerosol arguments to aerosol_definition_mod
+   call rad_cnst_get_aer_info(list_idx, aernames=aernames, naero=naero, &
+                              nmodes=nmodes, nbins=nbins)
+
+   ! Handle gas arguments locally
+   g_list => gaslist(list_idx)
+
+   if (present(ngas)) then
+      ngas = g_list%ngas
+   endif
+
+   if (present(gasnames)) then
+      gaslen = size(gasnames)
+      if (gaslen < g_list%ngas) then
+         write(iulog,*) subname//': ERROR: ngas=', g_list%ngas, '  gaslen=', gaslen
+         call endrun(subname//': ERROR: gasnames too short')
+      end if
+      do i = 1, g_list%ngas
+         gasnames(i) = g_list%gas(i)%camname
+      end do
+   end if
+
+   if (present(use_data_o3)) then
+      igas = rad_gas_index('O3')
+      source = g_list%gas(igas)%source
+      use_data_o3 = .false.
+      if (source == 'N') use_data_o3 = .true.
+   endif
+
+end subroutine rad_cnst_get_info_wrap
+
+!================================================================================================
 
 subroutine rad_cnst_get_gas(list_idx, gasname, state, pbuf, mmr)
 
@@ -2088,5 +2274,49 @@ subroutine print_lists(gas_list, aer_list, ma_list, sa_list)
 end subroutine print_lists
 
 !================================================================================================
+
+integer function get_cam_idx(source, name, routine)
+
+   use constituents,   only: cnst_get_ind
+   use physics_buffer, only: pbuf_get_index
+
+   ! get index of name in internal CAM array; either the constituent array
+   ! or the physics buffer
+
+   character(len=*), intent(in) :: source
+   character(len=*), intent(in) :: name
+   character(len=*), intent(in) :: routine  ! name of calling routine
+
+   integer :: idx
+   integer :: errcode
+   !-----------------------------------------------------------------------------
+
+   if (source(1:1) == 'N') then
+
+      idx = pbuf_get_index(trim(name),errcode)
+      if (errcode < 0) then
+         call endrun(routine//' ERROR: cannot find physics buffer field '//trim(name))
+      end if
+
+   else if (source(1:1) == 'A') then
+
+      call cnst_get_ind(trim(name), idx, abort=.false.)
+      if (idx < 0) then
+         call endrun(routine//' ERROR: cannot find constituent field '//trim(name))
+      end if
+
+   else if (source(1:1) == 'Z') then
+
+      idx = -1
+
+   else
+
+      call endrun(routine//' ERROR: invalid source for specie '//trim(name))
+
+   end if
+
+   get_cam_idx = idx
+
+end function get_cam_idx
 
 end module rad_constituents
