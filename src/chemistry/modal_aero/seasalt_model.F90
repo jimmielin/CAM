@@ -34,7 +34,7 @@ contains
   subroutine seasalt_init(seasalt_emis_scale)
     use sslt_sections, only: sslt_sections_init
     use constituents,  only: cnst_get_ind
-    use rad_constituents, only: rad_cnst_get_info
+    use radiative_aerosol, only: rad_aer_get_info
 
     real(r8), intent(in) :: seasalt_emis_scale
     integer :: m, l, nspec, ndx
@@ -47,9 +47,9 @@ contains
 
     ndx=0
     do m = 1, ntot_amode
-       call rad_cnst_get_info(0, m, nspec=nspec)
+       call rad_aer_get_info(0, m, nspec=nspec)
        do l = 1, nspec
-          call rad_cnst_get_info(0, m, l, spec_name=spec_name )
+          call rad_aer_get_info(0, m, l, spec_name=spec_name )
           if (spec_name(:3) == 'ncl') then
              ndx=ndx+1
              seasalt_names(ndx) = spec_name

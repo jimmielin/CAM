@@ -2,7 +2,7 @@ module modal_aerosol_properties_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
   use physconst, only: pi
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
-  use aerosol_definition_mod, only: rad_cnst_get_info, rad_cnst_get_mode_props, rad_cnst_get_aer_props
+  use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_mode_props, rad_aer_get_props
 
   implicit none
 
@@ -96,7 +96,7 @@ contains
        return
     end if
 
-    call rad_cnst_get_info(list_idx_loc, nmodes=nmodes)
+    call rad_aer_get_info(list_idx_loc, nmodes=nmodes)
 
     allocate(nspecies(nmodes),stat=ierr)
     if( ierr /= 0 ) then
@@ -153,11 +153,11 @@ contains
     ncnst_tot = 0
 
     do m = 1, nmodes
-       call rad_cnst_get_info(list_idx_loc, m, nspec=nspecies(m))
+       call rad_aer_get_info(list_idx_loc, m, nspec=nspecies(m))
 
        ncnst_tot =  ncnst_tot + nspecies(m) + 1
 
-       call rad_cnst_get_mode_props(list_idx_loc, m, sigmag=sigmag(m), &
+       call rad_aer_get_mode_props(list_idx_loc, m, sigmag=sigmag(m), &
                                     dgnum=dgnum, dgnumhi=dgnumhi, dgnumlo=dgnumlo )
 
        newobj%dgnum_(m) = dgnum
@@ -406,12 +406,12 @@ contains
     complex(r8), pointer, optional, intent(out) :: refindex_sw(:) ! short wave species refractive indices
     complex(r8), pointer, optional, intent(out) :: refindex_lw(:) ! long wave species refractive indices
 
-    call rad_cnst_get_aer_props(self%list_idx_, bin_ndx, species_ndx, &
+    call rad_aer_get_props(self%list_idx_, bin_ndx, species_ndx, &
                                 density_aer=density, hygro_aer=hygro, spectype=spectype, &
                                 refindex_aer_sw=refindex_sw, refindex_aer_lw=refindex_lw)
 
     if (present(specname)) then
-       call rad_cnst_get_info(self%list_idx_, bin_ndx, species_ndx, spec_name=specname)
+       call rad_aer_get_info(self%list_idx_, bin_ndx, species_ndx, spec_name=specname)
     end if
 
     if (present(specmorph)) then
@@ -492,7 +492,7 @@ contains
     real(r8),  optional, pointer :: r_lw_abs(:,:)
 
     ! refactive index table parameters
-    call rad_cnst_get_mode_props(self%list_idx_, bin_ndx, &
+    call rad_aer_get_mode_props(self%list_idx_, bin_ndx, &
                                  opticstype=opticstype, &
                                  extpsw=extpsw, &
                                  abspsw=abspsw, &
@@ -658,7 +658,7 @@ contains
     character(len=*), intent(out) :: name_a ! constituent name of ambient aerosol number dens
     character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol number dens
 
-    call rad_cnst_get_info(self%list_idx_,bin_ndx, num_name=name_a, num_name_cw=name_c)
+    call rad_aer_get_info(self%list_idx_,bin_ndx, num_name=name_a, num_name_cw=name_c)
   end subroutine num_names
 
   !------------------------------------------------------------------------
@@ -671,7 +671,7 @@ contains
     character(len=*), intent(out) :: name_a ! constituent name of ambient aerosol MMR
     character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol MMR
 
-    call rad_cnst_get_info(self%list_idx_, bin_ndx, species_ndx, spec_name=name_a, spec_name_cw=name_c)
+    call rad_aer_get_info(self%list_idx_, bin_ndx, species_ndx, spec_name=name_a, spec_name_cw=name_c)
   end subroutine mmr_names
 
   !------------------------------------------------------------------------
@@ -682,7 +682,7 @@ contains
     integer, intent(in) :: bin_ndx           ! bin number
     character(len=*), intent(out) :: name   ! constituent name of ambient aerosol number dens
 
-    call rad_cnst_get_info(self%list_idx_,bin_ndx, num_name=name)
+    call rad_aer_get_info(self%list_idx_,bin_ndx, num_name=name)
 
   end subroutine amb_num_name
 
@@ -695,7 +695,7 @@ contains
     integer, intent(in) :: species_ndx       ! species number
     character(len=*), intent(out) :: name   ! constituent name of ambient aerosol MMR
 
-    call rad_cnst_get_info(self%list_idx_, bin_ndx, species_ndx, spec_name=name)
+    call rad_aer_get_info(self%list_idx_, bin_ndx, species_ndx, spec_name=name)
 
   end subroutine amb_mmr_name
 
@@ -708,7 +708,7 @@ contains
     integer, intent(in) :: species_ndx       ! species number
     character(len=*), intent(out) :: spectype ! species type
 
-    call rad_cnst_get_info(self%list_idx_, bin_ndx, species_ndx, spec_type=spectype)
+    call rad_aer_get_info(self%list_idx_, bin_ndx, species_ndx, spec_type=spectype)
 
   end subroutine species_type
 
@@ -727,7 +727,7 @@ contains
 
     res = .false.
 
-    call rad_cnst_get_info(self%list_idx_, bin_ndx, mode_type=modetype)
+    call rad_aer_get_info(self%list_idx_, bin_ndx, mode_type=modetype)
     if (.not.(modetype=='coarse' .or. modetype=='coarse_dust')) then
        return
     end if
@@ -756,7 +756,7 @@ contains
 
     if (species_ndx>0) then
 
-       call rad_cnst_get_info(self%list_idx_, bin_ndx, mode_type=modetype)
+       call rad_aer_get_info(self%list_idx_, bin_ndx, mode_type=modetype)
        if (.not.(modetype=='coarse' .or. modetype=='coarse_dust')) then
           return
        end if
@@ -805,7 +805,7 @@ contains
 
     res = .false.
 
-    call rad_cnst_get_info(self%list_idx_, bin_ndx, mode_type=mode_name)
+    call rad_aer_get_info(self%list_idx_, bin_ndx, mode_type=mode_name)
 
     if ((trim(mode_name)/='aitken')) then
 
@@ -830,7 +830,7 @@ contains
 
     character(len=aero_name_len) :: mode_name
 
-    call rad_cnst_get_info(self%list_idx_, bin_ndx, mode_type=mode_name)
+    call rad_aer_get_info(self%list_idx_, bin_ndx, mode_type=mode_name)
 
     soluble = trim(mode_name)/='primary_carbon'
 
@@ -852,7 +852,7 @@ contains
     call self%species_type(bin_ndx, species_ndx, spectype=species_type)
     select case ( trim(species_type) )
     case('dust')
-       call rad_cnst_get_info(self%list_idx_, bin_ndx, mode_type=mode_type)
+       call rad_aer_get_info(self%list_idx_, bin_ndx, mode_type=mode_type)
        select case ( trim(mode_type) )
        case ('accum','fine_dust')
           minrad = 0.258e-6_r8
@@ -862,7 +862,7 @@ contains
           minrad = -huge(1._r8)
        end select
     case('black-c')
-       call rad_cnst_get_info(self%list_idx_, nmodes=nmodes)
+       call rad_aer_get_info(self%list_idx_, nmodes=nmodes)
        if (nmodes==3) then
           minrad = 0.04e-6_r8
        else
@@ -883,7 +883,7 @@ contains
 
     character(len=32) :: name
 
-    call rad_cnst_get_info(self%list_idx_, bin_ndx, mode_type=name)
+    call rad_aer_get_info(self%list_idx_, bin_ndx, mode_type=name)
 
   end function bin_name
 
@@ -1032,10 +1032,10 @@ contains
           Mtotal = Mtotal + dep_fluxes(mm) ! kg/m2
        end do
        mode_has_type: if (has_type) then
-          call rad_cnst_get_info(self%list_idx_, m, mode_type=modetype)
+          call rad_aer_get_info(self%list_idx_, m, mode_type=modetype)
           if (Ntot>1.e-40_r8 .and. Mtype>1.e-40_r8 .and. Mtotal>1.e-40_r8) then
 
-             call rad_cnst_get_mode_props(self%list_idx_, m, sigmag=sigma_g)
+             call rad_aer_get_mode_props(self%list_idx_, m, sigmag=sigma_g)
              tmp = sqrtwo*log(sigma_g)
 
              ! type number concentration
@@ -1080,7 +1080,7 @@ contains
 
     character(len=aero_name_len) :: modetype
 
-    call rad_cnst_get_info(self%list_idx_, bin_ndx, mode_type=modetype)
+    call rad_aer_get_info(self%list_idx_, bin_ndx, mode_type=modetype)
 
     hydrophilic = (trim(modetype) == 'accum')
 

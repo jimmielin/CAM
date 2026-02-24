@@ -15,7 +15,8 @@ use constituents,   only: pcnst, cnst_get_ind
 use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
 use physics_buffer, only: physics_buffer_desc
 use phys_control,   only: use_hetfrz_classnuc
-use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_aer_mmr, rad_cnst_get_aer_props
+use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props
+use rad_constituents, only: rad_cnst_get_aer_mmr
 
 use physics_buffer, only: pbuf_add_field, dtype_r8, pbuf_old_tim_idx, &
                           pbuf_get_index, pbuf_get_field, &
@@ -181,7 +182,7 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in, pbuf2d, aero_props)
 
    ! clim_modal_aero determines whether modal or carma aerosols are used in the climate calculation.
    ! The modal aerosols can be either prognostic or prescribed.
-   call rad_cnst_get_info(0, nmodes=nmodes, nbins=nbins)
+   call rad_aer_get_info(0, nmodes=nmodes, nbins=nbins)
 
    clim_modal_carma = (nmodes > 0) .or. (nbins > 0)
 
@@ -336,13 +337,13 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in, pbuf2d, aero_props)
 
       ! Props needed for BAM number concentration calcs.
 
-      call rad_cnst_get_info(0, naero=naer_all)
+      call rad_aer_get_info(0, naero=naer_all)
       allocate( &
          aername(naer_all),        &
          num_to_mass_aer(naer_all) )
 
       do iaer = 1, naer_all
-         call rad_cnst_get_aer_props(0, iaer, &
+         call rad_aer_get_props(0, iaer, &
             aername         = aername(iaer), &
             num_to_mass_aer = num_to_mass_aer(iaer))
          ! Look for sulfate, dust, and soot in this list (Bulk aerosol only)

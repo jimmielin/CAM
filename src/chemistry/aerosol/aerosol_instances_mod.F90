@@ -1,7 +1,8 @@
 module aerosol_instances_mod
   use aerosol_properties_mod, only: aerosol_properties
   use aerosol_state_mod, only: aerosol_state
-  use aerosol_definition_mod, only: N_DIAG, rad_cnst_get_info, rad_cnst_get_call_list
+  use radiative_aerosol_definitions, only: N_DIAG
+  use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_call_list
 
   implicit none
   private
@@ -46,7 +47,7 @@ contains
 
     num_aero_models_ = 0
 
-    call rad_cnst_get_info(0, nmodes=nmodes, nbins=nbins, naero=nbulk_aerosols)
+    call rad_aer_get_info(0, nmodes=nmodes, nbins=nbins, naero=nbulk_aerosols)
     modal_active_ = nmodes > 0
     carma_active_ = nbins > 0
     bulk_active_  = nbulk_aerosols > 0
@@ -62,11 +63,11 @@ contains
        call endrun(prefix//'allocation error: aero_props_all')
     end if
 
-    call rad_cnst_get_call_list(call_list)
+    call rad_aer_get_call_list(call_list)
 
     do ilist = 0, N_DIAG
        if (.not. call_list(ilist)) cycle
-       call rad_cnst_get_info(ilist, nmodes=nmodes, nbins=nbins, naero=nbulk_aerosols)
+       call rad_aer_get_info(ilist, nmodes=nmodes, nbins=nbins, naero=nbulk_aerosols)
 
        iaermod = 0
        if (modal_active_) then

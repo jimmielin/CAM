@@ -32,8 +32,8 @@ use physics_types,    only: physics_state, physics_ptend, physics_ptend_init, ph
 use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_old_tim_idx, pbuf_get_field, &
                             pbuf_get_chunk
 use phys_control,     only: phys_getopts, use_hetfrz_classnuc
-use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_aer_mmr, rad_cnst_get_aer_props, &
-                            rad_cnst_get_mode_num
+use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props
+use rad_constituents, only: rad_cnst_get_aer_mmr, rad_cnst_get_mode_num
 
 use nucleate_ice_cam, only: use_preexisting_ice, nucleate_ice_cam_readnl, nucleate_ice_cam_register, &
                             nucleate_ice_cam_init, nucleate_ice_cam_calc
@@ -218,7 +218,7 @@ subroutine microp_aero_init(phys_state,pbuf2d)
 
    ! clim_modal_aero determines whether modal aerosols are used in the climate calculation.
    ! The modal aerosols can be either prognostic or prescribed.
-   call rad_cnst_get_info(0, nmodes=nmodes, nbins=nbins)
+   call rad_aer_get_info(0, nmodes=nmodes, nbins=nbins)
    clim_modal_aero = (nmodes > 0)
    clim_carma_aero = (nbins> 0)
 
@@ -251,7 +251,7 @@ subroutine microp_aero_init(phys_state,pbuf2d)
 
       ! mode index for specified mode types
       do m = 1, nmodes
-         call rad_cnst_get_info(0, m, mode_type=str32)
+         call rad_aer_get_info(0, m, mode_type=str32)
          select case (trim(str32))
          case ('accum')
             mode_accum_idx = m
@@ -283,26 +283,26 @@ subroutine microp_aero_init(phys_state,pbuf2d)
 
       ! species indices for specified types
       ! find indices for the dust and seasalt species in the coarse mode
-      call rad_cnst_get_info(0, mode_coarse_dst_idx, nspec=nspec)
+      call rad_aer_get_info(0, mode_coarse_dst_idx, nspec=nspec)
       do n = 1, nspec
-         call rad_cnst_get_info(0, mode_coarse_dst_idx, n, spec_type=str32)
+         call rad_aer_get_info(0, mode_coarse_dst_idx, n, spec_type=str32)
          select case (trim(str32))
          case ('dust')
             coarse_dust_idx = n
          end select
       end do
-      call rad_cnst_get_info(0, mode_coarse_slt_idx, nspec=nspec)
+      call rad_aer_get_info(0, mode_coarse_slt_idx, nspec=nspec)
       do n = 1, nspec
-         call rad_cnst_get_info(0, mode_coarse_slt_idx, n, spec_type=str32)
+         call rad_aer_get_info(0, mode_coarse_slt_idx, n, spec_type=str32)
          select case (trim(str32))
          case ('seasalt')
             coarse_nacl_idx = n
          end select
       end do
       if (mode_coarse_idx>0) then
-         call rad_cnst_get_info(0, mode_coarse_idx, nspec=nspec)
+         call rad_aer_get_info(0, mode_coarse_idx, nspec=nspec)
          do n = 1, nspec
-            call rad_cnst_get_info(0, mode_coarse_idx, n, spec_type=str32)
+            call rad_aer_get_info(0, mode_coarse_idx, n, spec_type=str32)
             select case (trim(str32))
             case ('sulfate')
                coarse_so4_idx = n
@@ -321,13 +321,13 @@ subroutine microp_aero_init(phys_state,pbuf2d)
 
       ! Props needed for BAM number concentration calcs.
 
-      call rad_cnst_get_info(0, naero=naer_all)
+      call rad_aer_get_info(0, naero=naer_all)
       allocate( &
          aername(naer_all),        &
          num_to_mass_aer(naer_all) )
 
       do iaer = 1, naer_all
-         call rad_cnst_get_aer_props(0, iaer, &
+         call rad_aer_get_props(0, iaer, &
             aername         = aername(iaer), &
             num_to_mass_aer = num_to_mass_aer(iaer) )
 

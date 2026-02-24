@@ -3,7 +3,7 @@ module modal_aerosol_state_mod
   use shr_spfn_mod, only: erf => shr_spfn_erf
   use aerosol_state_mod, only: aerosol_state, ptr2d_t
   use rad_constituents, only: rad_cnst_get_aer_mmr, rad_cnst_get_mode_num
-  use aerosol_definition_mod, only: rad_cnst_get_info, rad_cnst_get_mode_props
+  use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_mode_props
   use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
   use physics_types, only: physics_state
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
@@ -234,7 +234,7 @@ contains
        call endrun('modal_aerosol_state::icenuc_size_wght_arr: only valid for climate list (list_idx=0)')
     end if
 
-    call rad_cnst_get_info(0, bin_ndx, mode_type=modetype)
+    call rad_aer_get_info(0, bin_ndx, mode_type=modetype)
 
     wght = 0._r8
 
@@ -248,7 +248,7 @@ contains
           if ( use_preexisting_ice ) then
              wght(:ncol,:) = 1._r8
           else
-             call rad_cnst_get_mode_props(0, bin_ndx, sigmag=sigmag_aitken)
+             call rad_aer_get_mode_props(0, bin_ndx, sigmag=sigmag_aitken)
              call pbuf_get_field(self%pbuf, pbuf_get_index('DGNUM' ), dgnum)
              do k = 1,nlev
                 do i = 1,ncol
@@ -296,7 +296,7 @@ contains
 
     wght = 0._r8
 
-    call rad_cnst_get_info(0, bin_ndx, mode_type=modetype)
+    call rad_aer_get_info(0, bin_ndx, mode_type=modetype)
 
     select case ( trim(species_type) )
     case('dust')
@@ -308,7 +308,7 @@ contains
           if ( use_preexisting_ice ) then
              wght = 1._r8
           else
-             call rad_cnst_get_mode_props(0, bin_ndx, sigmag=sigmag_aitken)
+             call rad_aer_get_mode_props(0, bin_ndx, sigmag=sigmag_aitken)
              call pbuf_get_field(self%pbuf, pbuf_get_index('DGNUM' ), dgnum)
 
              if (dgnum(col_ndx,lyr_ndx,bin_ndx) > 0._r8) then
@@ -356,7 +356,7 @@ contains
        call endrun('modal_aerosol_state::icenuc_type_wght: only valid for climate list (list_idx=0)')
     end if
 
-    call rad_cnst_get_info(0, bin_ndx, mode_type=modetype)
+    call rad_aer_get_info(0, bin_ndx, mode_type=modetype)
 
     wght = 0._r8
 
@@ -430,7 +430,7 @@ contains
 
     wght(:,:) = 1._r8
 
-    call rad_cnst_get_info(0, bin_ndx, mode_type=modetype)
+    call rad_aer_get_info(0, bin_ndx, mode_type=modetype)
 
     if (trim(modetype) == 'aitken') then
        wght(:,:) = 0._r8

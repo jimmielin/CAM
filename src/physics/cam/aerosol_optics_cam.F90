@@ -11,7 +11,8 @@ module aerosol_optics_cam
   use physconst, only: rga, rair
   use cam_abortutils, only: endrun
   use spmd_utils, only: masterproc
-  use rad_constituents,  only: n_diag, rad_cnst_get_call_list
+  use radiative_aerosol_definitions, only: N_DIAG
+  use radiative_aerosol, only: rad_aer_get_call_list
   use cam_history,       only: addfld, add_default, outfld, horiz_only, fieldname_len
   use cam_history_support, only: fillvalue
 
@@ -173,7 +174,7 @@ contains
           lw10um_indx = i ! index corresponding to 10 microns
        end if
     end do
-    call rad_cnst_get_call_list(call_list)
+    call rad_aer_get_call_list(call_list)
 
     do ilist = 0, n_diag
        if (call_list(ilist)) then

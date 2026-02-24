@@ -2,8 +2,8 @@ module carma_aerosol_properties_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
   use physconst, only: pi
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
-  use aerosol_definition_mod, only: rad_cnst_get_info, rad_cnst_get_bin_props_by_idx, &
-                              rad_cnst_get_info_by_bin, rad_cnst_get_info_by_bin_spec, rad_cnst_get_bin_props
+  use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_bin_props_by_idx, &
+                              rad_aer_get_info_by_bin, rad_aer_get_info_by_bin_spec, rad_aer_get_bin_props
   use infnan, only: nan, assignment(=)
 
   implicit none
@@ -85,7 +85,7 @@ contains
        return
     end if
 
-    call rad_cnst_get_info( list_idx_loc, nbins=nbins)
+    call rad_aer_get_info( list_idx_loc, nbins=nbins)
 
     allocate( nspecies(nbins),stat=ierr )
     if( ierr /= 0 ) then
@@ -116,7 +116,7 @@ contains
     ncnst_tot = 0
 
     do m = 1, nbins
-       call rad_cnst_get_info_by_bin(list_idx_loc, m, nspec=nspecies(m))
+       call rad_aer_get_info_by_bin(list_idx_loc, m, nspec=nspecies(m))
        ncnst_tot = ncnst_tot + nspecies(m) + 1
        nmasses(m) = nspecies(m)
     end do
@@ -278,28 +278,28 @@ contains
     complex(r8), pointer, optional, intent(out) :: refindex_lw(:) ! long wave species refractive indices
 
     if (present(density)) then
-       call rad_cnst_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, density_aer=density)
+       call rad_aer_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, density_aer=density)
     end if
     if (present(hygro)) then
-       call rad_cnst_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, hygro_aer=hygro)
+       call rad_aer_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, hygro_aer=hygro)
     end if
     if (present(spectype)) then
-       call rad_cnst_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, spectype=spectype)
+       call rad_aer_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, spectype=spectype)
     end if
     if (present(refindex_sw)) then
-       call rad_cnst_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, refindex_aer_sw=refindex_sw)
+       call rad_aer_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, refindex_aer_sw=refindex_sw)
     end if
     if (present(refindex_lw)) then
-       call rad_cnst_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, refindex_aer_lw=refindex_lw)
+       call rad_aer_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, refindex_aer_lw=refindex_lw)
     end if
     if (present(specmorph)) then
-       call rad_cnst_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, specmorph=specmorph)
+       call rad_aer_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, specmorph=specmorph)
     end if
     if (present(specname)) then
        if (species_ndx>self%nspecies(bin_ndx)) then
-          call rad_cnst_get_info_by_bin(self%list_idx_, bin_ndx,  mmr_name=specname)
+          call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx,  mmr_name=specname)
        else
-          call rad_cnst_get_info_by_bin_spec(self%list_idx_, bin_ndx, species_ndx, spec_name=specname)
+          call rad_aer_get_info_by_bin_spec(self%list_idx_, bin_ndx, species_ndx, spec_name=specname)
        end if
     end if
 
@@ -410,7 +410,7 @@ contains
        prefi = huge(1)
     end if
 
-    call rad_cnst_get_bin_props(self%list_idx_,bin_ndx, &
+    call rad_aer_get_bin_props(self%list_idx_,bin_ndx, &
                                 opticstype=opticstype, &
                                 sw_hygro_ext_wtp=sw_hygro_ext_wtp, &
                                 sw_hygro_ssa_wtp=sw_hygro_ssa_wtp, &
@@ -523,7 +523,7 @@ contains
     character(len=*), intent(out) :: name_a ! constituent name of ambient aerosol number dens
     character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol number dens
 
-    call rad_cnst_get_info_by_bin(self%list_idx_, bin_ndx, num_name=name_a, num_name_cw=name_c)
+    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, num_name=name_a, num_name_cw=name_c)
 
   end subroutine num_names
 
@@ -538,9 +538,9 @@ contains
     character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol MMR
 
     if (species_ndx>0) then
-       call rad_cnst_get_info_by_bin_spec(self%list_idx_, bin_ndx, species_ndx, spec_name=name_a, spec_name_cw=name_c)
+       call rad_aer_get_info_by_bin_spec(self%list_idx_, bin_ndx, species_ndx, spec_name=name_a, spec_name_cw=name_c)
     else
-       call rad_cnst_get_info_by_bin(self%list_idx_, bin_ndx,  mmr_name=name_a, mmr_name_cw=name_c)
+       call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx,  mmr_name=name_a, mmr_name_cw=name_c)
     end if
 
   end subroutine mmr_names
@@ -553,7 +553,7 @@ contains
     integer, intent(in) :: bin_ndx           ! bin number
     character(len=*), intent(out) :: name   ! constituent name of ambient aerosol number dens
 
-    call rad_cnst_get_info_by_bin(self%list_idx_, bin_ndx, num_name=name)
+    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, num_name=name)
 
   end subroutine amb_num_name
 
@@ -567,9 +567,9 @@ contains
     character(len=*), intent(out) :: name   ! constituent name of ambient aerosol MMR
 
     if (species_ndx>0) then
-       call rad_cnst_get_info_by_bin_spec(self%list_idx_, bin_ndx, species_ndx, spec_name=name)
+       call rad_aer_get_info_by_bin_spec(self%list_idx_, bin_ndx, species_ndx, spec_name=name)
     else
-       call rad_cnst_get_info_by_bin(self%list_idx_, bin_ndx,  mmr_name=name)
+       call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx,  mmr_name=name)
     end if
 
   end subroutine amb_mmr_name
@@ -583,7 +583,7 @@ contains
     integer, intent(in) :: species_ndx       ! species number
     character(len=*), intent(out) :: spectype ! species type
 
-    call rad_cnst_get_info_by_bin_spec(self%list_idx_, bin_ndx, species_ndx, spec_type=spectype)
+    call rad_aer_get_info_by_bin_spec(self%list_idx_, bin_ndx, species_ndx, spec_type=spectype)
 
   end subroutine species_type
 
@@ -702,7 +702,7 @@ contains
 
     character(len=32) name
 
-    call rad_cnst_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=name)
+    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=name)
 
   end function bin_name
 
@@ -727,7 +727,7 @@ contains
     character(len=aero_name_len) :: bin_name, shortname
     integer :: igroup, ibin, rc, nchr
 
-    call rad_cnst_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=bin_name)
+    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=bin_name)
 
     nchr = len_trim(bin_name)-2
     shortname = bin_name(:nchr)
@@ -867,7 +867,7 @@ contains
       integer :: ibin, igroup, rc, nchr
       real(r8) :: rmass
 
-      call rad_cnst_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=bin_name)
+      call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=bin_name)
 
       nchr = len_trim(bin_name)-2
       shortname = bin_name(:nchr)

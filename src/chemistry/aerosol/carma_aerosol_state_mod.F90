@@ -3,7 +3,7 @@ module carma_aerosol_state_mod
   use aerosol_state_mod, only: aerosol_state, ptr2d_t
 
   use rad_constituents, only: rad_cnst_get_bin_mmr_by_idx, rad_cnst_get_bin_num
-  use aerosol_definition_mod, only: rad_cnst_get_info_by_bin
+  use radiative_aerosol, only: rad_aer_get_info_by_bin
   use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
   use physics_types, only: physics_state
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
@@ -133,7 +133,7 @@ contains
 
     if (self%list_idx_ > 0) call endrun('carma_aerosol_state::ambient_total_bin_mmr: only valid for climate list (list_idx=0)')
 
-    call rad_cnst_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
+    call rad_aer_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
 
     nchr = len_trim(bin_name)-2
     shortname = bin_name(:nchr)
@@ -192,7 +192,7 @@ contains
 
     ncol = self%state%ncol
 
-    call rad_cnst_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
+    call rad_aer_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
 
     nchr = len_trim(bin_name)-2
     shortname = bin_name(:nchr)
@@ -225,7 +225,7 @@ contains
 
     ncol = self%state%ncol
 
-    call rad_cnst_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
+    call rad_aer_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
 
     nchr = len_trim(bin_name)-2
     shortname = bin_name(:nchr)
@@ -290,7 +290,7 @@ contains
 
     wght = 0._r8
 
-    call rad_cnst_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
+    call rad_aer_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
 
     nchr = len_trim(bin_name)-2
     shortname = bin_name(:nchr)
@@ -376,7 +376,7 @@ contains
 
     wght = 0._r8
 
-    call rad_cnst_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
+    call rad_aer_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
 
     nchr = len_trim(bin_name)-2
     shortname = bin_name(:nchr)
@@ -413,7 +413,7 @@ contains
        call endrun('carma_aerosol_state::hygroscopicity: only valid for climate list (list_idx=0)')
     end if
 
-    call rad_cnst_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
+    call rad_aer_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
 
     nchr = len_trim(bin_name)-2
     shortname = bin_name(:nchr)
@@ -482,7 +482,7 @@ contains
        call endrun('carma_aerosol_state::dry_volume: only valid for climate list (list_idx=0)')
     end if
 
-    call rad_cnst_get_info_by_bin(0, bin_idx, bin_name=bin_name)
+    call rad_aer_get_info_by_bin(0, bin_idx, bin_name=bin_name)
 
     nchr = len_trim(bin_name)-2
     shortname = bin_name(:nchr)
@@ -525,7 +525,7 @@ contains
        call endrun('carma_aerosol_state::wet_volume: only valid for climate list (list_idx=0)')
     end if
 
-    call rad_cnst_get_info_by_bin(0, bin_idx, bin_name=bin_name)
+    call rad_aer_get_info_by_bin(0, bin_idx, bin_name=bin_name)
 
     nchr = len_trim(bin_name)-2
     shortname = bin_name(:nchr)
@@ -592,7 +592,7 @@ contains
        call endrun('carma_aerosol_state::wet_diameter: only valid for climate list (list_idx=0)')
     end if
 
-    call rad_cnst_get_info_by_bin(0, bin_idx, bin_name=bin_name)
+    call rad_aer_get_info_by_bin(0, bin_idx, bin_name=bin_name)
 
     nchr = len_trim(bin_name)-2
     shortname = bin_name(:nchr)

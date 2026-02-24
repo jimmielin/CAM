@@ -11,8 +11,8 @@ use physics_types,    only: physics_state, physics_ptend
 use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_old_tim_idx, pbuf_get_field
 
 use phys_control,     only: phys_getopts
-use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_aer_mmr, rad_cnst_get_aer_props, &
-                            rad_cnst_get_mode_props, rad_cnst_get_mode_num
+use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props, rad_aer_get_mode_props
+use rad_constituents, only: rad_cnst_get_aer_mmr, rad_cnst_get_mode_num
 
 use cam_logfile,      only: iulog
 use cam_abortutils,   only: endrun
@@ -72,11 +72,11 @@ contains
 
 subroutine modal_aero_calcsize_reg()
   use physics_buffer,   only: pbuf_add_field, dtype_r8
-  use rad_constituents, only: rad_cnst_get_info
+  use radiative_aerosol, only: rad_aer_get_info
 
   integer :: nmodes
   
-  call rad_cnst_get_info(0, nmodes=nmodes)
+  call rad_aer_get_info(0, nmodes=nmodes)
 
   call pbuf_add_field('DGNUM', 'global',  dtype_r8, (/pcols, pver, nmodes/), dgnum_idx)    
 
@@ -1258,7 +1258,7 @@ subroutine modal_aero_calcsize_diag(state, pbuf, list_idx_in, dgnum_m, &
    list_idx = 0  ! climate list by default
    if (present(list_idx_in)) list_idx = list_idx_in
 
-   call rad_cnst_get_info(list_idx, nmodes=nmodes)
+   call rad_aer_get_info(list_idx, nmodes=nmodes)
 
    if (list_idx /= 0) then
       if (.not. present(dgnum_m)) then
@@ -1335,7 +1335,7 @@ subroutine modal_aero_calcsize_diag(state, pbuf, list_idx_in, dgnum_m, &
       end if
 
       ! get mode properties
-      call rad_cnst_get_mode_props(list_idx, n, dgnum=dgnum, dgnumhi=dgnumhi, dgnumlo=dgnumlo, &
+      call rad_aer_get_mode_props(list_idx, n, dgnum=dgnum, dgnumhi=dgnumhi, dgnumlo=dgnumlo, &
                                    sigmag=sigmag)
 
       ! get mode number mixing ratio
@@ -1346,11 +1346,11 @@ subroutine modal_aero_calcsize_diag(state, pbuf, list_idx_in, dgnum_m, &
 
       ! compute dry volume mixrats = 
       !      sum_over_components{ component_mass mixrat / density }
-      call rad_cnst_get_info(list_idx, n, nspec=nspec)
+      call rad_aer_get_info(list_idx, n, nspec=nspec)
       do l1 = 1, nspec
 
          call rad_cnst_get_aer_mmr(list_idx, n, l1, 'a', state, pbuf, specmmr)
-         call rad_cnst_get_aer_props(list_idx, n, l1, density_aer=specdens)
+         call rad_aer_get_props(list_idx, n, l1, density_aer=specdens)
 
          ! need qmass*dummwdens = (kg/kg-air) * [1/(kg/m3)] = m3/kg-air
          dummwdens = 1.0_r8 / specdens
@@ -1467,7 +1467,7 @@ subroutine modal_aero_calcdry(state, pbuf, list_idx_in, dgnumdry_m, hygro_m, dry
    end if
 
    ! loop over all aerosol modes
-   call rad_cnst_get_info(list_idx, nmodes=nmodes)
+   call rad_aer_get_info(list_idx, nmodes=nmodes)
 
    allocate( maer(pcols,pver))
 
@@ -1499,16 +1499,16 @@ subroutine modal_aero_calcdry(state, pbuf, list_idx_in, dgnumdry_m, hygro_m, dry
       so4dryvolmr(:,:) = 0._r8
 
       ! get mode properties
-      call rad_cnst_get_mode_props(list_idx, m, sigmag=sigmag)
+      call rad_aer_get_mode_props(list_idx, m, sigmag=sigmag)
 
       ! get mode info
-      call rad_cnst_get_info(list_idx, m, nspec=nspec)
+      call rad_aer_get_info(list_idx, m, nspec=nspec)
 
       do l = 1, nspec
 
          ! get species interstitial mixing ratio ('a')
          call rad_cnst_get_aer_mmr(list_idx, m, l, 'a', state, pbuf, raer)
-         call rad_cnst_get_aer_props(list_idx, m, l, density_aer=specdens, &
+         call rad_aer_get_props(list_idx, m, l, density_aer=specdens, &
                                      hygro_aer=spechygro, spectype=spectype)
 
          if (l == 1) then
