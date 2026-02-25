@@ -13,7 +13,8 @@ use shr_kind_mod,   only: r8 => shr_kind_r8
 use ppgrid,         only: pcols, pver
 use physics_types,  only: physics_state
 use physics_buffer, only: physics_buffer_desc, pbuf_get_field
-use cam_history,    only: addfld, fieldname_len, horiz_only
+use cam_history,    only: addfld, fieldname_len, horiz_only, outfld
+use physconst,      only: rga
 use cam_abortutils, only: endrun
 use cam_logfile,    only: iulog
 
@@ -45,6 +46,7 @@ public :: rad_cnst_get_bin_num_idx
 public :: rad_cnst_get_carma_mmr_idx
 public :: rad_cnst_get_bin_mmr
 public :: rad_aer_diag_init
+public :: rad_aer_diag_out
 
 !==============================================================================
 contains
@@ -685,6 +687,67 @@ subroutine rad_aer_diag_init(alist)
    end do
 
 end subroutine rad_aer_diag_init
+
+!================================================================================================
+
+subroutine rad_aer_diag_out(list_idx, state, pbuf)
+
+   ! Output the mass per layer, and total column burdens for aerosol
+   ! constituents in either the climate or diagnostic lists.
+
+   ! Arguments
+   integer,                     intent(in) :: list_idx
+   type(physics_state), target, intent(in) :: state
+   type(physics_buffer_desc), pointer      :: pbuf(:)
+
+   ! Local variables
+   integer :: i, naer, lchnk, ncol
+   integer :: idx
+   character(len=1)  :: source
+   character(len=32) :: name, cbname
+   real(r8)          :: mass(pcols,pver)
+   real(r8)          :: cb(pcols)
+   real(r8), pointer :: mmr(:,:)
+   type(aerlist_t), pointer :: aerlist
+   character(len=*), parameter :: subname = 'rad_aer_diag_out'
+   !-----------------------------------------------------------------------------
+
+   lchnk = state%lchnk
+   ncol  = state%ncol
+
+   ! Associate pointer with requested aerosol list
+   if (list_idx >= 0 .and. list_idx <= N_DIAG) then
+      aerlist => aerosollist(list_idx)
+   else
+      write(iulog,*) subname//': list_idx = ', list_idx
+      call endrun(subname//': list_idx out of range')
+   endif
+
+   naer = aerlist%numaerosols
+   do i = 1, naer
+
+      source = aerlist%aer(i)%source
+      idx    = aerlist%aer(i)%idx
+      name   = aerlist%aer(i)%mass_name
+      ! construct name for column burden field by replacing the 'm_' prefix by 'cb_'
+      cbname = 'cb_' // name(3:len_trim(name))
+
+      select case( source )
+      case ('A')
+         mmr => state%q(:,:,idx)
+      case ('N')
+         call pbuf_get_field(pbuf, idx, mmr)
+      end select
+
+      mass(:ncol,:) = mmr(:ncol,:) * state%pdeldry(:ncol,:) * rga
+      call outfld(trim(name), mass, pcols, lchnk)
+
+      cb(:ncol) = sum(mass(:ncol,:),2)
+      call outfld(trim(cbname), cb, pcols, lchnk)
+
+   end do
+
+end subroutine rad_aer_diag_out
 
 !================================================================================================
 

@@ -19,7 +19,7 @@ use time_manager,        only: get_nstep, is_first_restart_step, &
 
 use radiative_aerosol_definitions, only: N_DIAG
 use rad_constituents,    only: rad_cnst_get_gas, rad_cnst_out, oldcldoptics, liqcldoptics, icecldoptics
-use radiative_aerosol, only: rad_aer_get_call_list
+use radiative_aerosol, only: rad_aer_get_call_list, rad_aer_diag_out
 
 use radconstants,        only: nswbands, nlwbands, rrtmg_sw_cloudsim_band, rrtmg_lw_cloudsim_band, &
                                idx_sw_diag
@@ -1244,8 +1244,9 @@ subroutine radiation_tend( &
 
       end if
 
-      ! Output aerosol mmr
+      ! Output gas and aerosol diagnostics
       call rad_cnst_out(0, state, pbuf)
+      call rad_aer_diag_out(0, state, pbuf)
 
       ! Longwave radiation computation
 

@@ -7,8 +7,8 @@ module radiation_data
   use shr_kind_mod,     only: r8=>shr_kind_r8
   use ppgrid,           only : pcols, pver, pverp, begchunk, endchunk
   use cam_history,      only: addfld, add_default, horiz_only, outfld
-  use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_gas, rad_cnst_get_aer_mmr
-  use radiative_aerosol, only: rad_aer_get_info
+  use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_gas
+  use radiative_aerosol, only: rad_aer_get_info, rad_cnst_get_aer_mmr
   use radconstants,     only: nradgas, gaslist
   use cam_history_support, only: fieldname_len, fillvalue
   use spmd_utils,       only: masterproc
@@ -1125,7 +1125,6 @@ contains
   !=================================================================================
   !=================================================================================
   subroutine read_rad_aer_data(indata, name, idx, state, pbuf2d, recno )
-    use rad_constituents, only: rad_cnst_get_aer_mmr
     use drv_input_data,   only: drv_input_data_read
 
     type(drv_input_data_t), intent(inout) :: indata
@@ -1156,7 +1155,6 @@ contains
   !=================================================================================
   !=================================================================================
   subroutine read_rad_mam_data(indata, name, mode_idx, spec_idx, state, pbuf2d, recno )
-    use rad_constituents, only: rad_cnst_get_aer_mmr
     use drv_input_data,   only: drv_input_data_read
 
     type(drv_input_data_t), intent(inout) :: indata

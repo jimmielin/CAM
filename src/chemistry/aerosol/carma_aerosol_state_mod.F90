@@ -2,10 +2,12 @@ module carma_aerosol_state_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
   use aerosol_state_mod, only: aerosol_state, ptr2d_t
 
-  use rad_constituents, only: rad_cnst_get_bin_mmr_by_idx, rad_cnst_get_bin_num
-  use radiative_aerosol, only: rad_aer_get_info_by_bin
+  use radiative_aerosol, only: rad_aer_get_info_by_bin, &
+                               rad_cnst_get_bin_mmr_by_idx, rad_cnst_get_bin_num
+  !REMOVECAM: no longer need pbuf and state after CAM is retired
   use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
   use physics_types, only: physics_state
+  !REMOVECAM_END
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
   use cam_abortutils, only: endrun
 
@@ -23,8 +25,10 @@ module carma_aerosol_state_mod
 
   type, extends(aerosol_state) :: carma_aerosol_state
      private
+     !REMOVECAM: state and pbuf will be replaced by SIMA MMR API
      type(physics_state), pointer :: state => null()
      type(physics_buffer_desc), pointer :: pbuf(:) => null()
+     !REMOVECAM_END
    contains
 
      procedure :: get_transported

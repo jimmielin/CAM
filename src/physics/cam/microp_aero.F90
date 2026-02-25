@@ -32,8 +32,8 @@ use physics_types,    only: physics_state, physics_ptend, physics_ptend_init, ph
 use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_old_tim_idx, pbuf_get_field, &
                             pbuf_get_chunk
 use phys_control,     only: phys_getopts, use_hetfrz_classnuc
-use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props
-use rad_constituents, only: rad_cnst_get_aer_mmr, rad_cnst_get_mode_num
+use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props, &
+                             rad_cnst_get_aer_mmr, rad_cnst_get_mode_num
 
 use nucleate_ice_cam, only: use_preexisting_ice, nucleate_ice_cam_readnl, nucleate_ice_cam_register, &
                             nucleate_ice_cam_init, nucleate_ice_cam_calc

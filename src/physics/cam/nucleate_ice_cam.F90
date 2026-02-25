@@ -15,8 +15,8 @@ use constituents,   only: pcnst, cnst_get_ind
 use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
 use physics_buffer, only: physics_buffer_desc
 use phys_control,   only: use_hetfrz_classnuc
-use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props
-use rad_constituents, only: rad_cnst_get_aer_mmr
+use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props, &
+                             rad_cnst_get_aer_mmr
 
 use physics_buffer, only: pbuf_add_field, dtype_r8, pbuf_old_tim_idx, &
                           pbuf_get_index, pbuf_get_field, &

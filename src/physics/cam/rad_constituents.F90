@@ -2,17 +2,15 @@ module rad_constituents
 
 !------------------------------------------------------------------------------------------------
 !
-! Provide constituent distributions and properties to the radiation and
-! cloud microphysics routines.
+! Gas-only radiative constituent handling and cloud optics settings.
 !
-! Retains: namelist I/O, gas handling, gas MMR retrieval (state/pbuf),
-! initialization orchestration, diagnostics output, and cloud optics.
+! Provides: namelist I/O (shared gas+aerosol namelist), gas list init,
+! gas MMR retrieval (state/pbuf), gas diagnostics output, and cloud optics
+! public variables (iceopticsfile, liqopticsfile, etc.).
 !
-! Aerosol structural types, data, query/property routines, and namelist
-! parsing are in radiative_aerosol (facade) backed by
-! radiative_aerosol_definitions (core definitions).
-!
-! Aerosol MMR retrieval (state/pbuf access) is in aerosol_mmr_cam.
+! Aerosol handling is in radiative_aerosol (facade) backed by
+! radiative_aerosol_definitions (core definitions) and aerosol_mmr_cam
+! (CAM-specific MMR retrieval).
 !
 !------------------------------------------------------------------------------------------------
 
@@ -23,7 +21,6 @@ use physconst,      only: rga
 use physics_types,  only: physics_state
 use phys_control,   only: use_simple_phys
 use radconstants,   only: nradgas, rad_gas_index
-use phys_prop,      only: physprop_accum_unique_files, physprop_init
 use cam_history,    only: addfld, fieldname_len, outfld, horiz_only
 use physics_buffer, only: physics_buffer_desc, pbuf_get_field
 
@@ -34,32 +31,15 @@ use cam_logfile,    only: iulog
 use radiative_aerosol_definitions, only: cs1, N_DIAG, n_rad_cnst, verbose, nl, &
                             rad_cnst_namelist_t, radcnst_namelist, active_calls, get_cam_idx
 
-! Import from radiative_aerosol (facade: types, data, queries, parsing)
+! Import from radiative_aerosol (facade)
+! n_mode_str, n_bin_str: needed for mode_defs/bin_defs namelist arrays
+! parse_rad_specifier: parsing combined gas+aerosol specifiers
+! rad_aer_readnl: aerosol init phase 1 (called from rad_cnst_readnl)
+! rad_aer_get_info: aerosol info queries (called from rad_cnst_get_info_wrap)
 use radiative_aerosol, only: &
    n_mode_str, n_bin_str, &
-   modes_t, bins_t, &
-   aerosol_t, aerlist_t, &
-   modelist_t, binlist_t, &
-   modes, bins, &
-   aerosollist, ma_list, sa_list, &
-   rad_aer_get_info, &
-   init_mode_comps, init_bin_comps, list_init1, list_init2, &
-   parse_mode_defs, parse_bin_defs, parse_rad_specifier, &
-   print_modes, print_bins
-
-! Import from aerosol_mmr_cam (CAM-specific MMR retrieval)
-use aerosol_mmr_cam, only: &
-   aerosol_mmr_cam_init, &
-   rad_cnst_get_aer_mmr, &
-   rad_cnst_get_mam_mmr_idx, &
-   rad_cnst_get_mode_num, &
-   rad_cnst_get_mode_num_idx, &
-   rad_cnst_get_bin_mmr_by_idx, &
-   rad_cnst_get_bin_num, &
-   rad_cnst_get_bin_num_idx, &
-   rad_cnst_get_carma_mmr_idx, &
-   rad_cnst_get_bin_mmr, &
-   rad_aer_diag_init
+   parse_rad_specifier, &
+   rad_aer_readnl, rad_aer_get_info
 
 implicit none
 private
@@ -94,17 +74,6 @@ public :: &
    rad_cnst_get_gas,            &! return pointer to mmr for gasses
    rad_cnst_out                  ! output constituent diagnostics (mass per layer and column burden)
 
-! Re-export aerosol MMR routines from aerosol_mmr_cam for backward compatibility
-public :: &
-   rad_cnst_get_aer_mmr,        &! return pointer to mmr for aerosols
-   rad_cnst_get_mam_mmr_idx,    &! get constituent index of mam specie mmr (climate list only)
-   rad_cnst_get_mode_num,       &! return mode number mixing ratio
-   rad_cnst_get_mode_num_idx,   &! get constituent index of mode number m.r. (climate list only)
-   rad_cnst_get_bin_mmr_by_idx, &
-   rad_cnst_get_bin_num, &
-   rad_cnst_get_bin_num_idx, &
-   rad_cnst_get_carma_mmr_idx, &
-   rad_cnst_get_bin_mmr
 
 ! Generic interface for rad_cnst_get_info — gas-only wrapper
 interface rad_cnst_get_info
@@ -146,7 +115,6 @@ subroutine rad_cnst_readnl(nlfile)
    ! Local variables
    integer :: unitn, ierr, i
    character(len=2) :: suffix
-   character(len=1), pointer   :: ctype(:)
    character(len=*), parameter :: subname = 'rad_cnst_readnl'
 
    namelist /rad_cnst_nl/ mode_defs,     &
@@ -210,12 +178,6 @@ subroutine rad_cnst_readnl(nlfile)
 
    ! Parse the namelist input strings
 
-   ! Mode definition stings
-   call parse_mode_defs(mode_defs, modes)
-
-   ! Bin definition stings
-   call parse_bin_defs(bin_defs, bins)
-
    ! Lists of externally mixed entities for climate and diagnostic calculations
    do i = 0,N_DIAG
       select case (i)
@@ -248,11 +210,12 @@ subroutine rad_cnst_readnl(nlfile)
    ! if so, radiation will make a call with those consituents
    active_calls(:) = (radcnst_namelist(:)%ncnst > 0)
 
-   ! Initialize the gas and aerosol lists with the information from the
-   ! namelist.  This is done here so that this information is available via
-   ! the query functions at the time when the register methods are called.
+   ! Aerosol init phase 1: parse mode/bin defs, accumulate physprop files,
+   ! set aerosol list_id fields, initialize aerosol lists
+   call rad_aer_readnl(mode_defs, bin_defs)
 
-   ! Set the list_id fields which distinquish the climate and diagnostic lists
+   ! Gas init phase 1: set gas list_id fields and populate gas lists
+   if (masterproc) write(iulog,*) nl//subname//': Radiation gas constituent lists:'
    do i = 0, N_DIAG
       if (active_calls(i)) then
          if (i > 0) then
@@ -260,58 +223,15 @@ subroutine rad_cnst_readnl(nlfile)
          else
             suffix='  '
          end if
-         aerosollist(i)%list_id = suffix
-         gaslist(i)%list_id     = suffix
-         ma_list(i)%list_id     = suffix
-         sa_list(i)%list_id     = suffix
-      end if
-   end do
+         gaslist(i)%list_id = suffix
 
-   ! Create a list of the unique set of filenames containing property data
-
-   ! Start with the bulk aerosol species in the climate/diagnostic lists.
-   ! The physprop_accum_unique_files routine has the side effect of returning the number
-   ! of bulk aerosols in each list (they're identified by type='A').
-   do i = 0, N_DIAG
-      if (active_calls(i)) then
-         call physprop_accum_unique_files(radcnst_namelist(i)%radname, radcnst_namelist(i)%type)
-      endif
-   enddo
-
-   ! Add physprop files for the species from the mode definitions.
-   do i = 1, modes%nmodes
-      allocate(ctype(modes%comps(i)%nspec))
-      ctype = 'A'
-      call physprop_accum_unique_files(modes%comps(i)%props, ctype)
-      deallocate(ctype)
-   end do
-
-   ! Add physprop files for the species from the bin definitions.
-   do i = 1, bins%nbins
-      allocate(ctype(bins%comps(i)%nspec))
-      ctype = 'A'
-      call physprop_accum_unique_files(bins%comps(i)%props, ctype)
-      deallocate(ctype)
-   end do
-
-   ! Initialize the gas, bulk aerosol, and modal aerosol lists.  This step splits the
-   ! input climate/diagnostic lists into the corresponding gas, bulk and modal aerosol
-   ! lists.
-   if (masterproc) write(iulog,*) nl//subname//': Radiation constituent lists:'
-   do i = 0, N_DIAG
-      if (active_calls(i)) then
          call gas_list_init1(radcnst_namelist(i), gaslist(i))
-         call list_init1(radcnst_namelist(i), aerosollist(i), ma_list(i), sa_list(i))
 
          if (masterproc .and. verbose) then
-            call print_lists(gaslist(i), aerosollist(i), ma_list(i), sa_list(i))
+            call print_gas_list(gaslist(i))
          end if
-
       end if
    end do
-
-   if (masterproc .and. verbose) call print_modes(modes)
-   if (masterproc .and. verbose) call print_bins(bins)
 
 end subroutine rad_cnst_readnl
 
@@ -332,29 +252,8 @@ subroutine rad_cnst_init()
    allocate(zero_cols(pcols,pver))
    zero_cols = 0._r8
 
-   ! Initialize zero_cols in aerosol_mmr_cam
-   call aerosol_mmr_cam_init()
-
-   ! Allocate storage for the physical properties of each aerosol; read properties from
-   ! the data files.
-   call physprop_init()
-
-   ! Start checking that specified radiative constituents are present in the constituent
-   ! or physics buffer arrays.
-   if (masterproc) write(iulog,*) nl//subname//': checking for radiative constituents'
-
-   ! Finish initializing the mode definitions.
-   call init_mode_comps(modes)
-
-   ! Finish initializing the bin definitions.
-   call init_bin_comps(bins)
-
-   ! Finish initializing the aerosol lists.
-   do i = 0, N_DIAG
-      if (active_calls(i)) then
-         call list_init2(aerosollist(i), ma_list(i), sa_list(i))
-      end if
-   end do
+   ! Start checking that specified radiative gas constituents are present
+   if (masterproc) write(iulog,*) nl//subname//': checking for radiative gas constituents'
 
    ! Finish initializing the gas lists (resolve constituent indices).
    do i = 0, N_DIAG
@@ -372,9 +271,8 @@ subroutine rad_cnst_init()
       enddo
    endif
 
-   ! Initialize history output of climate diagnostic quantities
+   ! Initialize gas history output for climate diagnostic quantities
    call rad_gas_diag_init(gaslist(0))
-   call rad_aer_diag_init(aerosollist(0))
 
 
 end subroutine rad_cnst_init
@@ -548,62 +446,29 @@ end subroutine rad_cnst_get_gas
 
 subroutine rad_cnst_out(list_idx, state, pbuf)
 
-   ! Output the mass per layer, and total column burdens for gas and aerosol
-   ! constituents in either the climate or diagnostic lists
+   ! Output the mass per layer, and total column burdens for gas
+   ! constituents in either the climate or diagnostic lists.
+   ! Aerosol output is now handled by rad_aer_diag_out in aerosol_mmr_cam.
 
    ! Arguments
    integer,                     intent(in) :: list_idx
    type(physics_state), target, intent(in) :: state
    type(physics_buffer_desc), pointer      :: pbuf(:)
 
-
    ! Local variables
-   integer :: i, naer, ngas, lchnk, ncol
+   integer :: i, ngas, lchnk, ncol
    integer :: idx
    character(len=1)  :: source
    character(len=32) :: name, cbname
    real(r8)          :: mass(pcols,pver)
    real(r8)          :: cb(pcols)
    real(r8), pointer :: mmr(:,:)
-   type(aerlist_t), pointer :: aerlist
    type(gaslist_t), pointer :: g_list
    character(len=*), parameter :: subname = 'rad_cnst_out'
    !-----------------------------------------------------------------------------
 
    lchnk = state%lchnk
    ncol  = state%ncol
-
-   ! Associate pointer with requested aerosol list
-   if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      aerlist => aerosollist(list_idx)
-   else
-      write(iulog,*) subname//': list_idx = ', list_idx
-      call endrun(subname//': list_idx out of range')
-   endif
-
-   naer = aerlist%numaerosols
-   do i = 1, naer
-
-      source = aerlist%aer(i)%source
-      idx    = aerlist%aer(i)%idx
-      name   = aerlist%aer(i)%mass_name
-      ! construct name for column burden field by replacing the 'm_' prefix by 'cb_'
-      cbname = 'cb_' // name(3:len_trim(name))
-
-      select case( source )
-      case ('A')
-         mmr => state%q(:,:,idx)
-      case ('N')
-         call pbuf_get_field(pbuf, idx, mmr)
-      end select
-
-      mass(:ncol,:) = mmr(:ncol,:) * state%pdeldry(:ncol,:) * rga
-      call outfld(trim(name), mass, pcols, lchnk)
-
-      cb(:ncol) = sum(mass(:ncol,:),2)
-      call outfld(trim(cbname), cb, pcols, lchnk)
-
-   end do
 
    ! Associate pointer with requested gas list
    g_list => gaslist(list_idx)
@@ -684,70 +549,33 @@ end subroutine rad_gas_diag_init
 
 !================================================================================================
 
-subroutine print_lists(gas_list, aer_list, ma_list, sa_list)
+subroutine print_gas_list(glist)
 
-   ! Print summary of gas, bulk and modal aerosol lists.  This is just the information
-   ! read from the namelist.
+   ! Print summary of gas list.
 
    use radconstants, only: gascnst=>gaslist
 
-   type(aerlist_t),  intent(in) :: aer_list
-   type(gaslist_t),  intent(in) :: gas_list
-   type(modelist_t), intent(in) :: ma_list
-   type(binlist_t),  intent(in) :: sa_list
+   type(gaslist_t),  intent(in) :: glist
 
-   integer :: i, id
+   integer :: i
 
-   if (len_trim(gas_list%list_id) == 0) then
+   if (len_trim(glist%list_id) == 0) then
       write(iulog,*) nl//' gas list for climate calculations'
    else
-      write(iulog,*) nl//' gas list for diag'//gas_list%list_id//' calculations'
+      write(iulog,*) nl//' gas list for diag'//glist%list_id//' calculations'
    end if
 
    do i = 1, nradgas
-      if (gas_list%gas(i)%source .eq. 'N') then
-         write(iulog,*) '  '//gas_list%gas(i)%source//':'//gascnst(i)//' has pbuf name:'//&
-                        trim(gas_list%gas(i)%camname)
-      else if (gas_list%gas(i)%source .eq. 'A') then
-         write(iulog,*) '  '//gas_list%gas(i)%source//':'//gascnst(i)//' has constituents name:'//&
-                        trim(gas_list%gas(i)%camname)
+      if (glist%gas(i)%source .eq. 'N') then
+         write(iulog,*) '  '//glist%gas(i)%source//':'//gascnst(i)//' has pbuf name:'//&
+                        trim(glist%gas(i)%camname)
+      else if (glist%gas(i)%source .eq. 'A') then
+         write(iulog,*) '  '//glist%gas(i)%source//':'//gascnst(i)//' has constituents name:'//&
+                        trim(glist%gas(i)%camname)
       endif
    enddo
 
-   if (len_trim(aer_list%list_id) == 0) then
-      write(iulog,*) nl//' bulk aerosol list for climate calculations'
-   else
-      write(iulog,*) nl//' bulk aerosol list for diag'//aer_list%list_id//' calculations'
-   end if
-
-   do i = 1, aer_list%numaerosols
-      write(iulog,*) '  '//trim(aer_list%aer(i)%source)//':'//trim(aer_list%aer(i)%camname)//&
-                     ' optics and phys props in :'//trim(aer_list%aer(i)%physprop_file)
-   enddo
-
-   if (len_trim(ma_list%list_id) == 0) then
-      write(iulog,*) nl//' modal aerosol list for climate calculations'
-   else
-      write(iulog,*) nl//' modal aerosol list for diag'//ma_list%list_id//' calculations'
-   end if
-
-   do i = 1, ma_list%nmodes
-      id = ma_list%idx(i)
-      write(iulog,*) '  '//trim(modes%names(id))
-   enddo
-
-   if (len_trim(sa_list%list_id) == 0) then
-      write(iulog,*) nl//' bin aerosol list for climate calculations'
-   else
-      write(iulog,*) nl//' bin aerosol list for diag'//sa_list%list_id//' calculations'
-   end if
-
-   do i = 1, sa_list%nbins
-      id = sa_list%idx(i)
-      write(iulog,*) '  '//trim(bins%names(id))
-   enddo
-
-end subroutine print_lists
+end subroutine print_gas_list
 
 !================================================================================================
 

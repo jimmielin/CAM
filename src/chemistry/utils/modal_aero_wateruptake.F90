@@ -9,8 +9,8 @@ use physics_types,    only: physics_state
 use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_old_tim_idx, pbuf_get_field
 
 use wv_saturation,    only: qsat_water
-use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props, rad_aer_get_mode_props
-use rad_constituents, only: rad_cnst_get_aer_mmr
+use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props, rad_aer_get_mode_props, &
+                             rad_cnst_get_aer_mmr
 use cam_history,      only: addfld, add_default, outfld, horiz_only
 use cam_logfile,      only: iulog
 use ref_pres,         only: top_lev => clim_modal_aero_top_lev

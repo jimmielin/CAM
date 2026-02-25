@@ -11,10 +11,21 @@ module radiative_aerosol
 !------------------------------------------------------------------------------------------------
 
 use shr_kind_mod,   only: r8 => shr_kind_r8
-use phys_prop,      only: physprop_get, physprop_get_id, ot_length
+use phys_prop,      only: physprop_get, physprop_get_id, ot_length, &
+                         physprop_accum_unique_files, physprop_init
 use cam_abortutils, only: endrun
 use cam_logfile,    only: iulog
 use spmd_utils,     only: masterproc
+
+!REMOVECAM: swap aerosol_mmr_cam for aerosol_mmr_sima when CAM is retired
+use aerosol_mmr_cam, only: &
+   aerosol_mmr_cam_init, &
+   rad_cnst_get_aer_mmr, rad_cnst_get_mam_mmr_idx, &
+   rad_cnst_get_mode_num, rad_cnst_get_mode_num_idx, &
+   rad_cnst_get_bin_mmr_by_idx, rad_cnst_get_bin_num, &
+   rad_cnst_get_bin_num_idx, rad_cnst_get_carma_mmr_idx, &
+   rad_cnst_get_bin_mmr, rad_aer_diag_init, rad_aer_diag_out
+!REMOVECAM_END
 
 ! Import everything from radiative_aerosol_definitions and re-export
 use radiative_aerosol_definitions, only: &
@@ -85,6 +96,25 @@ public :: list_init1, list_init2
 ! Public routines — parsing (re-exported from radiative_aerosol_definitions)
 public :: parse_mode_defs, parse_bin_defs, parse_rad_specifier
 public :: print_modes, print_bins
+public :: print_aerosol_lists
+public :: rad_aer_readnl
+public :: rad_aer_init
+
+! Re-export aerosol MMR routines from aerosol_mmr_cam
+!REMOVECAM: swap aerosol_mmr_cam for aerosol_mmr_sima when CAM is retired
+public :: aerosol_mmr_cam_init
+public :: rad_cnst_get_aer_mmr
+public :: rad_cnst_get_mam_mmr_idx
+public :: rad_cnst_get_mode_num
+public :: rad_cnst_get_mode_num_idx
+public :: rad_cnst_get_bin_mmr_by_idx
+public :: rad_cnst_get_bin_num
+public :: rad_cnst_get_bin_num_idx
+public :: rad_cnst_get_carma_mmr_idx
+public :: rad_cnst_get_bin_mmr
+public :: rad_aer_diag_init
+public :: rad_aer_diag_out
+!REMOVECAM_END
 
 !==============================================================================
 contains
@@ -1139,6 +1169,176 @@ subroutine rad_aer_get_bin_props(list_idx, bin_idx, opticstype, &
    if (present(dryrad))                 call physprop_get(id, dryrad_aer=dryrad)
 
 end subroutine rad_aer_get_bin_props
+
+!================================================================================================
+
+subroutine print_aerosol_lists(aer_list, m_list, s_list)
+
+   ! Print summary of bulk, modal, and bin aerosol lists.
+
+   type(aerlist_t),  intent(in) :: aer_list
+   type(modelist_t), intent(in) :: m_list
+   type(binlist_t),  intent(in) :: s_list
+
+   integer :: i, id
+
+   if (len_trim(aer_list%list_id) == 0) then
+      write(iulog,*) nl//' bulk aerosol list for climate calculations'
+   else
+      write(iulog,*) nl//' bulk aerosol list for diag'//aer_list%list_id//' calculations'
+   end if
+
+   do i = 1, aer_list%numaerosols
+      write(iulog,*) '  '//trim(aer_list%aer(i)%source)//':'//trim(aer_list%aer(i)%camname)//&
+                     ' optics and phys props in :'//trim(aer_list%aer(i)%physprop_file)
+   enddo
+
+   if (len_trim(m_list%list_id) == 0) then
+      write(iulog,*) nl//' modal aerosol list for climate calculations'
+   else
+      write(iulog,*) nl//' modal aerosol list for diag'//m_list%list_id//' calculations'
+   end if
+
+   do i = 1, m_list%nmodes
+      id = m_list%idx(i)
+      write(iulog,*) '  '//trim(modes%names(id))
+   enddo
+
+   if (len_trim(s_list%list_id) == 0) then
+      write(iulog,*) nl//' bin aerosol list for climate calculations'
+   else
+      write(iulog,*) nl//' bin aerosol list for diag'//s_list%list_id//' calculations'
+   end if
+
+   do i = 1, s_list%nbins
+      id = s_list%idx(i)
+      write(iulog,*) '  '//trim(bins%names(id))
+   enddo
+
+end subroutine print_aerosol_lists
+
+!================================================================================================
+
+subroutine rad_aer_readnl(mode_defs, bin_defs)
+
+   ! Parse aerosol mode/bin definitions, accumulate physprop files,
+   ! and initialize aerosol lists (phase 1).
+   !
+   ! Called from rad_cnst_readnl after namelist I/O, broadcast, and
+   ! parse_rad_specifier / active_calls have been set.
+   !
+   ! In SIMA, this will read aerosol-specific namelists directly
+   ! (rad_aerosol / rad_aer_diag_N instead of rad_climate / rad_diag_N).
+
+   ! Arguments
+   character(len=cs1), intent(in) :: mode_defs(:)
+   character(len=cs1), intent(in) :: bin_defs(:)
+
+   ! Local variables
+   integer :: i
+   character(len=2) :: suffix
+   character(len=1), pointer :: ctype(:)
+   character(len=*), parameter :: subname = 'rad_aer_readnl'
+   !-----------------------------------------------------------------------------
+
+   ! Parse mode definition strings
+   call parse_mode_defs(mode_defs, modes)
+
+   ! Parse bin definition strings
+   call parse_bin_defs(bin_defs, bins)
+
+   ! Set the list_id fields for aerosol lists
+   do i = 0, N_DIAG
+      if (active_calls(i)) then
+         if (i > 0) then
+            write(suffix, fmt = '(i2.2)') i
+         else
+            suffix='  '
+         end if
+         aerosollist(i)%list_id = suffix
+         ma_list(i)%list_id     = suffix
+         sa_list(i)%list_id     = suffix
+      end if
+   end do
+
+   ! Accumulate unique physprop files — bulk aerosol species
+   do i = 0, N_DIAG
+      if (active_calls(i)) then
+         call physprop_accum_unique_files(radcnst_namelist(i)%radname, radcnst_namelist(i)%type)
+      endif
+   enddo
+
+   ! Accumulate physprop files for mode species
+   do i = 1, modes%nmodes
+      allocate(ctype(modes%comps(i)%nspec))
+      ctype = 'A'
+      call physprop_accum_unique_files(modes%comps(i)%props, ctype)
+      deallocate(ctype)
+   end do
+
+   ! Accumulate physprop files for bin species
+   do i = 1, bins%nbins
+      allocate(ctype(bins%comps(i)%nspec))
+      ctype = 'A'
+      call physprop_accum_unique_files(bins%comps(i)%props, ctype)
+      deallocate(ctype)
+   end do
+
+   ! Initialize aerosol lists (phase 1: split combined specifiers)
+   do i = 0, N_DIAG
+      if (active_calls(i)) then
+         call list_init1(radcnst_namelist(i), aerosollist(i), ma_list(i), sa_list(i))
+
+         if (masterproc .and. verbose) then
+            call print_aerosol_lists(aerosollist(i), ma_list(i), sa_list(i))
+         end if
+      end if
+   end do
+
+   if (masterproc .and. verbose) call print_modes(modes)
+   if (masterproc .and. verbose) call print_bins(bins)
+
+end subroutine rad_aer_readnl
+
+!================================================================================================
+
+subroutine rad_aer_init()
+
+   ! Complete aerosol initialization (phase 2).
+   ! Reads physprop files, resolves constituent indices for modes/bins,
+   ! finishes aerosol list init, and registers aerosol diagnostic fields.
+   !
+   ! Called from physpkg before rad_cnst_init (gas init).
+
+   integer :: i
+   character(len=*), parameter :: subname = 'rad_aer_init'
+   !-----------------------------------------------------------------------------
+
+   !REMOVECAM: aerosol_mmr_cam_init allocates CAM-specific zero_cols
+   call aerosol_mmr_cam_init()
+   !REMOVECAM_END
+
+   ! Read physical properties from data files
+   call physprop_init()
+
+   ! Finish initializing the mode definitions
+   call init_mode_comps(modes)
+
+   ! Finish initializing the bin definitions
+   call init_bin_comps(bins)
+
+   ! Finish initializing the aerosol lists
+   do i = 0, N_DIAG
+      if (active_calls(i)) then
+         call list_init2(aerosollist(i), ma_list(i), sa_list(i))
+      end if
+   end do
+
+   !REMOVECAM: rad_aer_diag_init registers CAM history fields
+   call rad_aer_diag_init(aerosollist(0))
+   !REMOVECAM_END
+
+end subroutine rad_aer_init
 
 !================================================================================================
 

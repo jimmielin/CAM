@@ -753,6 +753,7 @@ contains
     use vertical_diffusion, only: vertical_diffusion_init
     use phys_debug_util,    only: phys_debug_init
     use rad_constituents,   only: rad_cnst_init
+    use radiative_aerosol,  only: rad_aer_init
     use aer_rad_props,      only: aer_rad_props_init
     use subcol,             only: subcol_init
     use qbo,                only: qbo_init
@@ -859,7 +860,8 @@ contains
     call solar_data_init()
 
     ! Initialize rad constituents and their properties
-    call rad_cnst_init()
+    call rad_aer_init()   ! aerosol init: physprop_init + mode/bin/list init
+    call rad_cnst_init()  ! gas-specific init
 
     call radiation_init(pbuf2d)
 
