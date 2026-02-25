@@ -1231,8 +1231,8 @@ subroutine rad_aer_readnl(mode_defs, bin_defs)
    ! (rad_aerosol / rad_aer_diag_N instead of rad_climate / rad_diag_N).
 
    ! Arguments
-   character(len=cs1), intent(in) :: mode_defs(:)
-   character(len=cs1), intent(in) :: bin_defs(:)
+   character(len=cs1), intent(inout) :: mode_defs(:)
+   character(len=cs1), intent(inout) :: bin_defs(:)
 
    ! Local variables
    integer :: i
