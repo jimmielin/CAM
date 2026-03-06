@@ -21,7 +21,7 @@ use shr_kind_mod,     only: r8 => shr_kind_r8
 use camsrfexch,       only: cam_out_t     
 use constituents,     only: cnst_get_ind, pcnst
 use cam_abortutils,   only: endrun
-use rad_constituents, only: rad_cnst_get_info
+use radiative_aerosol, only: rad_aer_get_info
 
 implicit none
 private
@@ -296,7 +296,7 @@ subroutine get_indices( type, modes, indices, count )
   integer :: l, n, ndx, nmodes, nspec
   character(len=32) :: spec_type, spec_name, mode_type
 
-  call rad_cnst_get_info(0, nmodes=nmodes)
+  call rad_aer_get_info(0, nmodes=nmodes)
 
   count = 0
   indices(:) = -1
@@ -305,12 +305,12 @@ subroutine get_indices( type, modes, indices, count )
 
   do n = 1, nmodes
 
-     call rad_cnst_get_info(0, n, mode_type=mode_type, nspec=nspec)
+     call rad_aer_get_info(0, n, mode_type=mode_type, nspec=nspec)
 
      if ( any(modes==trim(mode_type)) ) then
 
         do l = 1,nspec
-           call rad_cnst_get_info(0, n, l, spec_type=spec_type, spec_name=spec_name)
+           call rad_aer_get_info(0, n, l, spec_type=spec_type, spec_name=spec_name)
            call cnst_get_ind(spec_name, ndx, abort=.false.)
            if (ndx>0) then
               if (trim(spec_type) == trim(type)) then

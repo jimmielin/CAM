@@ -13,8 +13,8 @@ use physics_types,    only: physics_state
 use physics_buffer,   only: physics_buffer_desc
 use radconstants,     only: nswbands, nlwbands, idx_sw_diag
 use phys_prop,        only: nrh, ot_length
-use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_aer_mmr, &
-                            rad_cnst_get_aer_props
+use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props, &
+                             rad_cnst_get_aer_mmr
 use wv_saturation,    only: qsat
 use aerosol_optics_cam,only: aerosol_optics_cam_init, aerosol_optics_cam_sw, aerosol_optics_cam_lw
 use cam_history,      only: fieldname_len, addfld, outfld, add_default, horiz_only
@@ -72,7 +72,7 @@ subroutine aer_rad_props_init()
    ! Contributions to AEROD_v from individual aerosols (climate species).
 
    ! number of bulk aerosols in climate list
-   call rad_cnst_get_info(0, naero=numaerosols, nmodes=nmodes, nbins=nbins)
+   call rad_aer_get_info(0, naero=numaerosols, nmodes=nmodes, nbins=nbins)
 
    call aer_vis_diag_init()
 
@@ -163,7 +163,7 @@ subroutine aer_rad_props_sw(list_idx, state, pbuf,  nnite, idxnite, &
    tau_w_f(1:ncol,:,:) = 0._r8
 
    ! get number of bulk aerosols and number of modes in current list
-   call rad_cnst_get_info(list_idx, naero=numaerosols, nmodes=nmodes, nbins=nbins)
+   call rad_aer_get_info(list_idx, naero=numaerosols, nmodes=nmodes, nbins=nbins)
 
    ! Contributions from modal and bin aerosols.
    if (numaerosols>0 .or. nmodes>0 .or. nbins>0) then
@@ -217,7 +217,7 @@ subroutine aer_rad_props_lw(list_idx, state, pbuf, odap_aer)
    !-----------------------------------------------------------------------------
 
    ! get number of bulk aerosols and number of modes in current list
-   call rad_cnst_get_info(list_idx, naero=numaerosols, nmodes=nmodes, nbins=nbins)
+   call rad_aer_get_info(list_idx, naero=numaerosols, nmodes=nmodes, nbins=nbins)
 
    odap_aer = 0._r8
 

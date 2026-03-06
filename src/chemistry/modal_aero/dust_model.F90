@@ -105,7 +105,7 @@ module dust_model
   subroutine dust_init()
     use soil_erod_mod, only: soil_erod_init
     use constituents,  only: cnst_get_ind
-    use rad_constituents, only: rad_cnst_get_info
+    use radiative_aerosol, only: rad_aer_get_info
     use dust_common,   only: dust_set_params
 
     integer :: l, m, mm, ndx, nspec
@@ -146,9 +146,9 @@ module dust_model
     ndx = 0
     do mm = 1, ntot_amode
        m = mymodes(mm)
-       call rad_cnst_get_info(0, m, nspec=nspec)
+       call rad_aer_get_info(0, m, nspec=nspec)
        do l = 1, nspec
-          call rad_cnst_get_info(0, m, l, spec_name=spec_name )
+          call rad_aer_get_info(0, m, l, spec_name=spec_name )
           if (spec_name(:3) == 'dst') then
              ndx=ndx+1
              dust_names(ndx) = spec_name

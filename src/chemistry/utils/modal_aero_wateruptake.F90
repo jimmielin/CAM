@@ -9,8 +9,8 @@ use physics_types,    only: physics_state
 use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_old_tim_idx, pbuf_get_field
 
 use wv_saturation,    only: qsat_water
-use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_aer_mmr, rad_cnst_get_aer_props, &
-                            rad_cnst_get_mode_props
+use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props, rad_aer_get_mode_props, &
+                             rad_cnst_get_aer_mmr
 use cam_history,      only: addfld, add_default, outfld, horiz_only
 use cam_logfile,      only: iulog
 use ref_pres,         only: top_lev => clim_modal_aero_top_lev
@@ -57,11 +57,11 @@ contains
 subroutine modal_aero_wateruptake_reg()
 
   use physics_buffer,   only: pbuf_add_field, dtype_r8
-  use rad_constituents, only: rad_cnst_get_info
+  use radiative_aerosol, only: rad_aer_get_info
 
    integer :: nmodes
 
-   call rad_cnst_get_info(0, nmodes=nmodes)
+   call rad_aer_get_info(0, nmodes=nmodes)
    call pbuf_add_field('DGNUMWET',   'global',  dtype_r8, (/pcols, pver, nmodes/), dgnumwet_idx)
    call pbuf_add_field('WETDENS_AP', 'physpkg', dtype_r8, (/pcols, pver, nmodes/), wetdens_ap_idx)
 
@@ -106,7 +106,7 @@ subroutine modal_aero_wateruptake_init(pbuf2d)
 
    ! assume for now that will compute wateruptake for climate list modes only
 
-   call rad_cnst_get_info(0, nmodes=nmodes)
+   call rad_aer_get_info(0, nmodes=nmodes)
 
    do m = 1, nmodes
       write(trnum, '(i3.3)') m
@@ -290,7 +290,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    end if
 
    ! loop over all aerosol modes
-   call rad_cnst_get_info(list_idx, nmodes=nmodes)
+   call rad_aer_get_info(list_idx, nmodes=nmodes)
 
    if (modal_strat_sulfate) then
      call pbuf_get_field(pbuf,  sulfeq_idx, sulfeq )
@@ -355,11 +355,11 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
 
    do m = 1, nmodes
 
-      call rad_cnst_get_mode_props(list_idx, m, sigmag=sigmag, &
+      call rad_aer_get_mode_props(list_idx, m, sigmag=sigmag, &
          rhcrystal=rhcrystal(m), rhdeliques=rhdeliques(m))
 
       ! get mode info
-      call rad_cnst_get_info(list_idx, m, nspec=nspec)
+      call rad_aer_get_info(list_idx, m, nspec=nspec)
 
       do l = 1, nspec
 
@@ -368,7 +368,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
          maer(:ncol,:,m)= maer(:ncol,:,m) + raer(:ncol,:)
 
          ! get species interstitial mixing ratio ('a')
-         call rad_cnst_get_aer_props(list_idx, m, l, density_aer=specdens, &
+         call rad_aer_get_props(list_idx, m, l, density_aer=specdens, &
                                      spectype=spectype)
 
          if (modal_strat_sulfate .and. (trim(spectype).eq.'sulfate')) then

@@ -154,7 +154,7 @@ contains
     use cam_diagnostics,    only: diag_register
     use cloud_diagnostics,  only: cloud_diagnostics_register
     use cospsimulator_intr, only: cospsimulator_intr_register
-    use rad_constituents,   only: rad_cnst_get_info ! Added to query if it is a modal aero sim or not
+    use radiative_aerosol,   only: rad_aer_get_info ! Added to query if it is a modal aero sim or not
     use radheat,            only: radheat_register
     use subcol,             only: subcol_register
     use subcol_utils,       only: is_subcol_on, subcol_get_scheme
@@ -267,7 +267,7 @@ contains
        call conv_water_register()
 
        ! Determine whether its a 'modal' aerosol simulation  or not
-       call rad_cnst_get_info(0, nmodes=nmodes)
+       call rad_aer_get_info(0, nmodes=nmodes)
        clim_modal_aero = (nmodes > 0)
 
        if (clim_modal_aero) then
@@ -753,6 +753,7 @@ contains
     use vertical_diffusion, only: vertical_diffusion_init
     use phys_debug_util,    only: phys_debug_init
     use rad_constituents,   only: rad_cnst_init
+    use radiative_aerosol,  only: rad_aer_init
     use aer_rad_props,      only: aer_rad_props_init
     use subcol,             only: subcol_init
     use qbo,                only: qbo_init
@@ -859,7 +860,8 @@ contains
     call solar_data_init()
 
     ! Initialize rad constituents and their properties
-    call rad_cnst_init()
+    call rad_aer_init()   ! aerosol init: physprop_init + mode/bin/list init
+    call rad_cnst_init()  ! gas-specific init
 
     call radiation_init(pbuf2d)
 
