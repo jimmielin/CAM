@@ -264,7 +264,7 @@ contains
   !  species morphology
   !------------------------------------------------------------------------
   subroutine get(self, bin_ndx, species_ndx, density, hygro, &
-                 spectype, specname, specmorph, refindex_sw, refindex_lw)
+                 spectype, specname, specmorph, refindex_sw, refindex_lw, num_to_mass_aer)
 
     class(carma_aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx             ! bin index
@@ -276,6 +276,7 @@ contains
     character(len=*), optional, intent(out) :: specmorph ! species morphology
     complex(r8), pointer, optional, intent(out) :: refindex_sw(:) ! short wave species refractive indices
     complex(r8), pointer, optional, intent(out) :: refindex_lw(:) ! long wave species refractive indices
+    real(r8), optional, intent(out) :: num_to_mass_aer ! ratio of number to mass concentration
 
     if (present(density)) then
        call rad_aer_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, density_aer=density)
@@ -301,6 +302,9 @@ contains
        else
           call rad_aer_get_info_by_bin_spec(self%list_idx_, bin_ndx, species_ndx, spec_name=specname)
        end if
+    end if
+    if (present(num_to_mass_aer)) then
+       call rad_aer_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, num_to_mass_aer=num_to_mass_aer)
     end if
 
   end subroutine get

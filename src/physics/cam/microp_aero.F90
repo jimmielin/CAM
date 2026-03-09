@@ -32,8 +32,12 @@ use physics_types,    only: physics_state, physics_ptend, physics_ptend_init, ph
 use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_old_tim_idx, pbuf_get_field, &
                             pbuf_get_chunk
 use phys_control,     only: phys_getopts, use_hetfrz_classnuc
-use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props
-use aerosol_mmr_cam,  only: rad_cnst_get_aer_mmr, rad_cnst_get_mode_num
+use aerosol_instances_mod, only: aerosol_instances_get_num_models, &
+                                 aerosol_instances_is_active, &
+                                 aerosol_instances_get_props, &
+                                 aerosol_instances_create_states, &
+                                 aerosol_instances_destroy_states, &
+                                 aero_state_entry_t
 
 use nucleate_ice_cam, only: use_preexisting_ice, nucleate_ice_cam_readnl, nucleate_ice_cam_register, &
                             nucleate_ice_cam_init, nucleate_ice_cam_calc
@@ -49,12 +53,8 @@ use cam_logfile,      only: iulog
 use cam_abortutils,       only: endrun
 
 use aerosol_properties_mod, only: aerosol_properties
-use modal_aerosol_properties_mod, only: modal_aerosol_properties
-use carma_aerosol_properties_mod, only: carma_aerosol_properties
 
 use aerosol_state_mod, only: aerosol_state
-use modal_aerosol_state_mod, only: modal_aerosol_state
-use carma_aerosol_state_mod, only: carma_aerosol_state
 
 implicit none
 private
@@ -178,19 +178,23 @@ subroutine microp_aero_init(phys_state,pbuf2d)
    !
    !-----------------------------------------------------------------------
 
+   use modal_aerosol_state_mod, only: modal_aerosol_state
+
    type(physics_state), pointer       :: phys_state(:)
    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
    ! local variables
-   integer  :: iaer, ierr
-   integer  :: m, n, nmodes, nspec
-   integer :: nbins
+   integer  :: iaer
+   integer  :: m, n, nspec
+   integer  :: iaermod
 
    character(len=32) :: str32
    character(len=*), parameter :: routine = 'microp_aero_init'
    logical :: history_amwg
    type(physics_buffer_desc), pointer :: pbuf(:)
    integer :: c
+
+   class(aerosol_properties), pointer :: aero_props_bulk => null()
 
    !-----------------------------------------------------------------------
 
@@ -218,19 +222,20 @@ subroutine microp_aero_init(phys_state,pbuf2d)
 
    ! clim_modal_aero determines whether modal aerosols are used in the climate calculation.
    ! The modal aerosols can be either prognostic or prescribed.
-   call rad_aer_get_info(0, nmodes=nmodes, nbins=nbins)
-   clim_modal_aero = (nmodes > 0)
-   clim_carma_aero = (nbins> 0)
+   clim_modal_aero = aerosol_instances_is_active('modal')
+   clim_carma_aero = aerosol_instances_is_active('carma')
 
    ast_idx = pbuf_get_index('AST')
 
    if (clim_modal_aero .or. clim_carma_aero) then
       cldo_idx = pbuf_get_index('CLDO')
-      if (clim_modal_aero) then
-         aero_props_obj => modal_aerosol_properties()
-      else if (clim_carma_aero) then
-         aero_props_obj => carma_aerosol_properties()
-      end if
+      ! Get modal/CARMA properties object from factory (factory owns the object)
+      do iaermod = 1, aerosol_instances_get_num_models()
+         aero_props_obj => aerosol_instances_get_props(iaermod, 0)
+         if (aero_props_obj%model_is('modal') .or. aero_props_obj%model_is('CARMA')) then
+            exit
+         end if
+      end do
       call ndrop_init(aero_props_obj)
    end if
 
@@ -250,8 +255,8 @@ subroutine microp_aero_init(phys_state,pbuf2d)
       ! Init indices for specific modes/species
 
       ! mode index for specified mode types
-      do m = 1, nmodes
-         call rad_aer_get_info(0, m, mode_type=str32)
+      do m = 1, aero_props_obj%nbins()
+         str32 = aero_props_obj%bin_name(m)
          select case (trim(str32))
          case ('accum')
             mode_accum_idx = m
@@ -283,26 +288,26 @@ subroutine microp_aero_init(phys_state,pbuf2d)
 
       ! species indices for specified types
       ! find indices for the dust and seasalt species in the coarse mode
-      call rad_aer_get_info(0, mode_coarse_dst_idx, nspec=nspec)
+      nspec = aero_props_obj%nspecies(mode_coarse_dst_idx)
       do n = 1, nspec
-         call rad_aer_get_info(0, mode_coarse_dst_idx, n, spec_type=str32)
+         call aero_props_obj%species_type(mode_coarse_dst_idx, n, str32)
          select case (trim(str32))
          case ('dust')
             coarse_dust_idx = n
          end select
       end do
-      call rad_aer_get_info(0, mode_coarse_slt_idx, nspec=nspec)
+      nspec = aero_props_obj%nspecies(mode_coarse_slt_idx)
       do n = 1, nspec
-         call rad_aer_get_info(0, mode_coarse_slt_idx, n, spec_type=str32)
+         call aero_props_obj%species_type(mode_coarse_slt_idx, n, str32)
          select case (trim(str32))
          case ('seasalt')
             coarse_nacl_idx = n
          end select
       end do
       if (mode_coarse_idx>0) then
-         call rad_aer_get_info(0, mode_coarse_idx, nspec=nspec)
+         nspec = aero_props_obj%nspecies(mode_coarse_idx)
          do n = 1, nspec
-            call rad_aer_get_info(0, mode_coarse_idx, n, spec_type=str32)
+            call aero_props_obj%species_type(mode_coarse_idx, n, str32)
             select case (trim(str32))
             case ('sulfate')
                coarse_so4_idx = n
@@ -320,15 +325,25 @@ subroutine microp_aero_init(phys_state,pbuf2d)
    else if (.not.clim_carma_aero) then
 
       ! Props needed for BAM number concentration calcs.
+      ! Find bulk properties object from factory
+      aero_props_bulk => null()
+      do iaermod = 1, aerosol_instances_get_num_models()
+         aero_props_bulk => aerosol_instances_get_props(iaermod, 0)
+         if (aero_props_bulk%model_is('BAM')) exit
+         aero_props_bulk => null()
+      end do
+      if (.not. associated(aero_props_bulk)) then
+         call endrun(routine//': ERROR BAM properties object not found')
+      end if
 
-      call rad_aer_get_info(0, naero=naer_all)
+      naer_all = aero_props_bulk%nbins()
       allocate( &
          aername(naer_all),        &
          num_to_mass_aer(naer_all) )
 
       do iaer = 1, naer_all
-         call rad_aer_get_props(0, iaer, &
-            aername         = aername(iaer), &
+         call aero_props_bulk%get(iaer, 1, &
+            specname        = aername(iaer), &
             num_to_mass_aer = num_to_mass_aer(iaer) )
 
          ! Look for sulfate, dust, and soot in this list (Bulk aerosol only)
@@ -393,9 +408,7 @@ subroutine microp_aero_final
 
   integer :: c
 
-  if (associated(aero_props_obj)) then
-     deallocate(aero_props_obj)
-  end if
+  ! Factory owns the properties object, just nullify
   nullify(aero_props_obj)
 
   if (associated(aero_state)) then
@@ -557,6 +570,9 @@ subroutine microp_aero_run ( &
    real(r8), allocatable :: factnum(:,:,:) ! activation fraction for aerosol number
 
    class(aerosol_state), pointer :: aero_state1_obj
+   type(aero_state_entry_t), allocatable :: aero_states1(:)
+   integer :: nstates1, iaermod
+   class(aerosol_properties), pointer :: props_tmp
 
    !-------------------------------------------------------------------------------
 
@@ -577,18 +593,23 @@ subroutine microp_aero_run ( &
 
    call physics_ptend_init(ptend_all, state%psetcols, 'microp_aero')
 
-   ! create the aerosol state object
-   if (clim_modal_aero) then
-      aero_state1_obj => modal_aerosol_state( state1, pbuf )
-      if (.not.associated(aero_state1_obj)) then
-         call endrun('microp_aero_run: construction of aero_state1_obj modal_aerosol_state object failed')
+   ! create aerosol state objects via factory
+   call aerosol_instances_create_states(0, state1, pbuf, aero_states1, nstates1)
+
+   ! find the appropriate state object for the active aerosol model
+   do iaermod = 1, nstates1
+      props_tmp => aerosol_instances_get_props(iaermod, 0)
+      if (clim_modal_aero .and. props_tmp%model_is('modal')) then
+         aero_state1_obj => aero_states1(iaermod)%obj
+         exit
+      else if (clim_carma_aero .and. props_tmp%model_is('CARMA')) then
+         aero_state1_obj => aero_states1(iaermod)%obj
+         exit
+      else if (.not.clim_modal_aero .and. .not.clim_carma_aero .and. props_tmp%model_is('BAM')) then
+         aero_state1_obj => aero_states1(iaermod)%obj
+         exit
       end if
-   else if (clim_carma_aero) then
-      aero_state1_obj => carma_aerosol_state( state1, pbuf )
-      if (.not.associated(aero_state1_obj)) then
-         call endrun('microp_aero_run: construction of aero_state1_obj carma_aerosol_state object failed')
-      end if
-   end if
+   end do
 
    if (clim_modal_aero.or.clim_carma_aero) then
 
@@ -622,13 +643,13 @@ subroutine microp_aero_run ( &
 
    if (clim_modal_aero) then
       ! mode number mixing ratios
-      call rad_cnst_get_mode_num(0, mode_coarse_dst_idx, 'a', state1, pbuf, num_coarse)
+      call aero_state1_obj%get_ambient_num(mode_coarse_dst_idx, num_coarse)
 
       ! mode specie mass m.r.
-      call rad_cnst_get_aer_mmr(0, mode_coarse_dst_idx, coarse_dust_idx, 'a', state1, pbuf, coarse_dust)
-      call rad_cnst_get_aer_mmr(0, mode_coarse_slt_idx, coarse_nacl_idx, 'a', state1, pbuf, coarse_nacl)
+      call aero_state1_obj%get_ambient_mmr(coarse_dust_idx, mode_coarse_dst_idx, coarse_dust)
+      call aero_state1_obj%get_ambient_mmr(coarse_nacl_idx, mode_coarse_slt_idx, coarse_nacl)
       if (mode_coarse_idx>0) then
-         call rad_cnst_get_aer_mmr(0, mode_coarse_idx, coarse_so4_idx, 'a', state1, pbuf, coarse_so4)
+         call aero_state1_obj%get_ambient_mmr(coarse_so4_idx, mode_coarse_idx, coarse_so4)
       endif
 
    else
@@ -638,7 +659,7 @@ subroutine microp_aero_run ( &
          maerosol(pcols,pver,naer_all))
 
       do m = 1, naer_all
-         call rad_cnst_get_aer_mmr(0, m, state1, pbuf, aer_mmr)
+         call aero_state1_obj%get_ambient_mmr(1, m, aer_mmr)
          maerosol(:ncol,:,m) = aer_mmr(:ncol,:)*rho(:ncol,:)
 
          if (m .eq. idxsul) then
@@ -887,11 +908,9 @@ subroutine microp_aero_run ( &
       deallocate(factnum)
    end if
 
-   if (associated(aero_state1_obj)) then
-      ! destroy the aerosol state object
-      deallocate(aero_state1_obj)
-      nullify(aero_state1_obj)
-   endif
+   ! destroy all aerosol state objects created for this chunk
+   nullify(aero_state1_obj)
+   call aerosol_instances_destroy_states(aero_states1)
 
  end subroutine microp_aero_run
 

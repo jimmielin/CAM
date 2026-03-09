@@ -99,7 +99,7 @@ module aerosol_properties_mod
      !  species morphology
      !------------------------------------------------------------------------
      subroutine aero_props_get(self, bin_ndx, species_ndx, density, hygro, &
-          spectype, specname, specmorph, refindex_sw, refindex_lw)
+          spectype, specname, specmorph, refindex_sw, refindex_lw, num_to_mass_aer)
        import :: aerosol_properties, r8
        class(aerosol_properties), intent(in) :: self
        integer, intent(in) :: bin_ndx             ! bin index
@@ -111,6 +111,7 @@ module aerosol_properties_mod
        character(len=*), optional, intent(out) :: specmorph ! species morphology
        complex(r8), pointer, optional, intent(out) :: refindex_sw(:) ! short wave species refractive indices
        complex(r8), pointer, optional, intent(out) :: refindex_lw(:) ! long wave species refractive indices
+       real(r8), optional, intent(out) :: num_to_mass_aer ! ratio of number to mass concentration
 
      end subroutine aero_props_get
 

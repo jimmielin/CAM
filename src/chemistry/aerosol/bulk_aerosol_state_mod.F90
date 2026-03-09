@@ -141,6 +141,9 @@ contains
     integer, intent(in) :: bin_ndx      ! bin index
     real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
 
+    ! species_ndx is ignored in the bulk implementation.
+    ! bin_ndx is used to identify each individual bulk aerosol.
+    ! TODO 3/9/26: need to document here why this is the case (how are bulk aerosol stored and why one species but multiple bins?)
     call rad_cnst_get_aer_mmr(self%list_idx_, bin_ndx, self%state, self%pbuf, mmr)
 
   end subroutine get_ambient_mmr
