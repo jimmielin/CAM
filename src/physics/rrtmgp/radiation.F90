@@ -22,7 +22,10 @@ use time_manager,        only: get_nstep, is_first_step, is_first_restart_step, 
 
 use radiative_aerosol_definitions, only: N_DIAG
 use rad_constituents,    only: rad_cnst_out
-use radiative_aerosol, only: rad_aer_get_call_list, rad_aer_diag_out
+use radiative_aerosol, only: rad_aer_get_call_list
+!REMOVECAM
+use aerosol_mmr_cam, only: rad_aer_diag_out
+!REMOVECAM_END
 
 use radconstants,        only: nradgas, gasnamelength, nswbands, nlwbands, &
                                gaslist, radconstants_init

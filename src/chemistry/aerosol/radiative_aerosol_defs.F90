@@ -7,21 +7,16 @@ module radiative_aerosol_definitions
 ! sectional (bin) aerosol representations.
 !
 ! This module is the lowest-level shared module in the aerosol hierarchy.
-! It is intended to be portable to CAM-SIMA (except get_cam_idx which is
-! host-specific).
+! It is fully portable to CAM-SIMA (zero host dependencies).
 !
 ! Subsumes the former rad_cnst_support module.
 !
 !------------------------------------------------------------------------------------------------
 
 use shr_kind_mod,   only: r8 => shr_kind_r8
-use phys_prop,      only: physprop_get_id
 use cam_abortutils, only: endrun
 use cam_logfile,    only: iulog
 use spmd_utils,     only: masterproc
-use constituents,   only: cnst_get_ind
-use physics_buffer, only: physics_buffer_desc, pbuf_get_index
-
 implicit none
 private
 save
@@ -209,162 +204,13 @@ character(len=8), public, parameter :: bin_morph_names(num_bin_morphs) = &
 ! Public routines
 !===========================
 
-public :: get_cam_idx
 public :: parse_mode_defs, parse_bin_defs, parse_rad_specifier
-public :: init_mode_comps, init_bin_comps
 public :: list_init1, list_init2
 public :: print_modes, print_bins
 
 !==============================================================================
 contains
 !==============================================================================
-
-integer function get_cam_idx(source, name, routine)
-
-   ! get index of name in internal CAM array; either the constituent array
-   ! or the physics buffer
-
-   character(len=*), intent(in) :: source
-   character(len=*), intent(in) :: name
-   character(len=*), intent(in) :: routine  ! name of calling routine
-
-   integer :: idx
-   integer :: errcode
-   !-----------------------------------------------------------------------------
-
-   if (source(1:1) == 'N') then
-
-      idx = pbuf_get_index(trim(name),errcode)
-      if (errcode < 0) then
-         call endrun(routine//' ERROR: cannot find physics buffer field '//trim(name))
-      end if
-
-   else if (source(1:1) == 'A') then
-
-      call cnst_get_ind(trim(name), idx, abort=.false.)
-      if (idx < 0) then
-         call endrun(routine//' ERROR: cannot find constituent field '//trim(name))
-      end if
-
-   else if (source(1:1) == 'Z') then
-
-      idx = -1
-
-   else
-
-      call endrun(routine//' ERROR: invalid source for specie '//trim(name))
-
-   end if
-
-   get_cam_idx = idx
-
-end function get_cam_idx
-
-!===========================
-
-subroutine init_mode_comps(modes)
-
-   ! Initialize the mode definitions by looking up the relevent indices in the
-   ! constituent and pbuf arrays, and getting the physprop IDs
-
-   ! Arguments
-   type(modes_t), intent(inout) :: modes
-
-   ! Local variables
-   integer :: m, ispec, nspec
-
-   character(len=*), parameter :: routine = 'init_mode_comps'
-   !-----------------------------------------------------------------------------
-
-   do m = 1, modes%nmodes
-
-      ! indices for number mixing ratio components
-      modes%comps(m)%idx_num_a = get_cam_idx(modes%comps(m)%source_num_a, modes%comps(m)%camname_num_a, routine)
-      modes%comps(m)%idx_num_c = get_cam_idx(modes%comps(m)%source_num_c, modes%comps(m)%camname_num_c, routine)
-
-      ! allocate memory for species
-      nspec = modes%comps(m)%nspec
-      allocate( &
-         modes%comps(m)%idx_mmr_a(nspec), &
-         modes%comps(m)%idx_mmr_c(nspec), &
-         modes%comps(m)%idx_props(nspec)  )
-
-      do ispec = 1, nspec
-
-         ! indices for species mixing ratio components
-         modes%comps(m)%idx_mmr_a(ispec) = get_cam_idx(modes%comps(m)%source_mmr_a(ispec), &
-                                                   modes%comps(m)%camname_mmr_a(ispec), routine)
-         modes%comps(m)%idx_mmr_c(ispec) = get_cam_idx(modes%comps(m)%source_mmr_c(ispec), &
-                                                   modes%comps(m)%camname_mmr_c(ispec), routine)
-
-         ! get physprop ID
-         modes%comps(m)%idx_props(ispec) = physprop_get_id(modes%comps(m)%props(ispec))
-         if (modes%comps(m)%idx_props(ispec) == -1) then
-            call endrun(routine//' : ERROR idx not found for '//trim(modes%comps(m)%props(ispec)))
-         end if
-
-      end do
-
-   end do
-
-end subroutine init_mode_comps
-
-!===========================
-
-subroutine init_bin_comps(bins)
-
-   ! Initialize the mode definitions by looking up the relevent indices in the
-   ! constituent and pbuf arrays, and getting the physprop IDs
-
-   ! Arguments
-   type(bins_t), intent(inout) :: bins
-
-   ! Local variables
-   integer :: m, ispec, nspec
-
-   character(len=*), parameter :: routine = 'init_bin_comps'
-   !-----------------------------------------------------------------------------
-
-   do m = 1, bins%nbins
-
-      ! indices for number mixing ratio components
-      bins%comps(m)%idx_num_a = get_cam_idx(bins%comps(m)%source_num_a, bins%comps(m)%camname_num_a, routine)
-      bins%comps(m)%idx_num_c = get_cam_idx(bins%comps(m)%source_num_c, bins%comps(m)%camname_num_c, routine)
-      if ( bins%comps(m)%source_mass_a /= 'NOTSET' .and. bins%comps(m)%camname_mass_a /= 'NOTSET' ) then
-         bins%comps(m)%idx_mass_a = get_cam_idx(bins%comps(m)%source_mass_a, bins%comps(m)%camname_mass_a, routine)
-      endif
-      if ( bins%comps(m)%source_mass_c /= 'NOTSET' .and. bins%comps(m)%camname_mass_c /= 'NOTSET' ) then
-         bins%comps(m)%idx_mass_c = get_cam_idx(bins%comps(m)%source_mass_c, bins%comps(m)%camname_mass_c, routine)
-      endif
-
-      ! allocate memory for species
-      nspec = bins%comps(m)%nspec
-      allocate( &
-         bins%comps(m)%idx_mmr_a(nspec), &
-         bins%comps(m)%idx_mmr_c(nspec), &
-         bins%comps(m)%idx_props(nspec)  )
-
-      do ispec = 1, nspec
-
-         ! indices for species mixing ratio components
-         bins%comps(m)%idx_mmr_a(ispec) = get_cam_idx(bins%comps(m)%source_mmr_a(ispec), &
-                                                   bins%comps(m)%camname_mmr_a(ispec), routine)
-         bins%comps(m)%idx_mmr_c(ispec) = get_cam_idx(bins%comps(m)%source_mmr_c(ispec), &
-                                                   bins%comps(m)%camname_mmr_c(ispec), routine)
-
-         ! get physprop ID
-         bins%comps(m)%idx_props(ispec) = physprop_get_id(bins%comps(m)%props(ispec))
-         if (bins%comps(m)%idx_props(ispec) == -1) then
-            call endrun(routine//' : ERROR idx not found for '//trim(bins%comps(m)%props(ispec)))
-         end if
-
-      end do
-
-   end do
-
-end subroutine init_bin_comps
-
-!===========================
 
 subroutine list_init1(namelist, aerlist, ma_list, sa_list)
 
@@ -501,9 +347,9 @@ end subroutine list_init1
 
 subroutine list_init2(aerlist, ma_list, sa_list)
 
-   ! Final initialization phase gets the component indices in the constituent array
-   ! and the physics buffer, and indices into physprop module.
-   ! Gas index resolution is handled in rad_constituents.
+   ! Final initialization phase: resolve physprop indices for bulk aerosols,
+   ! modes, and bins. Host-specific index resolution (get_cam_idx) is handled
+   ! separately by the host module (e.g. aerosol_mmr_cam).
 
    use phys_prop, only: physprop_get_id
 
@@ -518,9 +364,6 @@ subroutine list_init2(aerlist, ma_list, sa_list)
 
    ! Loop over bulk aerosols
    do i = 1, aerlist%numaerosols
-
-      ! locate the specie mixing ratio in the pbuf or state
-      aerlist%aer(i)%idx = get_cam_idx(aerlist%aer(i)%source, aerlist%aer(i)%camname, routine)
 
       ! get the physprop_id from the phys_prop module
       aerlist%aer(i)%physprop_id = physprop_get_id(aerlist%aer(i)%physprop_file)

@@ -4,9 +4,9 @@ module radiative_aerosol
 !
 ! Facade module for aerosol definitions and queries.
 !
-! Re-exports types, data, parsing, and init routines from radiative_aerosol_definitions.
 ! Provides query routines (rad_aer_get_info*, rad_aer_get_props*, etc.) and
 ! property-access routines that wrap phys_prop lookups.
+! Init is via rad_aer_init (uses host-specific module aerosol_mmr_cam).
 !
 !------------------------------------------------------------------------------------------------
 
@@ -17,35 +17,18 @@ use cam_abortutils, only: endrun
 use cam_logfile,    only: iulog
 use spmd_utils,     only: masterproc
 
-!REMOVECAM: swap aerosol_mmr_cam for aerosol_mmr_sima when CAM is retired
-use aerosol_mmr_cam, only: &
-   aerosol_mmr_cam_init, &
-   rad_cnst_get_aer_mmr, rad_cnst_get_mam_mmr_idx, &
-   rad_cnst_get_mode_num, rad_cnst_get_mode_num_idx, &
-   rad_cnst_get_bin_mmr_by_idx, rad_cnst_get_bin_num, &
-   rad_cnst_get_bin_num_idx, rad_cnst_get_carma_mmr_idx, &
-   rad_cnst_get_bin_mmr, rad_aer_diag_init, rad_aer_diag_out
-!REMOVECAM_END
-
-! Import everything from radiative_aerosol_definitions and re-export
 use radiative_aerosol_definitions, only: &
    cs1, nl, verbose, N_DIAG, n_rad_cnst, &
    rad_cnst_namelist_t, radcnst_namelist, active_calls, &
-   get_cam_idx, &
-   n_mode_str, n_bin_str, &
    mode_component_t, modes_t, bin_component_t, bins_t, &
    aerosol_t, aerlist_t, modelist_t, binlist_t, &
    modes, bins, aerosollist, ma_list, sa_list, &
-   mode_type_names, spec_type_names, num_mode_types, num_spec_types, &
-   num_bin_morphs, bin_morph_names, &
-   parse_mode_defs, parse_bin_defs, parse_rad_specifier, &
-   init_mode_comps, init_bin_comps, &
+   parse_mode_defs, parse_bin_defs, &
    list_init1, list_init2, &
    print_modes, print_bins
 
 implicit none
 private
-save
 
 ! Generic interface for aerosol info queries.
 interface rad_aer_get_info
@@ -60,23 +43,6 @@ interface rad_aer_get_props
    module procedure rad_aer_get_mam_props_by_idx
 end interface
 
-! Re-export types and data from radiative_aerosol_definitions
-public :: cs1, nl, verbose, N_DIAG, n_rad_cnst
-public :: rad_cnst_namelist_t, radcnst_namelist, active_calls
-public :: get_cam_idx
-public :: n_mode_str, n_bin_str
-
-! Public type declarations
-public :: mode_component_t, modes_t, bin_component_t, bins_t
-public :: aerosol_t, aerlist_t
-public :: modelist_t, binlist_t
-
-! Public module data
-public :: modes, bins
-public :: aerosollist, ma_list, sa_list
-public :: mode_type_names, spec_type_names, num_mode_types, num_spec_types
-public :: num_bin_morphs, bin_morph_names
-
 ! Public routines — aerosol queries (rad_aer_* naming)
 public :: rad_aer_get_info
 public :: rad_aer_get_info_by_mode, rad_aer_get_info_by_mode_spec
@@ -90,31 +56,9 @@ public :: rad_aer_get_props
 public :: rad_aer_get_bin_props_by_idx
 public :: rad_aer_get_bin_props
 public :: rad_aer_get_idx
-public :: init_mode_comps, init_bin_comps
-public :: list_init1, list_init2
-
-! Public routines — parsing (re-exported from radiative_aerosol_definitions)
-public :: parse_mode_defs, parse_bin_defs, parse_rad_specifier
-public :: print_modes, print_bins
 public :: print_aerosol_lists
 public :: rad_aer_readnl
 public :: rad_aer_init
-
-! Re-export aerosol MMR routines from aerosol_mmr_cam
-!REMOVECAM: swap aerosol_mmr_cam for aerosol_mmr_sima when CAM is retired
-public :: aerosol_mmr_cam_init
-public :: rad_cnst_get_aer_mmr
-public :: rad_cnst_get_mam_mmr_idx
-public :: rad_cnst_get_mode_num
-public :: rad_cnst_get_mode_num_idx
-public :: rad_cnst_get_bin_mmr_by_idx
-public :: rad_cnst_get_bin_num
-public :: rad_cnst_get_bin_num_idx
-public :: rad_cnst_get_carma_mmr_idx
-public :: rad_cnst_get_bin_mmr
-public :: rad_aer_diag_init
-public :: rad_aer_diag_out
-!REMOVECAM_END
 
 !==============================================================================
 contains
@@ -1310,31 +1254,39 @@ subroutine rad_aer_init()
    !
    ! Called from physpkg before rad_cnst_init (gas init).
 
+   !REMOVECAM: aerosol_mmr_cam handles CAM-specific index resolution
+   use aerosol_mmr_cam, only: aerosol_mmr_cam_init, &
+      init_mode_comps, init_bin_comps, list_resolve_bulk_idx, &
+      rad_aer_diag_init
+   !REMOVECAM_END
+
    integer :: i
    character(len=*), parameter :: subname = 'rad_aer_init'
    !-----------------------------------------------------------------------------
 
-   !REMOVECAM: aerosol_mmr_cam_init allocates CAM-specific zero_cols
+   !REMOVECAM
    call aerosol_mmr_cam_init()
    !REMOVECAM_END
 
    ! Read physical properties from data files
    call physprop_init()
 
-   ! Finish initializing the mode definitions
+   !REMOVECAM: resolve host-specific indices
    call init_mode_comps(modes)
-
-   ! Finish initializing the bin definitions
    call init_bin_comps(bins)
+   !REMOVECAM_END
 
    ! Finish initializing the aerosol lists
    do i = 0, N_DIAG
       if (active_calls(i)) then
+         !REMOVECAM
+         call list_resolve_bulk_idx(aerosollist(i))
+         !REMOVECAM_END
          call list_init2(aerosollist(i), ma_list(i), sa_list(i))
       end if
    end do
 
-   !REMOVECAM: rad_aer_diag_init registers CAM history fields
+   !REMOVECAM
    call rad_aer_diag_init(aerosollist(0))
    !REMOVECAM_END
 

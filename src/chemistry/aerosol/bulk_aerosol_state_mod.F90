@@ -1,6 +1,8 @@
 module bulk_aerosol_state_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
-  use radiative_aerosol, only: rad_cnst_get_aer_mmr
+  !REMOVECAM
+  use aerosol_mmr_cam, only: rad_cnst_get_aer_mmr
+  !REMOVECAM_END
   use cam_abortutils,   only: endrun
   
   !REMOVECAM: no longer need pbuf and state after CAM is retired

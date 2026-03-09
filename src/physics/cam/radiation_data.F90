@@ -8,7 +8,10 @@ module radiation_data
   use ppgrid,           only : pcols, pver, pverp, begchunk, endchunk
   use cam_history,      only: addfld, add_default, horiz_only, outfld
   use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_gas
-  use radiative_aerosol, only: rad_aer_get_info, rad_cnst_get_aer_mmr
+  use radiative_aerosol, only: rad_aer_get_info
+  !REMOVECAM
+  use aerosol_mmr_cam, only: rad_cnst_get_aer_mmr
+  !REMOVECAM_END
   use radconstants,     only: nradgas, gaslist
   use cam_history_support, only: fieldname_len, fillvalue
   use spmd_utils,       only: masterproc

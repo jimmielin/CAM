@@ -29,17 +29,14 @@ use cam_logfile,    only: iulog
 
 ! Import from radiative_aerosol_definitions (core definitions)
 use radiative_aerosol_definitions, only: cs1, N_DIAG, n_rad_cnst, verbose, nl, &
-                            rad_cnst_namelist_t, radcnst_namelist, active_calls, get_cam_idx
+                            rad_cnst_namelist_t, radcnst_namelist, active_calls, &
+                            n_mode_str, n_bin_str, parse_rad_specifier
 
-! Import from radiative_aerosol (facade)
-! n_mode_str, n_bin_str: needed for mode_defs/bin_defs namelist arrays
-! parse_rad_specifier: parsing combined gas+aerosol specifiers
-! rad_aer_readnl: aerosol init phase 1 (called from rad_cnst_readnl)
-! rad_aer_get_info: aerosol info queries (called from rad_cnst_get_info_wrap)
-use radiative_aerosol, only: &
-   n_mode_str, n_bin_str, &
-   parse_rad_specifier, &
-   rad_aer_readnl, rad_aer_get_info
+!REMOVECAM
+use aerosol_mmr_cam, only: get_cam_idx
+!REMOVECAM_END
+
+use radiative_aerosol, only: rad_aer_readnl, rad_aer_get_info
 
 implicit none
 private

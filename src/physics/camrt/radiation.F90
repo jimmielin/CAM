@@ -789,7 +789,9 @@ subroutine radiation_tend( &
    use radsw,               only: radcswmx
    use radlw,               only: radclwmx
    use rad_constituents,    only: rad_cnst_get_gas, rad_cnst_out
-   use radiative_aerosol,   only: rad_aer_diag_out
+   !REMOVECAM
+   use aerosol_mmr_cam, only: rad_aer_diag_out
+   !REMOVECAM_END
    use aer_rad_props,       only: aer_rad_props_sw, aer_rad_props_lw
    use interpolate_data,    only: vertinterp
    use radiation_data,      only: rad_data_write
