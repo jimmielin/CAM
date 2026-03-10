@@ -232,8 +232,8 @@ subroutine microp_aero_init(phys_state,pbuf2d)
       ! Get modal/CARMA properties object from factory (factory owns the object)
       do iaermod = 1, aerosol_instances_get_num_models()
          aero_props_obj => aerosol_instances_get_props(iaermod, 0)
-         if (aero_props_obj%model_is('modal') .or. aero_props_obj%model_is('CARMA')) then
-            exit
+         if (associated(aero_props_obj)) then
+            if (aero_props_obj%model_is('modal') .or. aero_props_obj%model_is('CARMA')) exit
          end if
       end do
       call ndrop_init(aero_props_obj)
@@ -329,7 +329,9 @@ subroutine microp_aero_init(phys_state,pbuf2d)
       aero_props_bulk => null()
       do iaermod = 1, aerosol_instances_get_num_models()
          aero_props_bulk => aerosol_instances_get_props(iaermod, 0)
-         if (aero_props_bulk%model_is('BAM')) exit
+         if (associated(aero_props_bulk)) then
+            if (aero_props_bulk%model_is('BAM')) exit
+         end if
          aero_props_bulk => null()
       end do
       if (associated(aero_props_bulk)) then
@@ -369,10 +371,9 @@ subroutine microp_aero_init(phys_state,pbuf2d)
       call add_default ('WSUB     ', 1, ' ')
    end if
 
-   if (.not.associated(aero_props_obj)) then
-      call endrun(routine//': no active aerosol model found for nucleate_ice_cam_init')
+   if (associated(aero_props_obj)) then
+      call nucleate_ice_cam_init(mincld, bulk_scale, pbuf2d, aero_props=aero_props_obj)
    end if
-   call nucleate_ice_cam_init(mincld, bulk_scale, pbuf2d, aero_props=aero_props_obj)
    if (use_hetfrz_classnuc) then
       if (associated(aero_props_obj)) then
          call hetfrz_classnuc_cam_init(mincld, aero_props_obj)
@@ -729,7 +730,11 @@ subroutine microp_aero_run ( &
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    !ICE Nucleation
 
-   call nucleate_ice_cam_calc(state1, wsubi, pbuf, deltatin, ptend_loc, aero_props_obj, aero_state1_obj)
+   if (associated(aero_props_obj) .and. associated(aero_state1_obj)) then
+      call nucleate_ice_cam_calc(state1, wsubi, pbuf, deltatin, ptend_loc, aero_props_obj, aero_state1_obj)
+   else
+      call physics_ptend_init(ptend_loc, state1%psetcols, 'none')
+   end if
 
    call physics_ptend_sum(ptend_loc, ptend_all, ncol)
    call physics_update(state1, ptend_loc, deltatin)

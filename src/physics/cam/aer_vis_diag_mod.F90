@@ -34,7 +34,9 @@ contains
     aero_props_bam => null()
     do iaermod = 1, aerosol_instances_get_num_models()
        aero_props_bam => aerosol_instances_get_props(iaermod, 0)
-       if (aero_props_bam%model_is('BAM')) exit
+       if (associated(aero_props_bam)) then
+          if (aero_props_bam%model_is('BAM')) exit
+       end if
        aero_props_bam => null()
     end do
 
@@ -52,7 +54,7 @@ contains
     if( astat/= 0 ) call endrun('aer_vis_diag_init: aernames allocate error')
 
     do i = 1, numaerosols
-       call aero_props_bam%get(i, 1, specname=aernames(i))
+       aernames(i) = aero_props_bam%bin_name(i)
     end do
 
     call phys_getopts( history_aero_optics_out = history_aero_optics )
