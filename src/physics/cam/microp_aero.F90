@@ -332,11 +332,11 @@ subroutine microp_aero_init(phys_state,pbuf2d)
          if (aero_props_bulk%model_is('BAM')) exit
          aero_props_bulk => null()
       end do
-      if (.not. associated(aero_props_bulk)) then
-         call endrun(routine//': ERROR BAM properties object not found')
+      if (associated(aero_props_bulk)) then
+         naer_all = aero_props_bulk%nbins()
+      else
+         naer_all = 0
       end if
-
-      naer_all = aero_props_bulk%nbins()
       allocate( &
          aername(naer_all),        &
          num_to_mass_aer(naer_all) )

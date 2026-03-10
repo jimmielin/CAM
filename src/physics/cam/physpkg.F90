@@ -744,6 +744,7 @@ contains
     use wv_saturation,      only: wv_sat_init
     use microp_driver,      only: microp_driver_init
     use microp_aero,        only: microp_aero_init
+    use aerosol_instances_mod, only: aerosol_instances_init
     use macrop_driver,      only: macrop_driver_init
     use conv_water,         only: conv_water_init
     use tracers,            only: tracers_init
@@ -861,6 +862,7 @@ contains
 
     ! Initialize rad constituents and their properties
     call rad_aer_init()   ! aerosol init: physprop_init + mode/bin/list init
+    call aerosol_instances_init()  ! create abstract aerosol factory objects
     call rad_cnst_init()  ! gas-specific init
 
     call radiation_init(pbuf2d)

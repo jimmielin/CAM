@@ -21,7 +21,7 @@ module aerosol_optics_cam
   use wv_saturation, only: qsat
 
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
-  use aerosol_instances_mod,  only: aerosol_instances_init, aerosol_instances_get_props, &
+  use aerosol_instances_mod,  only: aerosol_instances_get_props, &
                                     aerosol_instances_get_num_models, aerosol_instances_is_active, &
                                     aerosol_instances_final, &
                                     aerosol_instances_create_states, aerosol_instances_destroy_states, &
@@ -156,7 +156,6 @@ contains
        top_lev = 1
     endif
 
-    call aerosol_instances_init()
     num_aero_models = aerosol_instances_get_num_models()
 
     if (water_refindex_file=='NONE') then
