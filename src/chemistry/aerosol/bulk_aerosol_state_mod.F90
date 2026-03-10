@@ -125,7 +125,6 @@ contains
     real(r8) :: mmr_tot                 ! mass mixing ratios totaled for all species
     real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
 
-    if (self%list_idx_ > 0) call endrun('bulk_aerosol_state::ambient_total_bin_mmr: only valid for climate list (list_idx=0)')
     call self%get_ambient_mmr(1, bin_ndx, mmr)
 
     mmr_tot = mmr(col_ndx, lyr_ndx)
@@ -157,7 +156,6 @@ contains
     integer, intent(in) :: bin_ndx      ! bin index
     real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
 
-    if (self%list_idx_ > 0) call endrun('bulk_aerosol_state::get_cldbrne_mmr: only valid for climate list (list_idx=0)')
     call endrun('ERROR: bulk_aerosol_state_mod%get_cldbrne_mmr not yet implemented')
 
   end subroutine get_cldbrne_mmr
@@ -170,7 +168,6 @@ contains
     integer, intent(in) :: bin_ndx     ! bin index
     real(r8), pointer   :: num(:,:)    ! number densities
 
-    if (self%list_idx_ > 0) call endrun('bulk_aerosol_state::get_ambient_num: only valid for climate list (list_idx=0)')
     nullify(num)
 
     call endrun('ERROR: bulk_aerosol_state_mod%get_ambient_num not yet implemented')
@@ -185,7 +182,6 @@ contains
     integer, intent(in) :: bin_ndx             ! bin index
     real(r8), pointer :: num(:,:)
 
-    if (self%list_idx_ > 0) call endrun('bulk_aerosol_state::get_cldbrne_num: only valid for climate list (list_idx=0)')
     nullify(num)
 
     call endrun('ERROR: bulk_aerosol_state_mod%get_cldbrne_num not yet implemented')

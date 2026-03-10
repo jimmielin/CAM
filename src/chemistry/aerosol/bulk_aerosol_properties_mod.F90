@@ -149,7 +149,8 @@ contains
   !  species morphology
   !------------------------------------------------------------------------
   subroutine get(self, bin_ndx, species_ndx, density, hygro, &
-                 spectype, specname, specmorph, refindex_sw, refindex_lw, num_to_mass_aer)
+                 spectype, specname, specmorph, refindex_sw, refindex_lw, num_to_mass_aer, &
+                 dryrad)
 
     class(bulk_aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx             ! bin index
@@ -162,6 +163,7 @@ contains
     complex(r8), pointer, optional, intent(out) :: refindex_sw(:) ! short wave species refractive indices
     complex(r8), pointer, optional, intent(out) :: refindex_lw(:) ! long wave species refractive indices
     real(r8), optional, intent(out) :: num_to_mass_aer ! ratio of number to mass concentration
+    real(r8), optional, intent(out) :: dryrad  ! dry radius (m)
 
     character(len=20) :: aername
 
@@ -207,6 +209,9 @@ contains
     end if
     if (present(num_to_mass_aer)) then
        call rad_aer_get_props(self%list_idx_, bin_ndx,  num_to_mass_aer=num_to_mass_aer)
+    end if
+    if (present(dryrad)) then
+       call rad_aer_get_props(self%list_idx_, bin_ndx,  dryrad_aer=dryrad)
     end if
 
   end subroutine get

@@ -29,6 +29,11 @@ module aerosol_properties_mod
      real(r8), allocatable :: alogsig_(:) ! natural log of geometric deviation of the number distribution for aerosol bin
      real(r8), allocatable :: f1_(:) ! eq 28 Abdul-Razzak et al 1998
      real(r8), allocatable :: f2_(:) ! eq 29 Abdul-Razzak et al 1998
+     real(r8), allocatable :: dgnum_(:)       ! geometric mean diameter (m)
+     real(r8), allocatable :: dgnumhi_(:)     ! upper bound diameter (m)
+     real(r8), allocatable :: dgnumlo_(:)     ! lower bound diameter (m)
+     real(r8), allocatable :: rhcrystal_(:)   ! crystallization RH
+     real(r8), allocatable :: rhdeliques_(:)  ! deliquescence RH
      ! Abdul-Razzak, H., S.J. Ghan, and C. Rivera-Carpio, A parameterization of aerosol activation,
      ! 1, Singleaerosoltype. J. Geophys. Res., 103, 6123-6132, 1998.
      real(r8) :: soa_equivso4_factor_ = -huge(1._r8)
@@ -49,6 +54,11 @@ module aerosol_properties_mod
      procedure :: maxsat
      procedure(aero_amcube), deferred :: amcube
      procedure :: alogsig => alogsig_0list
+     procedure :: dgnum => dgnum_0list
+     procedure :: dgnumhi => dgnumhi_0list
+     procedure :: dgnumlo => dgnumlo_0list
+     procedure :: rhcrystal => rhcrystal_0list
+     procedure :: rhdeliques => rhdeliques_0list
      procedure(aero_number_transported), deferred :: number_transported
      procedure(aero_props_get), deferred :: get
      procedure(aero_actfracs), deferred :: actfracs
@@ -99,7 +109,8 @@ module aerosol_properties_mod
      !  species morphology
      !------------------------------------------------------------------------
      subroutine aero_props_get(self, bin_ndx, species_ndx, density, hygro, &
-          spectype, specname, specmorph, refindex_sw, refindex_lw, num_to_mass_aer)
+          spectype, specname, specmorph, refindex_sw, refindex_lw, num_to_mass_aer, &
+          dryrad)
        import :: aerosol_properties, r8
        class(aerosol_properties), intent(in) :: self
        integer, intent(in) :: bin_ndx             ! bin index
@@ -112,6 +123,7 @@ module aerosol_properties_mod
        complex(r8), pointer, optional, intent(out) :: refindex_sw(:) ! short wave species refractive indices
        complex(r8), pointer, optional, intent(out) :: refindex_lw(:) ! long wave species refractive indices
        real(r8), optional, intent(out) :: num_to_mass_aer ! ratio of number to mass concentration
+       real(r8), optional, intent(out) :: dryrad  ! dry radius (m)
 
      end subroutine aero_props_get
 
@@ -429,7 +441,8 @@ contains
   !------------------------------------------------------------------------------
   ! object initializer
   !------------------------------------------------------------------------------
-  subroutine aero_props_init(self, nbin, ncnst, nspec, nmasses, alogsig, f1,f2, ierr, list_idx )
+  subroutine aero_props_init(self, nbin, ncnst, nspec, nmasses, alogsig, f1,f2, ierr, list_idx, &
+                             dgnum, dgnumhi, dgnumlo, rhcrystal, rhdeliques)
     class(aerosol_properties), intent(inout) :: self
     integer, intent(in) :: nbin               ! number of bins
     integer, intent(in) :: ncnst              ! total number of constituents
@@ -440,6 +453,11 @@ contains
     real(r8),intent(in) :: f2(nbin)           ! eq 29 Abdul-Razzak et al 1998
     integer,intent(out) :: ierr
     integer, optional, intent(in) :: list_idx ! radiation list index (0=climate)
+    real(r8), optional, intent(in) :: dgnum(nbin)      ! geometric mean diameter (m)
+    real(r8), optional, intent(in) :: dgnumhi(nbin)    ! upper bound diameter (m)
+    real(r8), optional, intent(in) :: dgnumlo(nbin)    ! lower bound diameter (m)
+    real(r8), optional, intent(in) :: rhcrystal(nbin)  ! crystallization RH
+    real(r8), optional, intent(in) :: rhdeliques(nbin) ! deliquescence RH
 
     integer :: imas,ibin,indx
     character(len=*),parameter :: prefix = 'aerosol_properties::aero_props_init: '
@@ -467,6 +485,26 @@ contains
        return
     end if
     allocate(self%f2_(nbin),stat=ierr)
+    if( ierr /= 0 ) then
+       return
+    end if
+    allocate(self%dgnum_(nbin),stat=ierr)
+    if( ierr /= 0 ) then
+       return
+    end if
+    allocate(self%dgnumhi_(nbin),stat=ierr)
+    if( ierr /= 0 ) then
+       return
+    end if
+    allocate(self%dgnumlo_(nbin),stat=ierr)
+    if( ierr /= 0 ) then
+       return
+    end if
+    allocate(self%rhcrystal_(nbin),stat=ierr)
+    if( ierr /= 0 ) then
+       return
+    end if
+    allocate(self%rhdeliques_(nbin),stat=ierr)
     if( ierr /= 0 ) then
        return
     end if
@@ -498,6 +536,32 @@ contains
     self%alogsig_(:) = alogsig(:)
     self%f1_(:) = f1(:)
     self%f2_(:) = f2(:)
+
+    if (present(dgnum)) then
+       self%dgnum_(:) = dgnum(:)
+    else
+       self%dgnum_(:) = 0._r8
+    end if
+    if (present(dgnumhi)) then
+       self%dgnumhi_(:) = dgnumhi(:)
+    else
+       self%dgnumhi_(:) = 0._r8
+    end if
+    if (present(dgnumlo)) then
+       self%dgnumlo_(:) = dgnumlo(:)
+    else
+       self%dgnumlo_(:) = 0._r8
+    end if
+    if (present(rhcrystal)) then
+       self%rhcrystal_(:) = rhcrystal(:)
+    else
+       self%rhcrystal_(:) = 0._r8
+    end if
+    if (present(rhdeliques)) then
+       self%rhdeliques_(:) = rhdeliques(:)
+    else
+       self%rhdeliques_(:) = 0._r8
+    end if
 
     self%soa_equivso4_factor_ = spechygro_soa/spechygro_so4
     self%pom_equivso4_factor_ = spechygro_pom/spechygro_so4
@@ -533,6 +597,21 @@ contains
     endif
     if (allocated(self%f2_)) then
        deallocate(self%f2_)
+    endif
+    if (allocated(self%dgnum_)) then
+       deallocate(self%dgnum_)
+    endif
+    if (allocated(self%dgnumhi_)) then
+       deallocate(self%dgnumhi_)
+    endif
+    if (allocated(self%dgnumlo_)) then
+       deallocate(self%dgnumlo_)
+    endif
+    if (allocated(self%rhcrystal_)) then
+       deallocate(self%rhcrystal_)
+    endif
+    if (allocated(self%rhdeliques_)) then
+       deallocate(self%rhdeliques_)
     endif
 
     self%nbins_ = 0
@@ -623,6 +702,56 @@ contains
 
     alogsig_0list = self%alogsig_(bin_ndx)
   end function alogsig_0list
+
+  !------------------------------------------------------------------------------
+  ! returns the geometric mean diameter for aerosol bin
+  !------------------------------------------------------------------------------
+  pure real(r8) function dgnum_0list(self, bin_ndx)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: bin_ndx
+
+    dgnum_0list = self%dgnum_(bin_ndx)
+  end function dgnum_0list
+
+  !------------------------------------------------------------------------------
+  ! returns the upper bound diameter for aerosol bin
+  !------------------------------------------------------------------------------
+  pure real(r8) function dgnumhi_0list(self, bin_ndx)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: bin_ndx
+
+    dgnumhi_0list = self%dgnumhi_(bin_ndx)
+  end function dgnumhi_0list
+
+  !------------------------------------------------------------------------------
+  ! returns the lower bound diameter for aerosol bin
+  !------------------------------------------------------------------------------
+  pure real(r8) function dgnumlo_0list(self, bin_ndx)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: bin_ndx
+
+    dgnumlo_0list = self%dgnumlo_(bin_ndx)
+  end function dgnumlo_0list
+
+  !------------------------------------------------------------------------------
+  ! returns the crystallization RH for aerosol bin
+  !------------------------------------------------------------------------------
+  pure real(r8) function rhcrystal_0list(self, bin_ndx)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: bin_ndx
+
+    rhcrystal_0list = self%rhcrystal_(bin_ndx)
+  end function rhcrystal_0list
+
+  !------------------------------------------------------------------------------
+  ! returns the deliquescence RH for aerosol bin
+  !------------------------------------------------------------------------------
+  pure real(r8) function rhdeliques_0list(self, bin_ndx)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: bin_ndx
+
+    rhdeliques_0list = self%rhdeliques_(bin_ndx)
+  end function rhdeliques_0list
 
   !------------------------------------------------------------------------------
   ! returns maximum supersaturation

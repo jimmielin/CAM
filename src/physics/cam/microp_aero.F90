@@ -355,6 +355,9 @@ subroutine microp_aero_init(phys_state,pbuf2d)
 
       call ndrop_bam_init()
 
+      ! Set module-level props object for BAM (used by nucleate_ice_cam)
+      aero_props_obj => aero_props_bulk
+
    end if
 
    call addfld('LCLOUD', (/ 'lev' /), 'A', ' ',   'Liquid cloud fraction used in stratus activation', sampled_on_subcycle=.true.)
@@ -366,11 +369,10 @@ subroutine microp_aero_init(phys_state,pbuf2d)
       call add_default ('WSUB     ', 1, ' ')
    end if
 
-   if (associated(aero_props_obj)) then
-      call nucleate_ice_cam_init(mincld, bulk_scale, pbuf2d, aero_props=aero_props_obj)
-   else
-      call nucleate_ice_cam_init(mincld, bulk_scale, pbuf2d)
+   if (.not.associated(aero_props_obj)) then
+      call endrun(routine//': no active aerosol model found for nucleate_ice_cam_init')
    end if
+   call nucleate_ice_cam_init(mincld, bulk_scale, pbuf2d, aero_props=aero_props_obj)
    if (use_hetfrz_classnuc) then
       if (associated(aero_props_obj)) then
          call hetfrz_classnuc_cam_init(mincld, aero_props_obj)
@@ -727,11 +729,7 @@ subroutine microp_aero_run ( &
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    !ICE Nucleation
 
-   if (associated(aero_props_obj).and.associated(aero_state1_obj)) then
-      call nucleate_ice_cam_calc(state1, wsubi, pbuf, deltatin, ptend_loc, aero_props_obj, aero_state1_obj)
-   else
-      call nucleate_ice_cam_calc(state1, wsubi, pbuf, deltatin, ptend_loc)
-   end if
+   call nucleate_ice_cam_calc(state1, wsubi, pbuf, deltatin, ptend_loc, aero_props_obj, aero_state1_obj)
 
    call physics_ptend_sum(ptend_loc, ptend_all, ncol)
    call physics_update(state1, ptend_loc, deltatin)

@@ -1446,6 +1446,11 @@ contains
     use cam_budget,         only: thermo_budget_history
     use dyn_tests_utils,    only: vc_dycore, vc_height, vc_dry_pressure
     use air_composition,    only: cpairv, cp_or_cv_dycore
+    use aerosol_properties_mod, only: aerosol_properties
+    use aerosol_state_mod, only: aerosol_state
+    use aerosol_instances_mod, only: aerosol_instances_get_props, &
+         aerosol_instances_get_num_models, aerosol_instances_create_states, &
+         aerosol_instances_destroy_states, aero_state_entry_t
     !
     ! Arguments
     !
@@ -1453,7 +1458,7 @@ contains
 
     type(cam_in_t),      intent(inout) :: cam_in
     type(cam_out_t),     intent(inout) :: cam_out
-    type(physics_state), intent(inout) :: state
+    type(physics_state), intent(inout), target :: state
     type(physics_tend ), intent(inout) :: tend
     type(physics_buffer_desc), pointer :: pbuf(:)
 
@@ -1536,6 +1541,13 @@ contains
     real(r8) :: tmp_ps    (pcols)      ! tmp space
     real(r8) :: scaling(pcols,pver)
     logical  :: moist_mixing_ratio_dycore
+
+    ! For abstract aerosol interface (calcsize/wateruptake)
+    class(aerosol_properties), pointer :: aero_props => null()
+    class(aerosol_state), pointer :: aero_state_obj => null()
+
+    type(aero_state_entry_t), allocatable :: aero_states_lcl(:)
+    integer :: nstates_lcl, iaermod_lcl
 
     ! physics buffer fields for total energy and mass adjustment
     integer itim_old, ifld
@@ -1961,20 +1973,35 @@ contains
 
        call t_startf('aerosol_wet_processes')
        if (clim_modal_aero) then
+          !REMOVECAM - factory creates aerosol objects locally; under CAM-SIMA they will be passed as scheme inputs
+          do iaermod_lcl = 1, aerosol_instances_get_num_models()
+             aero_props => aerosol_instances_get_props(iaermod_lcl, 0)
+             if (associated(aero_props)) then
+                if (aero_props%model_is('MAM')) exit
+             end if
+          end do
+          call aerosol_instances_create_states(0, state, pbuf, aero_states_lcl, nstates_lcl)
+          aero_state_obj => aero_states_lcl(iaermod_lcl)%obj
+          !REMOVECAM_END
+
           if (prog_modal_aero) then
              call physics_ptend_init(ptend, state%psetcols, 'aero_water_uptake', lq=wetdep_lq)
              ! Do calculations of mode radius and water uptake if:
              ! 1) modal aerosols are affecting the climate, or
              ! 2) prognostic modal aerosols are enabled
-             call modal_aero_calcsize_sub(state, ptend, ztodt, pbuf)
+             call modal_aero_calcsize_sub(state, ptend, ztodt, pbuf, aero_props, aero_state_obj)
              ! for prognostic modal aerosols the transfer of mass between aitken and accumulation
              ! modes is done in conjunction with the dry radius calculation
-             call modal_aero_wateruptake_dr(state, pbuf)
+             call modal_aero_wateruptake_dr(state, pbuf, aero_props, aero_state_obj)
              call physics_update(state, ptend, ztodt, tend)
           else
-             call modal_aero_calcsize_diag(state, pbuf)
-             call modal_aero_wateruptake_dr(state, pbuf)
+             call modal_aero_calcsize_diag(state, pbuf, aero_props, aero_state_obj)
+             call modal_aero_wateruptake_dr(state, pbuf, aero_props, aero_state_obj)
           endif
+
+          !REMOVECAM - destroy factory-created aerosol state objects
+          call aerosol_instances_destroy_states(aero_states_lcl)
+          !REMOVECAM_END
        endif
 
        if (trim(cam_take_snapshot_before) == "aero_model_wetdep") then
@@ -2633,12 +2660,19 @@ contains
     use dyn_tests_utils, only: vc_dycore
     use surface_emissions_mod,only: surface_emissions_set
     use elevated_emissions_mod,only: elevated_emissions_set
+    use aerosol_properties_mod, only: aerosol_properties
+    use aerosol_state_mod, only: aerosol_state
+    !REMOVECAM - aerosol_instances_mod is the CAM-specific factory; not needed when objects are passed in
+    use aerosol_instances_mod, only: aerosol_instances_get_props, &
+         aerosol_instances_get_num_models, aerosol_instances_create_states, &
+         aerosol_instances_destroy_states, aero_state_entry_t
+    !REMOVECAM_END
 
     ! Arguments
 
     real(r8), intent(in) :: ztodt                          ! 2 delta t (model time increment)
 
-    type(physics_state), intent(inout) :: state
+    type(physics_state), intent(inout), target :: state
     type(physics_tend ), intent(inout) :: tend
     type(physics_buffer_desc), pointer :: pbuf(:)
 
@@ -2723,6 +2757,14 @@ contains
     real(r8), pointer :: psl(:)   ! Sea Level Pressure
 
     logical   :: lq(pcnst)
+
+    ! For abstract aerosol interface (calcsize/wateruptake)
+    class(aerosol_properties), pointer :: aero_props => null()
+    class(aerosol_state), pointer :: aero_state_obj => null()
+    !REMOVECAM - factory-specific variables; under CAM-SIMA objects are passed as scheme inputs
+    type(aero_state_entry_t), allocatable :: aero_states_lcl(:)
+    integer :: nstates_lcl, iaermod_lcl
+    !REMOVECAM_END
 
     !-----------------------------------------------------------------------
 
@@ -2987,8 +3029,23 @@ contains
       !===================================================
 
       if (clim_modal_aero) then
-         call modal_aero_calcsize_diag(state, pbuf)
-         call modal_aero_wateruptake_dr(state, pbuf)
+         !REMOVECAM - factory creates aerosol objects locally; under CAM-SIMA they will be passed as scheme inputs
+         do iaermod_lcl = 1, aerosol_instances_get_num_models()
+            aero_props => aerosol_instances_get_props(iaermod_lcl, 0)
+            if (associated(aero_props)) then
+               if (aero_props%model_is('MAM')) exit
+            end if
+         end do
+         call aerosol_instances_create_states(0, state, pbuf, aero_states_lcl, nstates_lcl)
+         aero_state_obj => aero_states_lcl(iaermod_lcl)%obj
+         !REMOVECAM_END
+
+         call modal_aero_calcsize_diag(state, pbuf, aero_props, aero_state_obj)
+         call modal_aero_wateruptake_dr(state, pbuf, aero_props, aero_state_obj)
+
+         !REMOVECAM - destroy factory-created aerosol state objects
+         call aerosol_instances_destroy_states(aero_states_lcl)
+         !REMOVECAM_END
       end if
 
       !===================================================

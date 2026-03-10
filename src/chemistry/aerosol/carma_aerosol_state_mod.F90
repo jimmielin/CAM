@@ -137,9 +137,7 @@ contains
     character(len=aero_name_len) :: bin_name, shortname
     integer :: igroup, ibin, rc, nchr
 
-    if (self%list_idx_ > 0) call endrun('carma_aerosol_state::ambient_total_bin_mmr: only valid for climate list (list_idx=0)')
-
-    call rad_aer_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
+    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=bin_name)
 
     nchr = len_trim(bin_name)-2
     shortname = bin_name(:nchr)
@@ -176,9 +174,7 @@ contains
     integer, intent(in) :: bin_ndx      ! bin index
     real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
 
-    if (self%list_idx_ > 0) call endrun('carma_aerosol_state::get_cldbrne_mmr: only valid for climate list (list_idx=0)')
-
-    call rad_cnst_get_bin_mmr_by_idx(0, bin_ndx, species_ndx, 'c', self%state, self%pbuf, mmr)
+    call rad_cnst_get_bin_mmr_by_idx(self%list_idx_, bin_ndx, species_ndx, 'c', self%state, self%pbuf, mmr)
 
   end subroutine get_cldbrne_mmr
 
@@ -194,11 +190,9 @@ contains
     integer :: igroup, ibin, rc, nchr, ncol
     real(r8) :: nmr(pcols,pver)
 
-    if (self%list_idx_ > 0) call endrun('carma_aerosol_state::get_ambient_num: only valid for climate list (list_idx=0)')
-
     ncol = self%state%ncol
 
-    call rad_aer_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
+    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=bin_name)
 
     nchr = len_trim(bin_name)-2
     shortname = bin_name(:nchr)
@@ -207,7 +201,7 @@ contains
 
     read(bin_name(nchr+1:),*) ibin
 
-    call rad_cnst_get_bin_num(0, bin_ndx, 'a', self%state, self%pbuf, num)
+    call rad_cnst_get_bin_num(self%list_idx_, bin_ndx, 'a', self%state, self%pbuf, num)
 
     call carma_get_number(self%state, igroup, ibin, nmr, rc)
 
@@ -227,11 +221,9 @@ contains
     integer :: igroup, ibin, rc, nchr, ncol
     real(r8) :: nmr(pcols,pver)
 
-    if (self%list_idx_ > 0) call endrun('carma_aerosol_state::get_cldbrne_num: only valid for climate list (list_idx=0)')
-
     ncol = self%state%ncol
 
-    call rad_aer_get_info_by_bin(0, bin_ndx, bin_name=bin_name)
+    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=bin_name)
 
     nchr = len_trim(bin_name)-2
     shortname = bin_name(:nchr)
@@ -240,7 +232,7 @@ contains
 
     read(bin_name(nchr+1:),*) ibin
 
-    call rad_cnst_get_bin_num(0, bin_ndx, 'c', self%state, self%pbuf, num)
+    call rad_cnst_get_bin_num(self%list_idx_, bin_ndx, 'c', self%state, self%pbuf, num)
 
     call carma_get_number_cld(self%pbuf, igroup, ibin,  ncol, pver, nmr, rc)
 

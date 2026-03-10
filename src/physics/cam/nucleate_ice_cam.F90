@@ -15,8 +15,6 @@ use constituents,   only: pcnst, cnst_get_ind
 use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
 use physics_buffer, only: physics_buffer_desc
 use phys_control,   only: use_hetfrz_classnuc
-use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props
-use aerosol_mmr_cam, only: rad_cnst_get_aer_mmr
 
 use physics_buffer, only: pbuf_add_field, dtype_r8, pbuf_old_tim_idx, &
                           pbuf_get_index, pbuf_get_field, &
@@ -161,7 +159,7 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in, pbuf2d, aero_props)
 
    real(r8), intent(in) :: mincld_in
    real(r8), intent(in) :: bulk_scale_in
-   class(aerosol_properties), optional, intent(in) :: aero_props
+   class(aerosol_properties), intent(in) :: aero_props
 
    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
@@ -170,7 +168,6 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in, pbuf2d, aero_props)
    integer :: ierr
    integer :: ispc, ibin
    integer :: idxtmp
-   integer :: nmodes, nbins
 
    character(len=*), parameter :: routine = 'nucleate_ice_cam_init'
    logical :: history_cesm_forcing
@@ -182,9 +179,7 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in, pbuf2d, aero_props)
 
    ! clim_modal_aero determines whether modal or carma aerosols are used in the climate calculation.
    ! The modal aerosols can be either prognostic or prescribed.
-   call rad_aer_get_info(0, nmodes=nmodes, nbins=nbins)
-
-   clim_modal_carma = (nmodes > 0) .or. (nbins > 0)
+   clim_modal_carma = aero_props%model_is('MAM') .or. aero_props%model_is('CARMA')
 
    mincld     = mincld_in
    bulk_scale = bulk_scale_in
@@ -192,10 +187,6 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in, pbuf2d, aero_props)
    lq(:) = .false.
 
    if (clim_modal_carma.and.use_preexisting_ice) then
-
-      if (.not. present(aero_props)) then
-         call endrun(routine//' :  aero_props must be present')
-      end if
 
       ! constituent tendencies are calculated only if use_preexisting_ice is TRUE
       ! set lq for constituent tendencies --
@@ -337,14 +328,14 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in, pbuf2d, aero_props)
 
       ! Props needed for BAM number concentration calcs.
 
-      call rad_aer_get_info(0, naero=naer_all)
+      naer_all = aero_props%nbins()
       allocate( &
          aername(naer_all),        &
          num_to_mass_aer(naer_all) )
 
       do iaer = 1, naer_all
-         call rad_aer_get_props(0, iaer, &
-            aername         = aername(iaer), &
+         call aero_props%get(iaer, 1, &
+            specname        = aername(iaer), &
             num_to_mass_aer = num_to_mass_aer(iaer))
          ! Look for sulfate, dust, and soot in this list (Bulk aerosol only)
          if (trim(aername(iaer)) == 'SULFATE') idxsul = iaer
@@ -378,8 +369,8 @@ subroutine nucleate_ice_cam_calc( &
    type(physics_buffer_desc),   pointer       :: pbuf(:)
    real(r8),                    intent(in)    :: dtime
    type(physics_ptend),         intent(out)   :: ptend
-   class(aerosol_properties),optional, intent(in) :: aero_props
-   class(aerosol_state),optional, intent(in) :: aero_state
+   class(aerosol_properties), intent(in) :: aero_props
+   class(aerosol_state), intent(in) :: aero_state
 
    ! local workspace
 
@@ -486,7 +477,7 @@ subroutine nucleate_ice_cam_calc( &
    ni    => state%q(:,:,numice_idx)
    pmid  => state%pmid
 
-   if (present(aero_props)) then
+   if (clim_modal_carma) then
       nbins = aero_props%nbins()
       nmaxspc = maxval(aero_props%nspecies())
 
@@ -510,7 +501,7 @@ subroutine nucleate_ice_cam_calc( &
            maerosol(pcols,pver,naer_all))
 
       do m = 1, naer_all
-         call rad_cnst_get_aer_mmr(0, m, state, pbuf, aer_mmr)
+         call aero_state%get_ambient_mmr(1, m, aer_mmr)
          maerosol(:ncol,:,m) = aer_mmr(:ncol,:)*rho(:ncol,:)
 
          if (m .eq. idxsul) then
@@ -610,10 +601,6 @@ subroutine nucleate_ice_cam_calc( &
    soot_num_col = 0._r8
 
    if (clim_modal_carma) then
-
-      if (.not.(present(aero_props).and.present(aero_state))) then
-         call endrun('nucleate_ice_cam_calc: aero_props and aero_state must be present')
-      end if
 
       ! collect number densities (#/cm^3) for dust, sulfate, and soot
       call aero_state%nuclice_get_numdens( aero_props, use_preexisting_ice, ncol, pver, rho, &

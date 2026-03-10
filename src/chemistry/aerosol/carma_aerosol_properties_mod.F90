@@ -264,7 +264,8 @@ contains
   !  species morphology
   !------------------------------------------------------------------------
   subroutine get(self, bin_ndx, species_ndx, density, hygro, &
-                 spectype, specname, specmorph, refindex_sw, refindex_lw, num_to_mass_aer)
+                 spectype, specname, specmorph, refindex_sw, refindex_lw, num_to_mass_aer, &
+                 dryrad)
 
     class(carma_aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx             ! bin index
@@ -277,6 +278,7 @@ contains
     complex(r8), pointer, optional, intent(out) :: refindex_sw(:) ! short wave species refractive indices
     complex(r8), pointer, optional, intent(out) :: refindex_lw(:) ! long wave species refractive indices
     real(r8), optional, intent(out) :: num_to_mass_aer ! ratio of number to mass concentration
+    real(r8), optional, intent(out) :: dryrad  ! dry radius (m) -- not meaningful for CARMA
 
     if (present(density)) then
        call rad_aer_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, density_aer=density)
@@ -306,6 +308,8 @@ contains
     if (present(num_to_mass_aer)) then
        call rad_aer_get_bin_props_by_idx(self%list_idx_, bin_ndx, species_ndx, num_to_mass_aer=num_to_mass_aer)
     end if
+
+    ! dryrad is not meaningful for CARMA; no-op
 
   end subroutine get
 
@@ -906,6 +910,8 @@ contains
     character(len=*),               intent(in) :: query
 
     if (trim(query) == 'CARMA' .or. trim(query) == 'carma') then
+       model_is = .true.
+    else if (trim(query) == 'sectional') then
        model_is = .true.
     else
        model_is = .false.

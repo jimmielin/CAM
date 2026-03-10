@@ -132,12 +132,10 @@ contains
     real(r8),pointer :: mmrptr(:,:)
     integer :: spec_ndx
 
-    if (self%list_idx_ > 0) call endrun('modal_aerosol_state::ambient_total_bin_mmr: only valid for climate list (list_idx=0)')
-
     mmr_tot = 0._r8
 
     do spec_ndx=1,aero_props%nspecies(bin_ndx)
-       call rad_cnst_get_aer_mmr(0, bin_ndx, spec_ndx, 'a', self%state, self%pbuf, mmrptr)
+       call rad_cnst_get_aer_mmr(self%list_idx_, bin_ndx, spec_ndx, 'a', self%state, self%pbuf, mmrptr)
        mmr_tot = mmr_tot + mmrptr(col_ndx,lyr_ndx)
     end do
 
@@ -164,9 +162,7 @@ contains
     integer, intent(in) :: bin_ndx      ! bin index
     real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
 
-    if (self%list_idx_ > 0) call endrun('modal_aerosol_state::get_cldbrne_mmr: only valid for climate list (list_idx=0)')
-
-    call rad_cnst_get_aer_mmr(0, bin_ndx, species_ndx, 'c', self%state, self%pbuf, mmr)
+    call rad_cnst_get_aer_mmr(self%list_idx_, bin_ndx, species_ndx, 'c', self%state, self%pbuf, mmr)
   end subroutine get_cldbrne_mmr
 
   !------------------------------------------------------------------------------
@@ -177,9 +173,7 @@ contains
     integer, intent(in) :: bin_ndx     ! bin index
     real(r8), pointer   :: num(:,:)    ! number densities
 
-    if (self%list_idx_ > 0) call endrun('modal_aerosol_state::get_ambient_num: only valid for climate list (list_idx=0)')
-
-    call rad_cnst_get_mode_num(0, bin_ndx, 'a', self%state, self%pbuf, num)
+    call rad_cnst_get_mode_num(self%list_idx_, bin_ndx, 'a', self%state, self%pbuf, num)
   end subroutine get_ambient_num
 
   !------------------------------------------------------------------------------
@@ -190,9 +184,7 @@ contains
     integer, intent(in) :: bin_ndx             ! bin index
     real(r8), pointer :: num(:,:)
 
-    if (self%list_idx_ > 0) call endrun('modal_aerosol_state::get_cldbrne_num: only valid for climate list (list_idx=0)')
-
-    call rad_cnst_get_mode_num(0, bin_ndx, 'c', self%state, self%pbuf, num)
+    call rad_cnst_get_mode_num(self%list_idx_, bin_ndx, 'c', self%state, self%pbuf, num)
   end subroutine get_cldbrne_num
 
   !------------------------------------------------------------------------------
@@ -508,10 +500,10 @@ contains
           qaerwat = -huge(1._r8)
           return
        end if
-       call modal_aero_calcsize_diag(self%state, self%pbuf, self%list_idx_, dgnumdry_m, hygro_m, &
+       call modal_aero_calcsize_diag(self%state, self%pbuf, aero_props, self, dgnumdry_m, hygro_m, &
                                      dryvol_m, dryrad_m, drymass_m, so4dryvol_m, naer_m)
-       call modal_aero_wateruptake_dr(self%state, self%pbuf, self%list_idx_, dgnumdry_m, dgnumwet_m, &
-                                      qaerwat_m, wetdens_m,  hygro_m, dryvol_m, dryrad_m, &
+       call modal_aero_wateruptake_dr(self%state, self%pbuf, aero_props, self, dgnumdry_m, dgnumwet_m, &
+                                      qaerwat_m, wetdens_m, hygro_m, dryvol_m, dryrad_m, &
                                       drymass_m, so4dryvol_m, naer_m)
 
        dgnumwet(:ncol,:nlev) = dgnumwet_m(:ncol,:nlev,bin_idx)

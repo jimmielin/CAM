@@ -24,7 +24,6 @@ module modal_aerosol_properties_mod
      integer,  allocatable :: bcarbon_mode_ndxs_(:,:)
      integer,  allocatable :: porganic_mode_ndxs_(:,:)
      integer,  allocatable :: sorganic_mode_ndxs_(:,:)
-     real(r8), allocatable :: dgnum_(:)
      integer,  allocatable :: mode_size_order_(:)
      integer :: num_soa_ = 0
      integer :: num_poa_ = 0
@@ -73,14 +72,20 @@ contains
 
     integer :: l, m, nmodes, ncnst_tot, mm, itmp
     integer :: list_idx_loc
-    real(r8) :: dgnumlo
-    real(r8) :: dgnumhi
-    real(r8) :: dgnum
+    real(r8) :: dgnumlo_val
+    real(r8) :: dgnumhi_val
+    real(r8) :: dgnum_val
+    real(r8) :: rhcrystal_val, rhdeliques_val
     integer,allocatable :: nspecies(:)
     real(r8),allocatable :: sigmag(:)
     real(r8),allocatable :: alogsig(:)
     real(r8),allocatable :: f1(:)
     real(r8),allocatable :: f2(:)
+    real(r8),allocatable :: dgnum_arr(:)
+    real(r8),allocatable :: dgnumhi_arr(:)
+    real(r8),allocatable :: dgnumlo_arr(:)
+    real(r8),allocatable :: rhcrystal_arr(:)
+    real(r8),allocatable :: rhdeliques_arr(:)
     integer :: ierr
 
     character(len=aero_name_len) :: spectype
@@ -139,7 +144,8 @@ contains
        nullify(newobj)
        return
     end if
-    allocate(newobj%dgnum_(nmodes),stat=ierr)
+    allocate(dgnum_arr(nmodes),dgnumhi_arr(nmodes),dgnumlo_arr(nmodes), &
+             rhcrystal_arr(nmodes),rhdeliques_arr(nmodes),stat=ierr)
     if( ierr /= 0 ) then
        nullify(newobj)
        return
@@ -158,9 +164,14 @@ contains
        ncnst_tot =  ncnst_tot + nspecies(m) + 1
 
        call rad_aer_get_mode_props(list_idx_loc, m, sigmag=sigmag(m), &
-                                    dgnum=dgnum, dgnumhi=dgnumhi, dgnumlo=dgnumlo )
+                                    dgnum=dgnum_val, dgnumhi=dgnumhi_val, dgnumlo=dgnumlo_val, &
+                                    rhcrystal=rhcrystal_val, rhdeliques=rhdeliques_val)
 
-       newobj%dgnum_(m) = dgnum
+       dgnum_arr(m) = dgnum_val
+       dgnumhi_arr(m) = dgnumhi_val
+       dgnumlo_arr(m) = dgnumlo_val
+       rhcrystal_arr(m) = rhcrystal_val
+       rhdeliques_arr(m) = rhdeliques_val
 
        alogsig(m) = log(sigmag(m))
 
@@ -170,9 +181,9 @@ contains
        f2(m) = 1._r8 + 0.25_r8*alogsig(m)
 
        newobj%voltonumblo_(m) = 1._r8 / ( (pi/6._r8)* &
-            (dgnumlo**3._r8)*exp(4.5_r8*alogsig(m)**2._r8) )
+            (dgnumlo_val**3._r8)*exp(4.5_r8*alogsig(m)**2._r8) )
        newobj%voltonumbhi_(m) = 1._r8 / ( (pi/6._r8)* &
-            (dgnumhi**3._r8)*exp(4.5_r8*alogsig(m)**2._r8) )
+            (dgnumhi_val**3._r8)*exp(4.5_r8*alogsig(m)**2._r8) )
 
     end do
 
@@ -182,7 +193,7 @@ contains
     end do
     do m = 1, nmodes-1
        do l = m+1, nmodes
-          if (newobj%dgnum_(newobj%mode_size_order_(l)) > newobj%dgnum_(newobj%mode_size_order_(m))) then
+          if (dgnum_arr(newobj%mode_size_order_(l)) > dgnum_arr(newobj%mode_size_order_(m))) then
              itmp = newobj%mode_size_order_(m)
              newobj%mode_size_order_(m) = newobj%mode_size_order_(l)
              newobj%mode_size_order_(l) = itmp
@@ -190,7 +201,9 @@ contains
        end do
     end do
 
-    call newobj%initialize(nmodes,ncnst_tot,nspecies,nspecies,alogsig,f1,f2,ierr,list_idx_loc)
+    call newobj%initialize(nmodes,ncnst_tot,nspecies,nspecies,alogsig,f1,f2,ierr,list_idx_loc, &
+                           dgnum=dgnum_arr,dgnumhi=dgnumhi_arr,dgnumlo=dgnumlo_arr, &
+                           rhcrystal=rhcrystal_arr,rhdeliques=rhdeliques_arr)
 
     npoa = 0
     nsoa = 0
@@ -317,6 +330,11 @@ contains
     deallocate(sigmag)
     deallocate(f1)
     deallocate(f2)
+    deallocate(dgnum_arr)
+    deallocate(dgnumhi_arr)
+    deallocate(dgnumlo_arr)
+    deallocate(rhcrystal_arr)
+    deallocate(rhdeliques_arr)
 
   end function constructor
 
@@ -333,9 +351,6 @@ contains
     end if
     if (allocated(self%voltonumbhi_)) then
        deallocate(self%voltonumbhi_)
-    end if
-    if (allocated(self%dgnum_)) then
-       deallocate(self%dgnum_)
     end if
     if (allocated(self%mode_size_order_)) then
        deallocate(self%mode_size_order_)
@@ -393,7 +408,8 @@ contains
   !  species morphology
   !------------------------------------------------------------------------
   subroutine get(self, bin_ndx, species_ndx, density, hygro, &
-                 spectype, specname, specmorph, refindex_sw, refindex_lw, num_to_mass_aer)
+                 spectype, specname, specmorph, refindex_sw, refindex_lw, num_to_mass_aer, &
+                 dryrad)
 
     class(modal_aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx             ! bin index
@@ -406,6 +422,7 @@ contains
     complex(r8), pointer, optional, intent(out) :: refindex_sw(:) ! short wave species refractive indices
     complex(r8), pointer, optional, intent(out) :: refindex_lw(:) ! long wave species refractive indices
     real(r8), optional, intent(out) :: num_to_mass_aer ! ratio of number to mass concentration
+    real(r8), optional, intent(out) :: dryrad  ! dry radius (m) -- not meaningful for modal
 
     call rad_aer_get_props(self%list_idx_, bin_ndx, species_ndx, &
                                 density_aer=density, hygro_aer=hygro, spectype=spectype, &
@@ -422,6 +439,8 @@ contains
     if (present(num_to_mass_aer)) then
        call rad_aer_get_props(self%list_idx_, bin_ndx, species_ndx, num_to_mass_aer=num_to_mass_aer)
     end if
+
+    ! dryrad is not meaningful for modal aerosols; no-op
 
   end subroutine get
 
@@ -901,7 +920,7 @@ contains
 
     real(r8) :: diam
 
-    diam = self%dgnum_(bin_ndx)
+    diam = self%dgnum(bin_ndx)
 
   end function scav_diam
 
