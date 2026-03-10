@@ -1319,6 +1319,8 @@ subroutine bulk_props_init(physprop, nc_id)
 
 !  Read props for bulk aerosols
 
+   use string_utils, only: GLC
+
    type (physprop_type), intent(inout) :: physprop ! storage for file data
    type (file_desc_T),   intent(inout) :: nc_id    ! indentifier for netcdf file
 
@@ -1335,6 +1337,7 @@ subroutine bulk_props_init(physprop, nc_id)
    ! read microphys
    ierr = pio_inq_varid(nc_id, 'name', vid)
    ierr = pio_get_var(nc_id, vid, physprop%aername)
+   physprop%aername = physprop%aername(:GLC(physprop%aername))
 
    ! use GLC function to remove trailing nulls and blanks.
    ! physprop%aername = aername_str(:GLC(aername_str))
