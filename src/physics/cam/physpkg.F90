@@ -2293,8 +2293,8 @@ contains
     real(r8) :: zero_tracers(pcols,pcnst)
 
     ! For abstract aerosol interface (calcsize/wateruptake)
-    class(aerosol_properties), pointer :: aero_props => null()
-    class(aerosol_state), pointer :: aero_state_obj => null()
+    class(aerosol_properties), pointer :: aero_props
+    class(aerosol_state), pointer :: aero_state_obj
 
     type(aero_state_entry_t), allocatable :: aero_states_lcl(:)
     integer :: nstates_lcl, iaermod_lcl
@@ -2304,6 +2304,9 @@ contains
     type(carma_diags_t), pointer :: carma_diags_obj
 
     !-----------------------------------------------------------------------
+    nullify(aero_props)
+    nullify(aero_state_obj)
+
     carma_diags_obj => carma_diags_t()
     if (.not.associated(carma_diags_obj)) then
        call endrun('tphysbc: carma_diags_obj allocation failed')

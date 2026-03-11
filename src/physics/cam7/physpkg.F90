@@ -1543,8 +1543,8 @@ contains
     logical  :: moist_mixing_ratio_dycore
 
     ! For abstract aerosol interface (calcsize/wateruptake)
-    class(aerosol_properties), pointer :: aero_props => null()
-    class(aerosol_state), pointer :: aero_state_obj => null()
+    class(aerosol_properties), pointer :: aero_props
+    class(aerosol_state), pointer :: aero_state_obj
 
     type(aero_state_entry_t), allocatable :: aero_states_lcl(:)
     integer :: nstates_lcl, iaermod_lcl
@@ -1569,6 +1569,9 @@ contains
     integer errflg
 
     !-----------------------------------------------------------------------
+    nullify(aero_props)
+    nullify(aero_state_obj)
+
     lchnk = state%lchnk
     ncol  = state%ncol
 
@@ -2760,14 +2763,16 @@ contains
     logical   :: lq(pcnst)
 
     ! For abstract aerosol interface (calcsize/wateruptake)
-    class(aerosol_properties), pointer :: aero_props => null()
-    class(aerosol_state), pointer :: aero_state_obj => null()
+    class(aerosol_properties), pointer :: aero_props
+    class(aerosol_state), pointer :: aero_state_obj
     !REMOVECAM - factory-specific variables; under CAM-SIMA objects are passed as scheme inputs
     type(aero_state_entry_t), allocatable :: aero_states_lcl(:)
     integer :: nstates_lcl, iaermod_lcl
     !REMOVECAM_END
 
     !-----------------------------------------------------------------------
+    nullify(aero_props)
+    nullify(aero_state_obj)
 
     call t_startf('bc_init')
 
