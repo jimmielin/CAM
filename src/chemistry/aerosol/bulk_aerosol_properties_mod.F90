@@ -67,8 +67,9 @@ contains
     integer,allocatable :: nspecies(:)
     real(r8),allocatable :: alogsig(:)
     real(r8),allocatable :: f1(:)
-    integer :: ierr, naero
+    integer :: ierr, naero, i
     integer :: list_idx_loc
+    real(r8) :: dispersion_val
 
     list_idx_loc = 0
     if (present(list_idx)) list_idx_loc = list_idx
@@ -101,8 +102,11 @@ contains
     ! Bulk aerosols have 1 chemical species in each bin
     nspecies(:) = 1
 
-    ! Taken from CARMA -- not sure if it will be used for our purposes
-    alogsig(:) = log(2._r8)
+    ! Read actual dispersion (sigma_logr) from physprop files
+    do i = 1, naero
+       call rad_aer_get_props(list_idx_loc, i, dispersion_aer=dispersion_val)
+       alogsig(i) = log(dispersion_val)
+    end do
     f1(:) = 1._r8
 
     ! For bulk aerosols, the number of bins and total number of constituents are

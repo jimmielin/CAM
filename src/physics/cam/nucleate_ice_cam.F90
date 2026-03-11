@@ -159,7 +159,7 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in, pbuf2d, aero_props)
 
    real(r8), intent(in) :: mincld_in
    real(r8), intent(in) :: bulk_scale_in
-   class(aerosol_properties), intent(in) :: aero_props
+   class(aerosol_properties), optional, intent(in) :: aero_props
 
    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
@@ -179,7 +179,11 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in, pbuf2d, aero_props)
 
    ! clim_modal_aero determines whether modal or carma aerosols are used in the climate calculation.
    ! The modal aerosols can be either prognostic or prescribed.
-   clim_modal_carma = aero_props%model_is('MAM') .or. aero_props%model_is('CARMA')
+   if (present(aero_props)) then
+      clim_modal_carma = aero_props%model_is('MAM') .or. aero_props%model_is('CARMA')
+   else
+      clim_modal_carma = .false.
+   end if
 
    mincld     = mincld_in
    bulk_scale = bulk_scale_in
@@ -328,7 +332,11 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in, pbuf2d, aero_props)
 
       ! Props needed for BAM number concentration calcs.
 
-      naer_all = aero_props%nbins()
+      if (present(aero_props)) then
+         naer_all = aero_props%nbins()
+      else
+         naer_all = 0
+      end if
       allocate( &
          aername(naer_all),        &
          num_to_mass_aer(naer_all) )
@@ -369,8 +377,8 @@ subroutine nucleate_ice_cam_calc( &
    type(physics_buffer_desc),   pointer       :: pbuf(:)
    real(r8),                    intent(in)    :: dtime
    type(physics_ptend),         intent(out)   :: ptend
-   class(aerosol_properties), intent(in) :: aero_props
-   class(aerosol_state), intent(in) :: aero_state
+   class(aerosol_properties), optional, intent(in) :: aero_props
+   class(aerosol_state), optional, intent(in) :: aero_state
 
    ! local workspace
 

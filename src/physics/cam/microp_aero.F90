@@ -373,6 +373,8 @@ subroutine microp_aero_init(phys_state,pbuf2d)
 
    if (associated(aero_props_obj)) then
       call nucleate_ice_cam_init(mincld, bulk_scale, pbuf2d, aero_props=aero_props_obj)
+   else
+      call nucleate_ice_cam_init(mincld, bulk_scale, pbuf2d)
    end if
    if (use_hetfrz_classnuc) then
       if (associated(aero_props_obj)) then
@@ -733,7 +735,7 @@ subroutine microp_aero_run ( &
    if (associated(aero_props_obj) .and. associated(aero_state1_obj)) then
       call nucleate_ice_cam_calc(state1, wsubi, pbuf, deltatin, ptend_loc, aero_props_obj, aero_state1_obj)
    else
-      call physics_ptend_init(ptend_loc, state1%psetcols, 'none')
+      call nucleate_ice_cam_calc(state1, wsubi, pbuf, deltatin, ptend_loc)
    end if
 
    call physics_ptend_sum(ptend_loc, ptend_all, ncol)
