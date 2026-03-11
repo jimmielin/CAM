@@ -5,8 +5,6 @@ module aerosol_mmr_cam
 ! CAM-specific aerosol MMR retrieval routines.  These routines access
 ! state%q and physics buffer (pbuf) to return mixing ratio pointers.
 !
-! This module is NOT portable to CAM-SIMA; it is CAM-host-specific.
-!
 !------------------------------------------------------------------------------------------------
 
 use shr_kind_mod,   only: r8 => shr_kind_r8

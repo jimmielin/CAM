@@ -1,22 +1,16 @@
 module radiative_aerosol_definitions
 
-!------------------------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
 !
 ! Core aerosol definitions for radiative calculations: shared constants,
 ! types, data, parsing, and initialization routines for both modal and
 ! sectional (bin) aerosol representations.
 !
 ! This module is the lowest-level shared module in the aerosol hierarchy.
-! It is fully portable to CAM-SIMA (zero host dependencies).
+! It will be shared with CAM-SIMA.
 !
-! Subsumes the former rad_cnst_support module.
-!
-!------------------------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
 
-use shr_kind_mod,   only: r8 => shr_kind_r8
-use cam_abortutils, only: endrun
-use cam_logfile,    only: iulog
-use spmd_utils,     only: masterproc
 implicit none
 private
 save
@@ -204,8 +198,10 @@ character(len=8), public, parameter :: bin_morph_names(num_bin_morphs) = &
 ! Public routines
 !===========================
 
-public :: parse_mode_defs, parse_bin_defs, parse_rad_specifier
-public :: list_populate, list_resolve_physprops
+public :: parse_mode_defs, parse_bin_defs  ! parse mode and bin definitions for aerosol.
+public :: parse_rad_specifier              ! parse rad_climate and rad_diag_N specifiers into rad_cnst_namelist_t.
+public :: list_populate                    ! populate aerosol list structures from parsed namelist (run before register)
+public :: list_resolve_physprops           ! resolve physprop indices into aerosol list structures
 public :: print_modes, print_bins
 
 !==============================================================================
@@ -213,6 +209,9 @@ contains
 !==============================================================================
 
 subroutine list_populate(namelist, aerlist, ma_list, sa_list)
+   use cam_abortutils, only: endrun
+   use cam_logfile,    only: iulog
+   use spmd_utils,     only: masterproc
 
    ! Populate aerosol list structures from parsed namelist specifiers.
    ! IMPORTANT: Must run at readnl time (before phys_register), because
@@ -232,7 +231,7 @@ subroutine list_populate(namelist, aerlist, ma_list, sa_list)
    integer :: ii, m, naero, nmodes, nbins
    integer :: ba_idx, ma_idx, sa_idx
    integer :: istat
-   character(len=*), parameter :: routine = 'list_populate'
+   character(len=*), parameter :: subname = 'list_populate'
    !-----------------------------------------------------------------------------
 
    ! Determine the number of bulk aerosols and aerosol modes in the list
@@ -258,13 +257,13 @@ subroutine list_populate(namelist, aerlist, ma_list, sa_list)
       sa_list%physprop_files(sa_list%nbins), &
       sa_list%idx_props(sa_list%nbins),     &
       stat=istat)
-   if (istat /= 0) call endrun(routine//': allocate ERROR; aero list components')
+   if (istat /= 0) call endrun(subname//': allocate ERROR; aero list components')
 
    if (masterproc .and. verbose) then
       if (len_trim(aerlist%list_id) == 0) then
-         write(iulog,*) nl//' '//routine//': namelist input for climate list'
+         write(iulog,*) nl//' '//subname//': namelist input for climate list'
       else
-         write(iulog,*) nl//' '//routine//': namelist input for diagnostic list:'//aerlist%list_id
+         write(iulog,*) nl//' '//subname//': namelist input for diagnostic list:'//aerlist%list_id
       end if
    end if
 
@@ -285,7 +284,7 @@ subroutine list_populate(namelist, aerlist, ma_list, sa_list)
       if (namelist%source(ii) /= 'A' .and. namelist%source(ii) /= 'M' .and. &
           namelist%source(ii) /= 'N' .and. namelist%source(ii) /= 'Z' .and. &
           namelist%source(ii) /= 'B' ) then
-         call endrun(routine//": source must either be A, B, M, N or Z:"//&
+         call endrun(subname//": source must either be A, B, M, N or Z:"//&
                      " illegal specifier in namelist input: "//namelist%source(ii))
       end if
 
@@ -314,7 +313,7 @@ subroutine list_populate(namelist, aerlist, ma_list, sa_list)
             end if
          end do
          if (ma_list%idx(ma_idx) == -1) &
-            call endrun(routine//' ERROR cannot find mode name '//trim(namelist%camname(ii)))
+            call endrun(subname//' ERROR cannot find mode name '//trim(namelist%camname(ii)))
 
          ! Also save the name of the physprop file
          ma_list%physprop_files(ma_idx) = namelist%radname(ii)
@@ -334,7 +333,7 @@ subroutine list_populate(namelist, aerlist, ma_list, sa_list)
             end if
          end do
          if (sa_list%idx(sa_idx) == -1) &
-            call endrun(routine//' ERROR cannot find bin name '//trim(namelist%camname(ii)))
+            call endrun(subname//' ERROR cannot find bin name '//trim(namelist%camname(ii)))
 
          ! Also save the name of the physprop file
          sa_list%physprop_files(sa_idx) = namelist%radname(ii)
@@ -364,7 +363,7 @@ subroutine list_resolve_physprops(aerlist, ma_list, sa_list)
 
    ! Local variables
    integer :: i
-   character(len=*), parameter :: routine = 'list_resolve_physprops'
+   character(len=*), parameter :: subname = 'list_resolve_physprops'
    !-----------------------------------------------------------------------------
 
    ! Loop over bulk aerosols
@@ -396,6 +395,8 @@ end subroutine list_resolve_physprops
 !===========================
 
 subroutine parse_mode_defs(nl_in, modes)
+   use cam_abortutils, only: endrun
+   use cam_logfile,    only: iulog
 
    ! Parse the mode definition specifiers.  The specifiers are of the form:
    !
@@ -416,7 +417,7 @@ subroutine parse_mode_defs(nl_in, modes)
    integer :: nspec, ispec
    integer :: strlen, iend, ipos
    logical :: num_mr_found
-   character(len=*), parameter :: routine = 'parse_mode_defs'
+   character(len=*), parameter :: subname = 'parse_mode_defs'
    character(len=len(nl_in(1))) :: tmpstr
    character(len=1)  :: tmp_src_a
    character(len=32) :: tmp_name_a
@@ -462,8 +463,8 @@ subroutine parse_mode_defs(nl_in, modes)
       modes%comps(nmodes),  &
       stat=istat )
    if (istat > 0) then
-      write(iulog,*) routine//': ERROR: cannot allocate storage for modes.  nmodes=', nmodes
-      call endrun(routine//': ERROR allocating storage for modes')
+      write(iulog,*) subname//': ERROR: cannot allocate storage for modes.  nmodes=', nmodes
+      call endrun(subname//': ERROR allocating storage for modes')
    end if
 
    mcur = 1              ! index of current string being processed
@@ -502,8 +503,8 @@ subroutine parse_mode_defs(nl_in, modes)
          stat=istat)
 
       if (istat > 0) then
-         write(iulog,*) routine//': ERROR: cannot allocate storage for species.  nspec=', nspec
-         call endrun(routine//': ERROR allocating storage for species')
+         write(iulog,*) subname//': ERROR: cannot allocate storage for species.  nspec=', nspec
+         call endrun(subname//': ERROR allocating storage for species')
       end if
 
       ! initialize components
@@ -654,9 +655,9 @@ subroutine parse_mode_defs(nl_in, modes)
       character(len=*), intent(in) :: msg
       character(len=*), intent(in) :: str
 
-      write(iulog,*) routine//': ERROR: '//msg
+      write(iulog,*) subname//': ERROR: '//msg
       write(iulog,*) ' input string: '//trim(str)
-      call endrun(routine//': ERROR: '//msg)
+      call endrun(subname//': ERROR: '//msg)
 
    end subroutine parse_error
 
@@ -701,6 +702,8 @@ end subroutine parse_mode_defs
 !===========================
 
 subroutine parse_bin_defs(nl_in, bins)
+   use cam_abortutils, only: endrun
+   use cam_logfile,    only: iulog
 
    ! Parse the bin definition specifiers.
 
@@ -717,7 +720,7 @@ subroutine parse_bin_defs(nl_in, bins)
    integer :: nspec, ispec
    integer :: strlen, ibeg, iend, ipos
    logical :: part_mr_found
-   character(len=*), parameter :: routine = 'parse_bin_defs'
+   character(len=*), parameter :: subname = 'parse_bin_defs'
    character(len=len(nl_in(1))) :: tmpstr
    character(len=1)  :: tmp_src_a
    character(len=32) :: tmp_name_a
@@ -763,8 +766,8 @@ subroutine parse_bin_defs(nl_in, bins)
       bins%comps(nbins),  &
       stat=istat )
    if (istat > 0) then
-      write(iulog,*) routine//': ERROR: cannot allocate storage for bins.  nbins=', nbins
-      call endrun(routine//': ERROR allocating storage for bins')
+      write(iulog,*) subname//': ERROR: cannot allocate storage for bins.  nbins=', nbins
+      call endrun(subname//': ERROR allocating storage for bins')
    end if
 
    mcur = 1              ! index of current string being processed
@@ -804,8 +807,8 @@ subroutine parse_bin_defs(nl_in, bins)
          stat=istat)
 
       if (istat > 0) then
-         write(iulog,*) routine//': ERROR: cannot allocate storage for species.  nspec=', nspec
-         call endrun(routine//': ERROR allocating storage for species')
+         write(iulog,*) subname//': ERROR: cannot allocate storage for species.  nspec=', nspec
+         call endrun(subname//': ERROR allocating storage for species')
       end if
 
       ! initialize components
@@ -985,9 +988,9 @@ subroutine parse_bin_defs(nl_in, bins)
       character(len=*), intent(in) :: msg
       character(len=*), intent(in) :: str
 
-      write(iulog,*) routine//': ERROR: '//msg
+      write(iulog,*) subname//': ERROR: '//msg
       write(iulog,*) ' input string: '//trim(str)
-      call endrun(routine//': ERROR: '//msg)
+      call endrun(subname//': ERROR: '//msg)
 
    end subroutine parse_error
 
@@ -1031,6 +1034,7 @@ end subroutine parse_bin_defs
 !===========================
 
 subroutine parse_rad_specifier(specifier, namelist_data)
+   use cam_abortutils, only: endrun
 
 !-----------------------------------------------------------------------------
 ! Parse the radiation namelist specifiers.
@@ -1115,6 +1119,7 @@ end subroutine parse_rad_specifier
 !===========================
 
 subroutine print_modes(modes)
+   use cam_logfile,    only: iulog
 
    type(modes_t), intent(inout) :: modes
 
@@ -1144,6 +1149,7 @@ end subroutine print_modes
 !===========================
 
 subroutine print_bins(bins)
+   use cam_logfile,    only: iulog
 
    type(bins_t), intent(inout) :: bins
 
