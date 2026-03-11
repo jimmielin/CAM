@@ -928,37 +928,37 @@ subroutine rad_aer_get_bin_props_by_idx(list_idx, &
       call endrun(subname//': specie list index out of range')
    end if
 
-   id = bins%comps(m_idx)%idx_props(spec_idx)
+   idx = bins%comps(m_idx)%idx_props(spec_idx)
 
-   if (present(opticstype))        call physprop_get(id, opticstype=opticstype)
+   if (present(opticstype))        call physprop_get(idx, opticstype=opticstype)
 
-   if (present(sw_hygro_ext))      call physprop_get(id, sw_hygro_ext=sw_hygro_ext)
-   if (present(sw_hygro_ssa))      call physprop_get(id, sw_hygro_ssa=sw_hygro_ssa)
-   if (present(sw_hygro_asm))      call physprop_get(id, sw_hygro_asm=sw_hygro_asm)
-   if (present(lw_hygro_ext))      call physprop_get(id, lw_hygro_abs=lw_hygro_ext)
+   if (present(sw_hygro_ext))      call physprop_get(idx, sw_hygro_ext=sw_hygro_ext)
+   if (present(sw_hygro_ssa))      call physprop_get(idx, sw_hygro_ssa=sw_hygro_ssa)
+   if (present(sw_hygro_asm))      call physprop_get(idx, sw_hygro_asm=sw_hygro_asm)
+   if (present(lw_hygro_ext))      call physprop_get(idx, lw_hygro_abs=lw_hygro_ext)
 
-   if (present(sw_nonhygro_ext))   call physprop_get(id, sw_nonhygro_ext=sw_nonhygro_ext)
-   if (present(sw_nonhygro_ssa))   call physprop_get(id, sw_nonhygro_ssa=sw_nonhygro_ssa)
-   if (present(sw_nonhygro_asm))   call physprop_get(id, sw_nonhygro_asm=sw_nonhygro_asm)
-   if (present(sw_nonhygro_scat))  call physprop_get(id, sw_nonhygro_scat=sw_nonhygro_scat)
-   if (present(sw_nonhygro_ascat)) call physprop_get(id, sw_nonhygro_ascat=sw_nonhygro_ascat)
-   if (present(lw_ext))            call physprop_get(id, lw_abs=lw_ext)
+   if (present(sw_nonhygro_ext))   call physprop_get(idx, sw_nonhygro_ext=sw_nonhygro_ext)
+   if (present(sw_nonhygro_ssa))   call physprop_get(idx, sw_nonhygro_ssa=sw_nonhygro_ssa)
+   if (present(sw_nonhygro_asm))   call physprop_get(idx, sw_nonhygro_asm=sw_nonhygro_asm)
+   if (present(sw_nonhygro_scat))  call physprop_get(idx, sw_nonhygro_scat=sw_nonhygro_scat)
+   if (present(sw_nonhygro_ascat)) call physprop_get(idx, sw_nonhygro_ascat=sw_nonhygro_ascat)
+   if (present(lw_ext))            call physprop_get(idx, lw_abs=lw_ext)
 
-   if (present(refindex_aer_sw))   call physprop_get(id, refindex_aer_sw=refindex_aer_sw)
-   if (present(refindex_aer_lw))   call physprop_get(id, refindex_aer_lw=refindex_aer_lw)
+   if (present(refindex_aer_sw))   call physprop_get(idx, refindex_aer_sw=refindex_aer_sw)
+   if (present(refindex_aer_lw))   call physprop_get(idx, refindex_aer_lw=refindex_aer_lw)
 
-   if (present(r_lw_abs))          call physprop_get(id, r_lw_abs=r_lw_abs)
-   if (present(r_sw_ext))          call physprop_get(id, r_sw_ext=r_sw_ext)
-   if (present(r_sw_scat))         call physprop_get(id, r_sw_scat=r_sw_scat)
-   if (present(r_sw_ascat))        call physprop_get(id, r_sw_ascat=r_sw_ascat)
-   if (present(mu))                call physprop_get(id, mu=mu)
+   if (present(r_lw_abs))          call physprop_get(idx, r_lw_abs=r_lw_abs)
+   if (present(r_sw_ext))          call physprop_get(idx, r_sw_ext=r_sw_ext)
+   if (present(r_sw_scat))         call physprop_get(idx, r_sw_scat=r_sw_scat)
+   if (present(r_sw_ascat))        call physprop_get(idx, r_sw_ascat=r_sw_ascat)
+   if (present(mu))                call physprop_get(idx, mu=mu)
 
-   if (present(aername))           call physprop_get(id, aername=aername)
-   if (present(density_aer))       call physprop_get(id, density_aer=density_aer)
-   if (present(hygro_aer))         call physprop_get(id, hygro_aer=hygro_aer)
-   if (present(dryrad_aer))        call physprop_get(id, dryrad_aer=dryrad_aer)
-   if (present(dispersion_aer))    call physprop_get(id, dispersion_aer=dispersion_aer)
-   if (present(num_to_mass_aer))   call physprop_get(id, num_to_mass_aer=num_to_mass_aer)
+   if (present(aername))           call physprop_get(idx, aername=aername)
+   if (present(density_aer))       call physprop_get(idx, density_aer=density_aer)
+   if (present(hygro_aer))         call physprop_get(idx, hygro_aer=hygro_aer)
+   if (present(dryrad_aer))        call physprop_get(idx, dryrad_aer=dryrad_aer)
+   if (present(dispersion_aer))    call physprop_get(idx, dispersion_aer=dispersion_aer)
+   if (present(num_to_mass_aer))   call physprop_get(idx, num_to_mass_aer=num_to_mass_aer)
 
    if (present(spectype)) spectype = bins%comps(m_idx)%type(spec_idx)
    if (present(specmorph)) specmorph = bins%comps(m_idx)%morph(spec_idx)
@@ -972,6 +972,7 @@ subroutine rad_aer_get_mode_props(list_idx, mode_idx, opticstype, &
    refitabsw, refrtablw, refitablw, ncoef, prefr, &
    prefi, sigmag, dgnum, dgnumlo, dgnumhi, &
    rhcrystal, rhdeliques)
+
    use shr_kind_mod,   only: r8 => shr_kind_r8
    use phys_prop,      only: physprop_get, ot_length
    use cam_abortutils, only: endrun
@@ -1005,7 +1006,7 @@ subroutine rad_aer_get_mode_props(list_idx, mode_idx, opticstype, &
    real(r8),  optional, intent(out) :: rhdeliques
 
    ! Local variables
-   integer :: id
+   integer :: idx
    type(modelist_t), pointer :: mlist
    character(len=*), parameter :: subname = 'rad_aer_get_mode_props'
    !------------------------------------------------------------------------------------
@@ -1024,28 +1025,28 @@ subroutine rad_aer_get_mode_props(list_idx, mode_idx, opticstype, &
    end if
 
    ! Get the physprop index for the requested mode
-   id = mlist%idx_props(mode_idx)
+   idx = mlist%idx_props(mode_idx)
 
-   if (present(opticstype))  call physprop_get(id, opticstype=opticstype)
-   if (present(extpsw))      call physprop_get(id, extpsw=extpsw)
-   if (present(abspsw))      call physprop_get(id, abspsw=abspsw)
-   if (present(asmpsw))      call physprop_get(id, asmpsw=asmpsw)
-   if (present(absplw))      call physprop_get(id, absplw=absplw)
+   if (present(opticstype))  call physprop_get(idx, opticstype=opticstype)
+   if (present(extpsw))      call physprop_get(idx, extpsw=extpsw)
+   if (present(abspsw))      call physprop_get(idx, abspsw=abspsw)
+   if (present(asmpsw))      call physprop_get(idx, asmpsw=asmpsw)
+   if (present(absplw))      call physprop_get(idx, absplw=absplw)
 
-   if (present(refrtabsw))   call physprop_get(id, refrtabsw=refrtabsw)
-   if (present(refitabsw))   call physprop_get(id, refitabsw=refitabsw)
-   if (present(refrtablw))   call physprop_get(id, refrtablw=refrtablw)
-   if (present(refitablw))   call physprop_get(id, refitablw=refitablw)
+   if (present(refrtabsw))   call physprop_get(idx, refrtabsw=refrtabsw)
+   if (present(refitabsw))   call physprop_get(idx, refitabsw=refitabsw)
+   if (present(refrtablw))   call physprop_get(idx, refrtablw=refrtablw)
+   if (present(refitablw))   call physprop_get(idx, refitablw=refitablw)
 
-   if (present(ncoef))       call physprop_get(id, ncoef=ncoef)
-   if (present(prefr))       call physprop_get(id, prefr=prefr)
-   if (present(prefi))       call physprop_get(id, prefi=prefi)
-   if (present(sigmag))      call physprop_get(id, sigmag=sigmag)
-   if (present(dgnum))       call physprop_get(id, dgnum=dgnum)
-   if (present(dgnumlo))     call physprop_get(id, dgnumlo=dgnumlo)
-   if (present(dgnumhi))     call physprop_get(id, dgnumhi=dgnumhi)
-   if (present(rhcrystal))   call physprop_get(id, rhcrystal=rhcrystal)
-   if (present(rhdeliques))  call physprop_get(id, rhdeliques=rhdeliques)
+   if (present(ncoef))       call physprop_get(idx, ncoef=ncoef)
+   if (present(prefr))       call physprop_get(idx, prefr=prefr)
+   if (present(prefi))       call physprop_get(idx, prefi=prefi)
+   if (present(sigmag))      call physprop_get(idx, sigmag=sigmag)
+   if (present(dgnum))       call physprop_get(idx, dgnum=dgnum)
+   if (present(dgnumlo))     call physprop_get(idx, dgnumlo=dgnumlo)
+   if (present(dgnumhi))     call physprop_get(idx, dgnumhi=dgnumhi)
+   if (present(rhcrystal))   call physprop_get(idx, rhcrystal=rhcrystal)
+   if (present(rhdeliques))  call physprop_get(idx, rhdeliques=rhdeliques)
 
 end subroutine rad_aer_get_mode_props
 

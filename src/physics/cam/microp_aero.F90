@@ -598,8 +598,10 @@ subroutine microp_aero_run ( &
 
    call physics_ptend_init(ptend_all, state%psetcols, 'microp_aero')
 
+   !REMOVECAM: this may not be necessary and aero_states should be an input when microp_aero is converted to CCPP for CAM-SIMA.
    ! create aerosol state objects via factory
-   call aerosol_instances_create_states(0, state1, pbuf, aero_states1, nstates1)
+   call aerosol_instances_create_states(list_idx=0, state=state1, pbuf=pbuf, aero_states=aero_states1, nstates=nstates1)
+   !REMOVECAM_END
 
    ! find the appropriate state object for the active aerosol model
    do iaermod = 1, nstates1

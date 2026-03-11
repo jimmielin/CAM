@@ -36,7 +36,7 @@ use radiative_aerosol_definitions, only: cs1, N_DIAG, n_rad_cnst, verbose, nl, &
 use aerosol_mmr_cam, only: get_cam_idx
 !REMOVECAM_END
 
-use radiative_aerosol, only: rad_aer_readnl, rad_aer_get_info
+use radiative_aerosol, only: rad_aer_readnl
 
 implicit none
 private
@@ -70,12 +70,6 @@ public :: &
    rad_cnst_get_info,           &! gas+aerosol info wrapper
    rad_cnst_get_gas,            &! return pointer to mmr for gasses
    rad_cnst_out                  ! output constituent diagnostics (mass per layer and column burden)
-
-
-! Generic interface for rad_cnst_get_info — gas-only wrapper
-interface rad_cnst_get_info
-   module procedure rad_cnst_get_info_wrap
-end interface
 
 character(len=cs1), public :: iceopticsfile, liqopticsfile
 character(len=32),  public :: icecldoptics,liqcldoptics
@@ -269,7 +263,6 @@ subroutine rad_cnst_init()
    ! Initialize gas history output for climate diagnostic quantities
    call rad_gas_diag_init(gaslist(0))
 
-
 end subroutine rad_cnst_init
 
 subroutine gas_list_populate(namelist, gaslist)
@@ -338,22 +331,16 @@ end subroutine gas_list_resolve_cnst_idx
 
 !================================================================================================
 
-subroutine rad_cnst_get_info_wrap(list_idx, gasnames, aernames, &
-                                  use_data_o3, ngas, naero, nmodes, nbins)
+subroutine rad_cnst_get_info(list_idx, gasnames, use_data_o3, ngas)
 
-   ! Wrapper that provides the original rad_cnst_get_info interface.
-   ! Gas arguments are handled locally; aerosol arguments are delegated
-   ! to rad_aer_get_info in radiative_aerosol.
+   ! Gas variant of rad_cnst_get_info;
+   ! aerosol information moved to radiative_aerosol::rad_aer_get_info.
 
    ! Arguments
    integer,                     intent(in)  :: list_idx
    character(len=64), optional, intent(out) :: gasnames(:)
-   character(len=64), optional, intent(out) :: aernames(:)
    logical,           optional, intent(out) :: use_data_o3
-   integer,           optional, intent(out) :: naero
    integer,           optional, intent(out) :: ngas
-   integer,           optional, intent(out) :: nmodes
-   integer,           optional, intent(out) :: nbins
 
    ! Local variables
    type(gaslist_t),  pointer :: g_list
@@ -361,10 +348,6 @@ subroutine rad_cnst_get_info_wrap(list_idx, gasnames, aernames, &
    character(len=1) :: source
    character(len=*), parameter :: subname = 'rad_cnst_get_info'
    !-----------------------------------------------------------------------------
-
-   ! Delegate aerosol arguments to radiative_aerosol
-   call rad_aer_get_info(list_idx, aernames=aernames, naero=naero, &
-                         nmodes=nmodes, nbins=nbins)
 
    ! Handle gas arguments locally
    g_list => gaslist(list_idx)
@@ -391,7 +374,7 @@ subroutine rad_cnst_get_info_wrap(list_idx, gasnames, aernames, &
       if (source == 'N') use_data_o3 = .true.
    endif
 
-end subroutine rad_cnst_get_info_wrap
+end subroutine rad_cnst_get_info
 
 !================================================================================================
 

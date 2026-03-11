@@ -2942,14 +2942,15 @@ contains
 
        call t_startf('aerosol_wet_processes')
        if (clim_modal_aero) then
-          !REMOVECAM - factory creates aerosol objects locally; under CAM-SIMA they will be passed as scheme inputs
+          ! Find the modal aerosol model properties object.
           do iaermod_lcl = 1, aerosol_instances_get_num_models()
-             aero_props => aerosol_instances_get_props(iaermod_lcl, 0)
+             aero_props => aerosol_instances_get_props(iaermod_lcl, list_idx=0)
              if (associated(aero_props)) then
                 if (aero_props%model_is('MAM')) exit
              end if
           end do
-          call aerosol_instances_create_states(0, state, pbuf, aero_states_lcl, nstates_lcl)
+          !REMOVECAM - factory creates aerosol objects locally; under CAM-SIMA they will be passed as scheme inputs
+          call aerosol_instances_create_states(list_idx=0, state=state, pbuf=pbuf, aero_states=aero_states_lcl, nstates=nstates_lcl)
           aero_state_obj => aero_states_lcl(iaermod_lcl)%obj
           !REMOVECAM_END
 

@@ -1,6 +1,6 @@
 module aerosol_instances_mod
-  use aerosol_properties_mod, only: aerosol_properties
-  use aerosol_state_mod, only: aerosol_state
+  use aerosol_properties_mod,        only: aerosol_properties
+  use aerosol_state_mod,             only: aerosol_state
   use radiative_aerosol_definitions, only: N_DIAG
 
   implicit none
@@ -20,11 +20,19 @@ module aerosol_instances_mod
   end type aero_props_entry_t
 
   type :: aero_state_entry_t
-     class(aerosol_state), pointer :: obj => null()
+     class(aerosol_state),      pointer :: obj => null()
   end type aero_state_entry_t
 
+  ! Module holds aerosol properties objects
+  ! See comment below on why aerosol state is not handled the same way for now.
   type(aero_props_entry_t), allocatable, target :: aero_props_all(:,:) ! (iaermod, 0:N_DIAG)
+
+  ! Number of aerosol models active at runtime.
+  ! Note: Multiple aerosol models can be active at once, e.g., using bulk for volcanic aerosol and modal for others.
+  ! When retrieving properties via aerosol_instances_get_props, or creating states from
+  ! aerosol_instances_create_states, ensure that the aerosol model matches what is needed (e.g., aero_props%model_is('MAM') == .true.)
   integer :: num_aero_models_ = 0
+
   logical :: modal_active_ = .false.
   logical :: carma_active_ = .false.
   logical :: bulk_active_  = .false.
@@ -152,11 +160,14 @@ contains
   end subroutine aerosol_instances_final
 
   !------------------------------------------------------------------------------
-  !> Creates aerosol state objects for all active aerosol models.
-  !! Unlike aerosol properties (pre-allocated as shared module data), state objects
-  !! are created per-call because they hold mutable per-chunk state/pbuf pointers.
-  !! Since aerosol_optics_cam_sw/lw runs inside an OMP chunk-parallel loop,
-  !! shared mutable state objects would have race conditions.
+  ! Create aerosol state objects for all active aerosol models.
+  !
+  ! Unlike aerosol properties (pre-allocated as shared module data), state objects
+  ! are created per-call because they hold mutable per-chunk state/pbuf pointers.
+  !
+  !REMOVECAM: When CAM is retired and chunking is removed, it will be possible to have
+  ! aerosol_instances_mod hold the aerosol states similar to how aero_props_all
+  ! is held now within this module.
   subroutine aerosol_instances_create_states(list_idx, state, pbuf, aero_states, nstates)
     use modal_aerosol_state_mod, only: modal_aerosol_state
     use carma_aerosol_state_mod, only: carma_aerosol_state
@@ -165,21 +176,21 @@ contains
     use physics_buffer, only: physics_buffer_desc
     use cam_abortutils, only: endrun
 
-    integer, intent(in) :: list_idx
-    type(physics_state), intent(in), target :: state
-    type(physics_buffer_desc), pointer :: pbuf(:)
-    type(aero_state_entry_t), allocatable, intent(out) :: aero_states(:)
-    integer, intent(out) :: nstates
+    integer,                   intent(in)               :: list_idx
+    type(physics_state),       intent(in),  target      :: state
+    type(physics_buffer_desc),              pointer     :: pbuf(:)
+    type(aero_state_entry_t),  intent(out), allocatable :: aero_states(:)    ! aerosol state objects
+    integer,                   intent(out)              :: nstates           ! number of aerosol states created
 
     integer :: iaermod, istat
-    character(len=*), parameter :: prefix = 'aerosol_instances_create_states: '
+    character(len=*), parameter :: subname = 'aerosol_instances_create_states: '
 
     nstates = num_aero_models_
     if (nstates < 1) return
 
     allocate(aero_states(nstates), stat=istat)
     if (istat /= 0) then
-       call endrun(prefix//'allocation error: aero_states')
+       call endrun(subname//'allocation error: aero_states')
     end if
 
     iaermod = 0
