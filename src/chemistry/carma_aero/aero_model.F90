@@ -20,7 +20,8 @@ module aero_model
   use mo_tracname,       only: solsym
   use infnan,            only: nan, assignment(=)
   use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_info_by_bin, rad_aer_get_info_by_bin_spec, &
-                               rad_aer_get_bin_props_by_idx, rad_cnst_get_bin_mmr_by_idx
+                               rad_aer_get_bin_props_by_idx
+  use aerosol_mmr_cam,   only: rad_cnst_get_bin_mmr_by_idx
   use mo_setsox,         only: setsox, has_sox
   use carma_aerosol_properties_mod, only: carma_aerosol_properties
 
