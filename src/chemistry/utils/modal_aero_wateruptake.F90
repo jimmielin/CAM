@@ -369,7 +369,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, aero_props, aero_state, &
       do l = 1, nspec
 
          ! accumulate the aerosol masses of each mode
-         call aero_state%get_ambient_mmr(l, m, raer)
+         call aero_state%get_ambient_mmr(species_ndx=l, bin_ndx=m, mmr=raer)
          maer(:ncol,:,m)= maer(:ncol,:,m) + raer(:ncol,:)
 
          ! get species interstitial mixing ratio ('a')

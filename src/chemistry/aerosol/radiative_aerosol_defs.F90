@@ -205,21 +205,22 @@ character(len=8), public, parameter :: bin_morph_names(num_bin_morphs) = &
 !===========================
 
 public :: parse_mode_defs, parse_bin_defs, parse_rad_specifier
-public :: list_init1, list_init2
+public :: list_populate, list_resolve_physprops
 public :: print_modes, print_bins
 
 !==============================================================================
 contains
 !==============================================================================
 
-subroutine list_init1(namelist, aerlist, ma_list, sa_list)
+subroutine list_populate(namelist, aerlist, ma_list, sa_list)
 
-   ! Initialize the bulk and modal aerosol lists with the
-   ! entities specified in the climate or diagnostic lists.
+   ! Populate aerosol list structures from parsed namelist specifiers.
+   ! IMPORTANT: Must run at readnl time (before phys_register), because
+   ! phys_register routines (e.g., modal_aero_data_reg) query
+   ! ma_list(0)%nmodes via rad_aer_get_info.
+   ! Do NOT merge with list_resolve_physprops.
+   !
    ! Gas initialization is handled in rad_constituents.
-
-   ! This first phase initialization just sets the information that
-   ! is available at the time the namelist is read.
 
    type(rad_cnst_namelist_t), intent(in) :: namelist ! parsed namelist input for climate or diagnostic lists
 
@@ -231,7 +232,7 @@ subroutine list_init1(namelist, aerlist, ma_list, sa_list)
    integer :: ii, m, naero, nmodes, nbins
    integer :: ba_idx, ma_idx, sa_idx
    integer :: istat
-   character(len=*), parameter :: routine = 'list_init1'
+   character(len=*), parameter :: routine = 'list_populate'
    !-----------------------------------------------------------------------------
 
    ! Determine the number of bulk aerosols and aerosol modes in the list
@@ -341,14 +342,18 @@ subroutine list_init1(namelist, aerlist, ma_list, sa_list)
       end if
    end do
 
-end subroutine list_init1
+end subroutine list_populate
 
 !===========================
 
-subroutine list_init2(aerlist, ma_list, sa_list)
+subroutine list_resolve_physprops(aerlist, ma_list, sa_list)
 
-   ! Final initialization phase: resolve physprop indices for bulk aerosols,
-   ! modes, and bins. Host-specific index resolution (get_cam_idx) is handled
+   ! Resolve physprop indices for bulk aerosols, modes, and bins.
+   ! IMPORTANT: Must run at init time (after physprop_init), because
+   ! physprop_get_id requires physprop files to have been read.
+   ! Do NOT merge with list_populate.
+   !
+   ! Host-specific index resolution (get_cam_idx) is handled
    ! separately by the host module (e.g. aerosol_mmr_cam).
 
    use phys_prop, only: physprop_get_id
@@ -359,7 +364,7 @@ subroutine list_init2(aerlist, ma_list, sa_list)
 
    ! Local variables
    integer :: i
-   character(len=*), parameter :: routine = 'list_init2'
+   character(len=*), parameter :: routine = 'list_resolve_physprops'
    !-----------------------------------------------------------------------------
 
    ! Loop over bulk aerosols
@@ -386,7 +391,7 @@ subroutine list_init2(aerlist, ma_list, sa_list)
 
    end do
 
-end subroutine list_init2
+end subroutine list_resolve_physprops
 
 !===========================
 

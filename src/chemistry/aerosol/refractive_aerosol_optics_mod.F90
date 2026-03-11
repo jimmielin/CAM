@@ -163,7 +163,7 @@ contains
     do ilev = 1, nlev
        dryvol(:ncol) = 0._r8
        do ispec = 1, nspec
-          call aero_state%get_ambient_mmr(ispec,ibin,specmmr)
+          call aero_state%get_ambient_mmr(species_ndx=ispec,bin_ndx=ibin,mmr=specmmr)
           call aero_props%get(ibin, ispec, density=specdens)
 
           do icol = 1, ncol

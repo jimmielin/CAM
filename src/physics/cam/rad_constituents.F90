@@ -222,7 +222,7 @@ subroutine rad_cnst_readnl(nlfile)
          end if
          gaslist(i)%list_id = suffix
 
-         call gas_list_init1(radcnst_namelist(i), gaslist(i))
+         call gas_list_populate(radcnst_namelist(i), gaslist(i))
 
          if (masterproc .and. verbose) then
             call print_gas_list(gaslist(i))
@@ -249,13 +249,11 @@ subroutine rad_cnst_init()
    allocate(zero_cols(pcols,pver))
    zero_cols = 0._r8
 
-   ! Start checking that specified radiative gas constituents are present
+   ! Resolve constituent indices for gas lists
    if (masterproc) write(iulog,*) nl//subname//': checking for radiative gas constituents'
-
-   ! Finish initializing the gas lists (resolve constituent indices).
    do i = 0, N_DIAG
       if (active_calls(i)) then
-         call gas_list_init2(gaslist(i))
+         call gas_list_resolve_cnst_idx(gaslist(i))
       end if
    end do
 
@@ -274,16 +272,18 @@ subroutine rad_cnst_init()
 
 end subroutine rad_cnst_init
 
-subroutine gas_list_init1(namelist, gaslist)
+subroutine gas_list_populate(namelist, gaslist)
 
-   ! Initialize gas list from parsed namelist data.
+   ! Populate gas list from parsed namelist data.
+   ! Must run at readnl time for consistency with aerosol list_populate.
+   ! Do NOT merge with gas_list_resolve_cnst_idx.
 
    type(rad_cnst_namelist_t), intent(in)    :: namelist
    type(gaslist_t),           intent(inout) :: gaslist
 
    ! Local variables
    integer :: ii, igas, istat
-   character(len=*), parameter :: routine = 'gas_list_init1'
+   character(len=*), parameter :: routine = 'gas_list_populate'
    !-----------------------------------------------------------------------------
 
    ! nradgas is set by the radiative transfer code
@@ -313,26 +313,28 @@ subroutine gas_list_init1(namelist, gaslist)
       gaslist%gas(igas)%camname = namelist%camname(ii)
    end do
 
-end subroutine gas_list_init1
+end subroutine gas_list_populate
 
 !================================================================================================
 
-subroutine gas_list_init2(gaslist)
+subroutine gas_list_resolve_cnst_idx(gaslist)
 
    ! Resolve constituent indices for gas list entries.
+   ! Must run at init time (after constituent registration).
+   ! Do NOT merge with gas_list_populate.
 
    type(gaslist_t), intent(inout) :: gaslist
 
    ! Local variables
    integer :: i
-   character(len=*), parameter :: routine = 'gas_list_init2'
+   character(len=*), parameter :: routine = 'gas_list_resolve_cnst_idx'
    !-----------------------------------------------------------------------------
 
    do i = 1, gaslist%ngas
       gaslist%gas(i)%idx = get_cam_idx(gaslist%gas(i)%source, gaslist%gas(i)%camname, routine)
    end do
 
-end subroutine gas_list_init2
+end subroutine gas_list_resolve_cnst_idx
 
 !================================================================================================
 

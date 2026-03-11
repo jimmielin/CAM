@@ -10,19 +10,6 @@ module aerosol_mmr_cam
 !------------------------------------------------------------------------------------------------
 
 use shr_kind_mod,   only: r8 => shr_kind_r8
-use ppgrid,         only: pcols, pver
-use physics_types,  only: physics_state
-use constituents,   only: cnst_get_ind
-use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
-use phys_prop,      only: physprop_get_id
-use cam_history,    only: addfld, fieldname_len, horiz_only, outfld
-use physconst,      only: rga
-use cam_abortutils, only: endrun
-use cam_logfile,    only: iulog
-
-use radiative_aerosol_definitions, only: N_DIAG, &
-   modes_t, bins_t, aerosol_t, aerlist_t, modelist_t, binlist_t, &
-   modes, bins, aerosollist, ma_list, sa_list
 
 implicit none
 private
@@ -39,8 +26,8 @@ real(r8), allocatable, target :: zero_cols(:,:)
 
 public :: aerosol_mmr_cam_init    ! allocate zero_cols
 public :: get_cam_idx
-public :: init_mode_comps, init_bin_comps
-public :: list_resolve_bulk_idx
+public :: resolve_mode_cam_idx, resolve_bin_cam_idx
+public :: resolve_bulk_cam_idx
 public :: rad_cnst_get_aer_mmr
 public :: rad_cnst_get_mam_mmr_idx
 public :: rad_cnst_get_mode_num
@@ -58,6 +45,7 @@ contains
 !==============================================================================
 
 subroutine aerosol_mmr_cam_init()
+   use ppgrid, only: pcols, pver
    ! Allocate zero_cols array (must be called after ppgrid is set up)
    if (.not. allocated(zero_cols)) then
       allocate(zero_cols(pcols,pver))
@@ -71,6 +59,10 @@ integer function get_cam_idx(source, name, routine)
 
    ! get index of name in internal CAM array; either the constituent array
    ! or the physics buffer
+
+   use physics_buffer, only: pbuf_get_index
+   use constituents,   only: cnst_get_ind
+   use cam_abortutils, only: endrun
 
    character(len=*), intent(in) :: source
    character(len=*), intent(in) :: name
@@ -110,10 +102,14 @@ end function get_cam_idx
 
 !===========================
 
-subroutine init_mode_comps(modes)
+subroutine resolve_mode_cam_idx(modes)
 
    ! Initialize the mode definitions by looking up the relevent indices in the
    ! constituent and pbuf arrays, and getting the physprop IDs
+
+   use phys_prop,      only: physprop_get_id
+   use cam_abortutils, only: endrun
+   use radiative_aerosol_definitions, only: modes_t
 
    ! Arguments
    type(modes_t), intent(inout) :: modes
@@ -121,7 +117,7 @@ subroutine init_mode_comps(modes)
    ! Local variables
    integer :: m, ispec, nspec
 
-   character(len=*), parameter :: routine = 'init_mode_comps'
+   character(len=*), parameter :: routine = 'resolve_mode_cam_idx'
    !-----------------------------------------------------------------------------
 
    do m = 1, modes%nmodes
@@ -155,14 +151,18 @@ subroutine init_mode_comps(modes)
 
    end do
 
-end subroutine init_mode_comps
+end subroutine resolve_mode_cam_idx
 
 !===========================
 
-subroutine init_bin_comps(bins)
+subroutine resolve_bin_cam_idx(bins)
 
-   ! Initialize the mode definitions by looking up the relevent indices in the
+   ! Initialize the bin definitions by looking up the relevent indices in the
    ! constituent and pbuf arrays, and getting the physprop IDs
+
+   use phys_prop,      only: physprop_get_id
+   use cam_abortutils, only: endrun
+   use radiative_aerosol_definitions, only: bins_t
 
    ! Arguments
    type(bins_t), intent(inout) :: bins
@@ -170,7 +170,7 @@ subroutine init_bin_comps(bins)
    ! Local variables
    integer :: m, ispec, nspec
 
-   character(len=*), parameter :: routine = 'init_bin_comps'
+   character(len=*), parameter :: routine = 'resolve_bin_cam_idx'
    !-----------------------------------------------------------------------------
 
    do m = 1, bins%nbins
@@ -210,26 +210,29 @@ subroutine init_bin_comps(bins)
 
    end do
 
-end subroutine init_bin_comps
+end subroutine resolve_bin_cam_idx
 
 !===========================
 
-subroutine list_resolve_bulk_idx(aerlist)
+subroutine resolve_bulk_cam_idx(aerlist)
 
    ! Resolve host-specific indices for bulk aerosols.
-   ! Must be called before list_init2 (which resolves physprop IDs).
+   ! Must be called before list_resolve_physprops (which resolves physprop IDs).
+
+   use cam_abortutils, only: endrun
+   use radiative_aerosol_definitions, only: aerlist_t
 
    type(aerlist_t), intent(inout) :: aerlist
 
    integer :: i
-   character(len=*), parameter :: routine = 'list_resolve_bulk_idx'
+   character(len=*), parameter :: routine = 'resolve_bulk_cam_idx'
    !-----------------------------------------------------------------------------
 
    do i = 1, aerlist%numaerosols
       aerlist%aer(i)%idx = get_cam_idx(aerlist%aer(i)%source, aerlist%aer(i)%camname, routine)
    end do
 
-end subroutine list_resolve_bulk_idx
+end subroutine resolve_bulk_cam_idx
 
 !================================================================================================
 
@@ -237,6 +240,12 @@ subroutine rad_cnst_get_aer_mmr_by_idx(list_idx, aer_idx, state, pbuf, mmr)
 
    ! Return pointer to mass mixing ratio for the aerosol from the specified
    ! climate or diagnostic list.
+
+   use cam_logfile,    only: iulog
+   use cam_abortutils, only: endrun
+   use physics_types,  only: physics_state
+   use physics_buffer, only: physics_buffer_desc, pbuf_get_field
+   use radiative_aerosol_definitions, only: N_DIAG, aerlist_t, aerosollist
 
    ! Arguments
    integer,                     intent(in) :: list_idx    ! index of the climate or a diagnostic list
@@ -288,6 +297,12 @@ subroutine rad_cnst_get_mam_mmr_by_idx(list_idx, mode_idx, spec_idx, phase, stat
 
    ! Return pointer to mass mixing ratio for the modal aerosol specie from the specified
    ! climate or diagnostic list.
+
+   use cam_logfile,    only: iulog
+   use cam_abortutils, only: endrun
+   use physics_types,  only: physics_state
+   use physics_buffer, only: physics_buffer_desc, pbuf_get_field
+   use radiative_aerosol_definitions, only: N_DIAG, modelist_t, ma_list, modes
 
    ! Arguments
    integer,                     intent(in) :: list_idx    ! index of the climate or a diagnostic list
@@ -360,6 +375,12 @@ subroutine rad_cnst_get_bin_mmr_by_idx(list_idx, bin_idx, spec_idx, phase, state
 
    ! Return pointer to mass mixing ratio for the modal aerosol specie from the specified
    ! climate or diagnostic list.
+
+   use cam_logfile,    only: iulog
+   use cam_abortutils, only: endrun
+   use physics_types,  only: physics_state
+   use physics_buffer, only: physics_buffer_desc, pbuf_get_field
+   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sa_list, bins
 
    ! Arguments
    integer,                     intent(in) :: list_idx    ! index of the climate or a diagnostic list
@@ -438,6 +459,10 @@ subroutine rad_cnst_get_mam_mmr_idx(mode_idx, spec_idx, idx)
    ! and are operating over the entire constituent array.  The interstitial phase
    ! is assumed since that's what is contained in the constituent array.
 
+   use cam_logfile,    only: iulog
+   use cam_abortutils, only: endrun
+   use radiative_aerosol_definitions, only: modelist_t, modes, ma_list
+
    ! Arguments
    integer, intent(in)  :: mode_idx    ! mode index
    integer, intent(in)  :: spec_idx    ! index of specie in the mode
@@ -484,6 +509,10 @@ subroutine rad_cnst_get_carma_mmr_idx(bin_idx, spec_idx, idx)
    ! and are operating over the entire constituent array.  The interstitial phase
    ! is assumed since that's what is contained in the constituent array.
 
+   use cam_logfile,    only: iulog
+   use cam_abortutils, only: endrun
+   use radiative_aerosol_definitions, only: binlist_t, bins, sa_list
+
    ! Arguments
    integer, intent(in)  :: bin_idx     ! bin index
    integer, intent(in)  :: spec_idx    ! index of specie in the bin
@@ -524,6 +553,12 @@ subroutine rad_cnst_get_bin_mmr(list_idx, bin_idx, phase, state, pbuf, mmr)
 
    ! Return pointer to mass mixing ratio for the aerosol bin from the specified
    ! climate or diagnostic list.
+
+   use cam_logfile,    only: iulog
+   use cam_abortutils, only: endrun
+   use physics_types,  only: physics_state
+   use physics_buffer, only: physics_buffer_desc, pbuf_get_field
+   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sa_list, bins
 
    ! Arguments
    integer,                     intent(in) :: list_idx    ! index of the climate or a diagnostic list
@@ -590,6 +625,12 @@ subroutine rad_cnst_get_mode_num(list_idx, mode_idx, phase, state, pbuf, num)
    ! Return pointer to number mixing ratio for the aerosol mode from the specified
    ! climate or diagnostic list.
 
+   use cam_logfile,    only: iulog
+   use cam_abortutils, only: endrun
+   use physics_types,  only: physics_state
+   use physics_buffer, only: physics_buffer_desc, pbuf_get_field
+   use radiative_aerosol_definitions, only: N_DIAG, modelist_t, ma_list, modes
+
    ! Arguments
    integer,                     intent(in) :: list_idx    ! index of the climate or a diagnostic list
    integer,                     intent(in) :: mode_idx    ! mode index
@@ -654,6 +695,12 @@ subroutine rad_cnst_get_bin_num(list_idx, bin_idx, phase, state, pbuf, num)
 
    ! Return pointer to number mixing ratio for the aerosol bin from the specified
    ! climate or diagnostic list.
+
+   use cam_logfile,    only: iulog
+   use cam_abortutils, only: endrun
+   use physics_types,  only: physics_state
+   use physics_buffer, only: physics_buffer_desc, pbuf_get_field
+   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sa_list, bins
 
    ! Arguments
    integer,                     intent(in) :: list_idx    ! index of the climate or a diagnostic list
@@ -725,6 +772,10 @@ subroutine rad_cnst_get_mode_num_idx(mode_idx, cnst_idx)
    ! and are operating over the entire constituent array.  The interstitial phase
    ! is assumed since that's what is contained in the constituent array.
 
+   use cam_logfile,    only: iulog
+   use cam_abortutils, only: endrun
+   use radiative_aerosol_definitions, only: modelist_t, modes, ma_list
+
    ! Arguments
    integer,  intent(in)  :: mode_idx    ! mode index
    integer,  intent(out) :: cnst_idx    ! constituent index
@@ -772,6 +823,10 @@ subroutine rad_cnst_get_bin_num_idx(bin_idx, cnst_idx)
    ! and are operating over the entire constituent array.  The interstitial phase
    ! is assumed since that's what is contained in the constituent array.
 
+   use cam_logfile,    only: iulog
+   use cam_abortutils, only: endrun
+   use radiative_aerosol_definitions, only: binlist_t, bins, sa_list
+
    ! Arguments
    integer,  intent(in)  :: bin_idx    ! bin index
    integer,  intent(out) :: cnst_idx    ! constituent index
@@ -812,6 +867,11 @@ end subroutine rad_cnst_get_bin_num_idx
 subroutine rad_aer_diag_init(alist)
 
 ! Add diagnostic fields to the master fieldlist.
+
+   use cam_history,    only: addfld, fieldname_len, horiz_only
+   use cam_logfile,    only: iulog
+   use cam_abortutils, only: endrun
+   use radiative_aerosol_definitions, only: aerlist_t
 
    type(aerlist_t), intent(inout) :: alist
 
@@ -865,6 +925,15 @@ subroutine rad_aer_diag_out(list_idx, state, pbuf)
 
    ! Output the mass per layer, and total column burdens for aerosol
    ! constituents in either the climate or diagnostic lists.
+
+   use ppgrid,         only: pcols, pver
+   use physics_types,  only: physics_state
+   use physics_buffer, only: physics_buffer_desc, pbuf_get_field
+   use physconst,      only: rga
+   use cam_history,    only: outfld
+   use cam_logfile,    only: iulog
+   use cam_abortutils, only: endrun
+   use radiative_aerosol_definitions, only: N_DIAG, aerlist_t, aerosollist
 
    ! Arguments
    integer,                     intent(in) :: list_idx

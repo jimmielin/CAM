@@ -125,7 +125,7 @@ contains
 
     do ispec = 1,nspec
 
-       call aero_state%get_ambient_mmr(ispec,ibin,specmmr)
+       call aero_state%get_ambient_mmr(species_ndx=ispec,bin_ndx=ibin,mmr=specmmr)
 
        call aero_props%get(ibin, ispec, density=specdens, &
                            spectype=spectype, specmorph=specmorph)

@@ -347,7 +347,7 @@ contains
 
     do l = 1, aero_props%nspecies(m)
 
-       call self%get_ambient_mmr(l,m, raer)
+       call self%get_ambient_mmr(species_ndx=l, bin_ndx=m, mmr=raer)
        call self%get_cldbrne_mmr(l,m, qqcw)
        call aero_props%get(m,l, density=specdens, hygro=spechygro, spectype=spectype)
        if (present(pom_hygro)) then
@@ -516,7 +516,7 @@ contains
        if (cldbrne) then
           call self%get_cldbrne_mmr(ispc, bin_ndx, aer_bin)
        else
-          call self%get_ambient_mmr(ispc, bin_ndx, aer_bin)
+          call self%get_ambient_mmr(species_ndx=ispc, bin_ndx=bin_ndx, mmr=aer_bin)
        end if
        call aero_props%species_type(bin_ndx, ispc, spectype=spectype)
 
@@ -667,22 +667,22 @@ contains
 
     if (sulf_ndx>0) then
        call aero_props%get(bin_ndx, sulf_ndx, density=specdens_so4)
-       call self%get_ambient_mmr(sulf_ndx, bin_ndx, sulf_mmr)
+       call self%get_ambient_mmr(species_ndx=sulf_ndx, bin_ndx=bin_ndx, mmr=sulf_mmr)
        vol_shell(:ncol,:) = vol_shell(:ncol,:) + sulf_mmr(:ncol,:)/specdens_so4
     end if
     if (pom_ndx>0) then
        call aero_props%get(bin_ndx, pom_ndx, density=specdens_pom)
-       call self%get_ambient_mmr(pom_ndx, bin_ndx, pom_mmr)
+       call self%get_ambient_mmr(species_ndx=pom_ndx, bin_ndx=bin_ndx, mmr=pom_mmr)
        vol_shell(:ncol,:) = vol_shell(:ncol,:) + pom_mmr(:ncol,:)*aero_props%pom_equivso4_factor()/specdens_pom
     end if
     if (soa_ndx>0) then
        call aero_props%get(bin_ndx, soa_ndx, density=specdens_soa)
-       call self%get_ambient_mmr(soa_ndx, bin_ndx, soa_mmr)
+       call self%get_ambient_mmr(species_ndx=soa_ndx, bin_ndx=bin_ndx, mmr=soa_mmr)
        vol_shell(:ncol,:) = vol_shell(:ncol,:) + soa_mmr(:ncol,:)*aero_props%soa_equivso4_factor()/specdens_soa
     end if
 
     call aero_props%get(bin_ndx, species_ndx, density=specdens)
-    call self%get_ambient_mmr(species_ndx, bin_ndx, aer_mmr)
+    call self%get_ambient_mmr(species_ndx=species_ndx, bin_ndx=bin_ndx, mmr=aer_mmr)
     vol_core(:ncol,:) = aer_mmr(:ncol,:)/specdens
 
     alnsg = aero_props%alogsig(bin_ndx)
@@ -736,7 +736,7 @@ contains
     call aero_props%species_type(bin_ndx, species_ndx, spectype=species_type)
 
     call aero_props%get(bin_ndx, species_ndx, density=specdens) ! kg/m3
-    call self%get_ambient_mmr(species_ndx, bin_ndx, aer_mmr) ! kg/kg
+    call self%get_ambient_mmr(species_ndx=species_ndx, bin_ndx=bin_ndx, mmr=aer_mmr) ! kg/kg
     call self%get_amb_species_numdens(bin_ndx, ncol, nlev, species_type, aero_props, rho, aer_numdens) ! #/cm3
 
     aer_massdens(:ncol,:) = aer_mmr(:ncol,:)*rho(:ncol,:)*wght(:ncol,:) ! kg/m3
@@ -791,11 +791,11 @@ contains
           call aero_props%species_type(bin_ndx, ispc, spectype)
 
           if (trim(spectype)=='black-c' .or. trim(spectype)=='p-organic' .or. trim(spectype)=='s-organic') then
-             call self%get_ambient_mmr(ispc, bin_ndx, aer_mmr)
+             call self%get_ambient_mmr(species_ndx=ispc, bin_ndx=bin_ndx, mmr=aer_mmr)
              tot2_mmr(:ncol,:) = tot2_mmr(:ncol,:) + aer_mmr(:ncol,:)
           end if
           if (trim(spectype)=='sulfate') then
-             call self%get_ambient_mmr(ispc, bin_ndx, aer_mmr)
+             call self%get_ambient_mmr(species_ndx=ispc, bin_ndx=bin_ndx, mmr=aer_mmr)
              tot1_mmr(:ncol,:) = tot1_mmr(:ncol,:) + aer_mmr(:ncol,:)
           end if
        end do
@@ -847,7 +847,7 @@ contains
 
     do ispec = 1, aero_props%nspecies(ibin)
 
-       call self%get_ambient_mmr(ispec,ibin,specmmr)
+       call self%get_ambient_mmr(species_ndx=ispec, bin_ndx=ibin, mmr=specmmr)
        call aero_props%get(ibin, ispec, density=specdens,  refindex_sw=specrefindex)
 
        do icol = 1, ncol
@@ -882,7 +882,7 @@ contains
 
     do ispec = 1, aero_props%nspecies(ibin)
 
-       call self%get_ambient_mmr(ispec,ibin,specmmr)
+       call self%get_ambient_mmr(species_ndx=ispec, bin_ndx=ibin, mmr=specmmr)
        call aero_props%get(ibin, ispec, density=specdens,  refindex_lw=specrefindex)
 
        do icol = 1, ncol
@@ -937,7 +937,7 @@ contains
     do ispc = 1, aero_props%nspecies(bin_ndx)
 
        call aero_props%get(bin_ndx, ispc, hygro=spechygro)
-       call self%get_ambient_mmr(ispc, bin_ndx, aer_mmr)
+       call self%get_ambient_mmr(species_ndx=ispc, bin_ndx=bin_ndx, mmr=aer_mmr)
 
        totmmr(:ncol,:) = totmmr(:ncol,:) + aer_mmr(:ncol,:)
        solmmr(:ncol,:) = solmmr(:ncol,:) + aer_mmr(:ncol,:)*spechygro

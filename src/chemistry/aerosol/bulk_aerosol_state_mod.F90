@@ -125,7 +125,7 @@ contains
     real(r8) :: mmr_tot                 ! mass mixing ratios totaled for all species
     real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
 
-    call self%get_ambient_mmr(1, bin_ndx, mmr)
+    call self%get_ambient_mmr(species_ndx=1, bin_ndx=bin_ndx, mmr=mmr)
 
     mmr_tot = mmr(col_ndx, lyr_ndx)
 

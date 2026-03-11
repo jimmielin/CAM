@@ -509,7 +509,7 @@ subroutine nucleate_ice_cam_calc( &
            maerosol(pcols,pver,naer_all))
 
       do m = 1, naer_all
-         call aero_state%get_ambient_mmr(1, m, aer_mmr)
+         call aero_state%get_ambient_mmr(species_ndx=1, bin_ndx=m, mmr=aer_mmr)
          maerosol(:ncol,:,m) = aer_mmr(:ncol,:)*rho(:ncol,:)
 
          if (m .eq. idxsul) then
@@ -713,7 +713,7 @@ subroutine nucleate_ice_cam_calc( &
 
                                  idxtmp = aer_cnst_idx(m,l)
 
-                                 call aero_state%get_ambient_mmr(l,m,amb_mmr)
+                                 call aero_state%get_ambient_mmr(species_ndx=l, bin_ndx=m, mmr=amb_mmr)
                                  call aero_state%get_cldbrne_mmr(l,m,cld_mmr)
 
                                  ! determine change in aerosol mass

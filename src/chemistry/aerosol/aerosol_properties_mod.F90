@@ -42,7 +42,7 @@ module aerosol_properties_mod
    contains
      procedure :: list_idx => get_list_idx
      procedure :: initialize => aero_props_init
-     procedure :: nbins => nbins_0list
+     procedure :: nbins => get_nbins
      procedure :: ncnst_tot
      procedure,private :: nspecies_per_bin
      procedure,private :: nspecies_all_bins
@@ -53,12 +53,12 @@ module aerosol_properties_mod
      procedure :: indexer
      procedure :: maxsat
      procedure(aero_amcube), deferred :: amcube
-     procedure :: alogsig => alogsig_0list
-     procedure :: dgnum => dgnum_0list
-     procedure :: dgnumhi => dgnumhi_0list
-     procedure :: dgnumlo => dgnumlo_0list
-     procedure :: rhcrystal => rhcrystal_0list
-     procedure :: rhdeliques => rhdeliques_0list
+     procedure :: alogsig => get_alogsig
+     procedure :: dgnum => get_dgnum
+     procedure :: dgnumhi => get_dgnumhi
+     procedure :: dgnumlo => get_dgnumlo
+     procedure :: rhcrystal => get_rhcrystal
+     procedure :: rhdeliques => get_rhdeliques
      procedure(aero_number_transported), deferred :: number_transported
      procedure(aero_props_get), deferred :: get
      procedure(aero_actfracs), deferred :: actfracs
@@ -677,12 +677,12 @@ contains
   !------------------------------------------------------------------------------
   ! returns the total number of bins
   !------------------------------------------------------------------------------
-  pure function nbins_0list(self) result(nbins)
+  pure function get_nbins(self) result(nbins)
     class(aerosol_properties), intent(in) :: self
     integer :: nbins
 
     nbins = self%nbins_
-  end function nbins_0list
+  end function get_nbins
 
   !------------------------------------------------------------------------------
   ! returns number of constituents (or elements) totaled across all bins
@@ -696,62 +696,62 @@ contains
   !------------------------------------------------------------------------------
   ! returns the natural log of geometric standard deviation of the number distribution for aerosol bin
   !------------------------------------------------------------------------------
-  pure real(r8) function alogsig_0list(self, bin_ndx)
+  pure real(r8) function get_alogsig(self, bin_ndx)
     class(aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx           ! bin number
 
-    alogsig_0list = self%alogsig_(bin_ndx)
-  end function alogsig_0list
+    get_alogsig = self%alogsig_(bin_ndx)
+  end function get_alogsig
 
   !------------------------------------------------------------------------------
   ! returns the geometric mean diameter for aerosol bin
   !------------------------------------------------------------------------------
-  pure real(r8) function dgnum_0list(self, bin_ndx)
+  pure real(r8) function get_dgnum(self, bin_ndx)
     class(aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx
 
-    dgnum_0list = self%dgnum_(bin_ndx)
-  end function dgnum_0list
+    get_dgnum = self%dgnum_(bin_ndx)
+  end function get_dgnum
 
   !------------------------------------------------------------------------------
   ! returns the upper bound diameter for aerosol bin
   !------------------------------------------------------------------------------
-  pure real(r8) function dgnumhi_0list(self, bin_ndx)
+  pure real(r8) function get_dgnumhi(self, bin_ndx)
     class(aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx
 
-    dgnumhi_0list = self%dgnumhi_(bin_ndx)
-  end function dgnumhi_0list
+    get_dgnumhi = self%dgnumhi_(bin_ndx)
+  end function get_dgnumhi
 
   !------------------------------------------------------------------------------
   ! returns the lower bound diameter for aerosol bin
   !------------------------------------------------------------------------------
-  pure real(r8) function dgnumlo_0list(self, bin_ndx)
+  pure real(r8) function get_dgnumlo(self, bin_ndx)
     class(aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx
 
-    dgnumlo_0list = self%dgnumlo_(bin_ndx)
-  end function dgnumlo_0list
+    get_dgnumlo = self%dgnumlo_(bin_ndx)
+  end function get_dgnumlo
 
   !------------------------------------------------------------------------------
   ! returns the crystallization RH for aerosol bin
   !------------------------------------------------------------------------------
-  pure real(r8) function rhcrystal_0list(self, bin_ndx)
+  pure real(r8) function get_rhcrystal(self, bin_ndx)
     class(aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx
 
-    rhcrystal_0list = self%rhcrystal_(bin_ndx)
-  end function rhcrystal_0list
+    get_rhcrystal = self%rhcrystal_(bin_ndx)
+  end function get_rhcrystal
 
   !------------------------------------------------------------------------------
   ! returns the deliquescence RH for aerosol bin
   !------------------------------------------------------------------------------
-  pure real(r8) function rhdeliques_0list(self, bin_ndx)
+  pure real(r8) function get_rhdeliques(self, bin_ndx)
     class(aerosol_properties), intent(in) :: self
     integer, intent(in) :: bin_ndx
 
-    rhdeliques_0list = self%rhdeliques_(bin_ndx)
-  end function rhdeliques_0list
+    get_rhdeliques = self%rhdeliques_(bin_ndx)
+  end function get_rhdeliques
 
   !------------------------------------------------------------------------------
   ! returns maximum supersaturation

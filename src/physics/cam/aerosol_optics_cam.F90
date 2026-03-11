@@ -926,7 +926,7 @@ contains
          do ispec = 1, aeroprops%nspecies(ibin)
             call aeroprops%get(ibin, ispec, density=specdens, &
                  spectype=spectype, refindex_sw=specrefindex, hygro=hygro_aer)
-            call aerostate%get_ambient_mmr(ispec, ibin, specmmr)
+            call aerostate%get_ambient_mmr(species_ndx=ispec, bin_ndx=ibin, mmr=specmmr)
 
             burden(icol) = burden(icol) + specmmr(icol,ilev)*mass(icol,ilev)
 

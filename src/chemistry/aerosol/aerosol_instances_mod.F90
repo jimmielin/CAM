@@ -2,7 +2,6 @@ module aerosol_instances_mod
   use aerosol_properties_mod, only: aerosol_properties
   use aerosol_state_mod, only: aerosol_state
   use radiative_aerosol_definitions, only: N_DIAG
-  use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_call_list
 
   implicit none
   private
@@ -34,6 +33,7 @@ contains
 
   !------------------------------------------------------------------------------
   subroutine aerosol_instances_init()
+    use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_call_list
     use modal_aerosol_properties_mod, only: modal_aerosol_properties
     use carma_aerosol_properties_mod, only: carma_aerosol_properties
     use bulk_aerosol_properties_mod,  only: bulk_aerosol_properties

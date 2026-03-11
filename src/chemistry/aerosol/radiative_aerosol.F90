@@ -24,7 +24,7 @@ use radiative_aerosol_definitions, only: &
    aerosol_t, aerlist_t, modelist_t, binlist_t, &
    modes, bins, aerosollist, ma_list, sa_list, &
    parse_mode_defs, parse_bin_defs, &
-   list_init1, list_init2, &
+   list_populate, list_resolve_physprops, &
    print_modes, print_bins
 
 implicit none
@@ -1228,10 +1228,10 @@ subroutine rad_aer_readnl(mode_defs, bin_defs)
       deallocate(ctype)
    end do
 
-   ! Initialize aerosol lists (phase 1: split combined specifiers)
+   ! Initialize aerosol lists (populate from namelist specifiers)
    do i = 0, N_DIAG
       if (active_calls(i)) then
-         call list_init1(radcnst_namelist(i), aerosollist(i), ma_list(i), sa_list(i))
+         call list_populate(radcnst_namelist(i), aerosollist(i), ma_list(i), sa_list(i))
 
          if (masterproc .and. verbose) then
             call print_aerosol_lists(aerosollist(i), ma_list(i), sa_list(i))
@@ -1256,7 +1256,7 @@ subroutine rad_aer_init()
 
    !REMOVECAM: aerosol_mmr_cam handles CAM-specific index resolution
    use aerosol_mmr_cam, only: aerosol_mmr_cam_init, &
-      init_mode_comps, init_bin_comps, list_resolve_bulk_idx, &
+      resolve_mode_cam_idx, resolve_bin_cam_idx, resolve_bulk_cam_idx, &
       rad_aer_diag_init
    !REMOVECAM_END
 
@@ -1271,18 +1271,18 @@ subroutine rad_aer_init()
    ! Read physical properties from data files
    call physprop_init()
 
-   !REMOVECAM: resolve host-specific indices
-   call init_mode_comps(modes)
-   call init_bin_comps(bins)
+   !REMOVECAM: resolve host-specific indices (CAM uses pbuf and state)
+   call resolve_mode_cam_idx(modes)
+   call resolve_bin_cam_idx(bins)
    !REMOVECAM_END
 
-   ! Finish initializing the aerosol lists
+   ! Resolve physprop indices for aerosol lists
    do i = 0, N_DIAG
       if (active_calls(i)) then
-         !REMOVECAM
-         call list_resolve_bulk_idx(aerosollist(i))
+         !REMOVECAM: resolve host-specific indices (CAM uses pbuf and state)
+         call resolve_bulk_cam_idx(aerosollist(i))
          !REMOVECAM_END
-         call list_init2(aerosollist(i), ma_list(i), sa_list(i))
+         call list_resolve_physprops(aerosollist(i), ma_list(i), sa_list(i))
       end if
    end do
 

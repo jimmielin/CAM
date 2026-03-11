@@ -651,10 +651,10 @@ subroutine microp_aero_run ( &
       call aero_state1_obj%get_ambient_num(mode_coarse_dst_idx, num_coarse)
 
       ! mode specie mass m.r.
-      call aero_state1_obj%get_ambient_mmr(coarse_dust_idx, mode_coarse_dst_idx, coarse_dust)
-      call aero_state1_obj%get_ambient_mmr(coarse_nacl_idx, mode_coarse_slt_idx, coarse_nacl)
+      call aero_state1_obj%get_ambient_mmr(species_ndx=coarse_dust_idx, bin_ndx=mode_coarse_dst_idx, mmr=coarse_dust)
+      call aero_state1_obj%get_ambient_mmr(species_ndx=coarse_nacl_idx, bin_ndx=mode_coarse_slt_idx, mmr=coarse_nacl)
       if (mode_coarse_idx>0) then
-         call aero_state1_obj%get_ambient_mmr(coarse_so4_idx, mode_coarse_idx, coarse_so4)
+         call aero_state1_obj%get_ambient_mmr(species_ndx=coarse_so4_idx, bin_ndx=mode_coarse_idx, mmr=coarse_so4)
       endif
 
    else
@@ -664,7 +664,7 @@ subroutine microp_aero_run ( &
          maerosol(pcols,pver,naer_all))
 
       do m = 1, naer_all
-         call aero_state1_obj%get_ambient_mmr(1, m, aer_mmr)
+         call aero_state1_obj%get_ambient_mmr(species_ndx=1, bin_ndx=m, mmr=aer_mmr)
          maerosol(:ncol,:,m) = aer_mmr(:ncol,:)*rho(:ncol,:)
 
          if (m .eq. idxsul) then

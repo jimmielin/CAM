@@ -204,7 +204,7 @@ contains
        call self%get_cldbrne_num(ibin, qqcw(indx)%fld)
        do ispc = 1, aero_props%nspecies(ibin)
           indx = aero_props%indexer(ibin, ispc)
-          call self%get_ambient_mmr(ispc,ibin, raer(indx)%fld)
+          call self%get_ambient_mmr(species_ndx=ispc, bin_ndx=ibin, mmr=raer(indx)%fld)
           call self%get_cldbrne_mmr(ispc,ibin, qqcw(indx)%fld)
        end do
     end do
@@ -453,6 +453,7 @@ contains
   ! returns aerosol wet diameter and aerosol water concentration for a given
   ! radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
+  !REMOVECAM - under CAM-SIMA, water uptake computed by CCPP scheme; results passed via constituent interface
   subroutine water_uptake(self, aero_props, bin_idx, ncol, nlev, dgnumwet, qaerwat)
     use modal_aero_wateruptake, only: modal_aero_wateruptake_dr
     use modal_aero_calcsize,    only: modal_aero_calcsize_diag
@@ -546,7 +547,7 @@ contains
     vol(:,:) = 0._r8
 
     do ispec = 1, aero_props%nspecies(bin_idx)
-       call self%get_ambient_mmr(ispec, bin_idx, mmr)
+       call self%get_ambient_mmr(species_ndx=ispec, bin_ndx=bin_idx, mmr=mmr)
        call aero_props%get(bin_idx, ispec, density=specdens)
        vol(:ncol,:) = vol(:ncol,:) + mmr(:ncol,:)/specdens
     end do
@@ -606,6 +607,7 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol wet diameter
   !------------------------------------------------------------------------------
+  !REMOVECAM - under CAM-SIMA, wet diameter provided by CCPP scheme output
   function wet_diameter(self, bin_idx, ncol, nlev) result(diam)
     class(modal_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_idx   ! bin number
@@ -625,6 +627,7 @@ contains
   !------------------------------------------------------------------------------
   ! prescribed aerosol activation fraction for convective cloud
   !------------------------------------------------------------------------------
+  !REMOVECAM - direct state%q access and modal_aero_data dependency
   function convcld_actfrac(self, ibin, ispc, ncol, nlev) result(frac)
 
     use modal_aero_data

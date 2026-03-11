@@ -1353,7 +1353,7 @@ subroutine modal_aero_calcsize_diag(state, pbuf, aero_props, aero_state, dgnum_m
       nspec = aero_props%nspecies(n)
       do l1 = 1, nspec
 
-         call aero_state%get_ambient_mmr(l1, n, specmmr)
+         call aero_state%get_ambient_mmr(species_ndx=l1, bin_ndx=n, mmr=specmmr)
          call aero_props%get(n, l1, density=specdens)
 
          ! need qmass*dummwdens = (kg/kg-air) * [1/(kg/m3)] = m3/kg-air
@@ -1512,7 +1512,7 @@ subroutine modal_aero_calcdry(state, pbuf, aero_props, aero_state, dgnumdry_m, h
       do l = 1, nspec
 
          ! get species interstitial mixing ratio ('a')
-         call aero_state%get_ambient_mmr(l, m, raer)
+         call aero_state%get_ambient_mmr(species_ndx=l, bin_ndx=m, mmr=raer)
          call aero_props%get(m, l, density=specdens, &
                                      hygro=spechygro, spectype=spectype)
 
