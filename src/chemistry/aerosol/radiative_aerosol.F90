@@ -48,7 +48,7 @@ contains
 !==============================================================================
 
 function rad_aer_num_name(list_idx, spc_name_in, num_name_out, mode_out, spec_out ) result(found)
-   use radiative_aerosol_definitions, only: modelist_t, ma_list, modes
+   use radiative_aerosol_definitions, only: modelist_t, modal_aerosol_list, modes
 
   ! for a given species name spc_name_in return (optionals):
   !   num_name_out -- corresponding number density species name
@@ -72,7 +72,7 @@ function rad_aer_num_name(list_idx, spc_name_in, num_name_out, mode_out, spec_ou
 
   found = .false.
 
-  m_list => ma_list(list_idx)
+  m_list => modal_aerosol_list(list_idx)
   nmodes = m_list%nmodes
 
   do n = 1,nmodes
@@ -102,7 +102,7 @@ subroutine rad_aer_get_info(list_idx, aernames, naero, nmodes, nbins)
    use cam_abortutils, only: endrun
    use cam_logfile,    only: iulog
    use radiative_aerosol_definitions, only: aerlist_t, modelist_t, binlist_t, &
-      aerosollist, ma_list, sa_list
+      bulk_aerosol_list, modal_aerosol_list, sectional_aerosol_list
 
    ! Return info about aerosol lists (gas info handled in rad_constituents)
 
@@ -124,9 +124,9 @@ subroutine rad_aer_get_info(list_idx, aernames, naero, nmodes, nbins)
    character(len=*), parameter :: subname = 'rad_aer_get_info'
    !-----------------------------------------------------------------------------
 
-   a_list => aerosollist(list_idx)
-   m_list => ma_list(list_idx)
-   s_list => sa_list(list_idx)
+   a_list => bulk_aerosol_list(list_idx)
+   m_list => modal_aerosol_list(list_idx)
+   s_list => sectional_aerosol_list(list_idx)
 
    ! number of bulk aerosols in list
    if (present(naero)) then
@@ -167,7 +167,7 @@ subroutine rad_aer_get_info_by_mode(list_idx, m_idx, &
    mode_type, num_name, num_name_cw, nspec)
    use cam_abortutils, only: endrun
    use cam_logfile,    only: iulog
-   use radiative_aerosol_definitions, only: modelist_t, ma_list, modes
+   use radiative_aerosol_definitions, only: modelist_t, modal_aerosol_list, modes
 
    ! Return info about modal aerosol lists
 
@@ -188,7 +188,7 @@ subroutine rad_aer_get_info_by_mode(list_idx, m_idx, &
    character(len=*), parameter :: subname = 'rad_aer_get_info_by_mode'
    !-----------------------------------------------------------------------------
 
-   m_list => ma_list(list_idx)
+   m_list => modal_aerosol_list(list_idx)
 
    ! check for valid mode index
    nmodes = m_list%nmodes
@@ -228,7 +228,7 @@ subroutine rad_aer_get_info_by_bin(list_idx, m_idx, &
    bin_name, num_name, num_name_cw, mmr_name, mmr_name_cw, nspec)
    use cam_abortutils, only: endrun
    use cam_logfile,    only: iulog
-   use radiative_aerosol_definitions, only: binlist_t, sa_list, bins
+   use radiative_aerosol_definitions, only: binlist_t, sectional_aerosol_list, bins
 
    ! Return info about CARMA aerosol lists
 
@@ -251,7 +251,7 @@ subroutine rad_aer_get_info_by_bin(list_idx, m_idx, &
    character(len=*), parameter :: subname = 'rad_aer_get_info_by_bin'
    !-----------------------------------------------------------------------------
 
-   s_list => sa_list(list_idx)
+   s_list => sectional_aerosol_list(list_idx)
 
    ! check for valid mode index
    nbins = s_list%nbins
@@ -300,7 +300,7 @@ subroutine rad_aer_get_info_by_bin_spec(list_idx, m_idx, s_idx, &
    spec_type, spec_morph, spec_name, spec_name_cw)
    use cam_abortutils, only: endrun
    use cam_logfile,    only: iulog
-   use radiative_aerosol_definitions, only: binlist_t, sa_list, bins
+   use radiative_aerosol_definitions, only: binlist_t, sectional_aerosol_list, bins
 
    ! Return info about CARMA aerosol lists
 
@@ -321,7 +321,7 @@ subroutine rad_aer_get_info_by_bin_spec(list_idx, m_idx, s_idx, &
    character(len=*), parameter :: subname = 'rad_aer_get_info_by_bin_spec'
    !-----------------------------------------------------------------------------
 
-   s_list => sa_list(list_idx)
+   s_list => sectional_aerosol_list(list_idx)
 
    ! check for valid mode index
    nbins = s_list%nbins
@@ -360,7 +360,7 @@ subroutine rad_aer_get_info_by_mode_spec(list_idx, m_idx, s_idx, &
    spec_type, spec_name, spec_name_cw)
    use cam_abortutils, only: endrun
    use cam_logfile,    only: iulog
-   use radiative_aerosol_definitions, only: modelist_t, ma_list, modes
+   use radiative_aerosol_definitions, only: modelist_t, modal_aerosol_list, modes
 
    ! Return info about modal aerosol lists
 
@@ -382,7 +382,7 @@ subroutine rad_aer_get_info_by_mode_spec(list_idx, m_idx, s_idx, &
    character(len=*), parameter :: subname = 'rad_aer_get_info_by_mode_spec'
    !-----------------------------------------------------------------------------
 
-   m_list => ma_list(list_idx)
+   m_list => modal_aerosol_list(list_idx)
 
    ! check for valid mode index
    nmodes = m_list%nmodes
@@ -421,7 +421,7 @@ end subroutine rad_aer_get_info_by_mode_spec
 !================================================================================================
 
 subroutine rad_aer_get_info_by_spectype(list_idx, spectype, mode_idx, spec_idx)
-   use radiative_aerosol_definitions, only: modelist_t, ma_list, modes
+   use radiative_aerosol_definitions, only: modelist_t, modal_aerosol_list, modes
 
    ! Return info about modes in the specified climate/diagnostics list
 
@@ -440,7 +440,7 @@ subroutine rad_aer_get_info_by_spectype(list_idx, spectype, mode_idx, spec_idx)
    character(len=*), parameter :: subname = 'rad_aer_get_info_by_spectype'
    !-----------------------------------------------------------------------------
 
-   m_list => ma_list(list_idx)
+   m_list => modal_aerosol_list(list_idx)
 
    ! number of modes in specified list
    nmodes = m_list%nmodes
@@ -479,7 +479,7 @@ end subroutine rad_aer_get_info_by_spectype
 !================================================================================================
 
 function rad_aer_get_mode_idx(list_idx, mode_type) result(mode_idx)
-   use radiative_aerosol_definitions, only: modelist_t, ma_list, modes
+   use radiative_aerosol_definitions, only: modelist_t, modal_aerosol_list, modes
 
    ! Return mode index of the specified type in the specified climate/diagnostics list.
    ! Return -1 if not found.
@@ -503,7 +503,7 @@ function rad_aer_get_mode_idx(list_idx, mode_type) result(mode_idx)
    mode_idx = -1
 
    ! specified mode list
-   m_list => ma_list(list_idx)
+   m_list => modal_aerosol_list(list_idx)
 
    ! number of modes in specified list
    nmodes = m_list%nmodes
@@ -526,7 +526,7 @@ end function rad_aer_get_mode_idx
 !================================================================================================
 
 function rad_aer_get_spec_idx(list_idx, mode_idx, spec_type) result(spec_idx)
-   use radiative_aerosol_definitions, only: modelist_t, mode_component_t, ma_list, modes
+   use radiative_aerosol_definitions, only: modelist_t, mode_component_t, modal_aerosol_list, modes
 
    ! Return specie index of the specified type in the specified mode of the specified
    ! climate/diagnostics list.  Return -1 if not found.
@@ -552,7 +552,7 @@ function rad_aer_get_spec_idx(list_idx, mode_idx, spec_type) result(spec_idx)
    spec_idx = -1
 
    ! modes in specified list
-   m_list => ma_list(list_idx)
+   m_list => modal_aerosol_list(list_idx)
 
    ! get index of the specified mode in the definition object
    m_idx = m_list%idx(mode_idx)
@@ -595,7 +595,7 @@ end subroutine rad_aer_get_call_list
 integer function rad_aer_get_idx(list_idx, aer_name)
    use cam_abortutils, only: endrun
    use cam_logfile,    only: iulog
-   use radiative_aerosol_definitions, only: N_DIAG, aerlist_t, aerosollist
+   use radiative_aerosol_definitions, only: N_DIAG, aerlist_t, bulk_aerosol_list
 
    ! Return the index of aerosol aer_name in the list specified by list_idx.
 
@@ -610,7 +610,7 @@ integer function rad_aer_get_idx(list_idx, aer_name)
    !-------------------------------------------------------------------------
 
    if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      aerlist => aerosollist(list_idx)
+      aerlist => bulk_aerosol_list(list_idx)
    else
       write(iulog,*) subname//': list_idx =', list_idx
       call endrun(subname//': list_idx out of bounds')
@@ -645,7 +645,7 @@ subroutine rad_aer_get_props_by_idx(list_idx, &
    use phys_prop,      only: physprop_get, ot_length
    use cam_abortutils, only: endrun
    use cam_logfile,    only: iulog
-   use radiative_aerosol_definitions, only: N_DIAG, aerlist_t, aerosollist
+   use radiative_aerosol_definitions, only: N_DIAG, aerlist_t, bulk_aerosol_list
 
    ! Return requested properties for the aerosol from the specified
    ! climate or diagnostic list.
@@ -686,7 +686,7 @@ subroutine rad_aer_get_props_by_idx(list_idx, &
    !------------------------------------------------------------------------------------
 
    if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      aerlist => aerosollist(list_idx)
+      aerlist => bulk_aerosol_list(list_idx)
    else
       write(iulog,*) subname//': list_idx = ', list_idx
       call endrun(subname//': list_idx out of range')
@@ -746,7 +746,7 @@ subroutine rad_aer_get_mam_props_by_idx(list_idx, &
    use phys_prop,      only: physprop_get, ot_length
    use cam_abortutils, only: endrun
    use cam_logfile,    only: iulog
-   use radiative_aerosol_definitions, only: N_DIAG, modelist_t, ma_list, modes
+   use radiative_aerosol_definitions, only: N_DIAG, modelist_t, modal_aerosol_list, modes
 
    ! Return requested properties for the aerosol from the specified
    ! climate or diagnostic list.
@@ -785,12 +785,12 @@ subroutine rad_aer_get_mam_props_by_idx(list_idx, &
 
    ! Local variables
    integer :: m_idx, id
-   type(modelist_t), pointer :: mlist
+   type(modelist_t), pointer   :: mlist
    character(len=*), parameter :: subname = 'rad_aer_get_mam_props_by_idx'
    !------------------------------------------------------------------------------------
 
    if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      mlist => ma_list(list_idx)
+      mlist => modal_aerosol_list(list_idx)
    else
       write(iulog,*) subname//': list_idx = ', list_idx
       call endrun(subname//': list_idx out of range')
@@ -862,7 +862,7 @@ subroutine rad_aer_get_bin_props_by_idx(list_idx, &
    use phys_prop,      only: physprop_get, ot_length
    use cam_abortutils, only: endrun
    use cam_logfile,    only: iulog
-   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sa_list, bins
+   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sectional_aerosol_list, bins
 
    ! Return requested properties for the aerosol from the specified
    ! climate or diagnostic list.
@@ -907,7 +907,7 @@ subroutine rad_aer_get_bin_props_by_idx(list_idx, &
    !------------------------------------------------------------------------------------
 
    if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      slist => sa_list(list_idx)
+      slist => sectional_aerosol_list(list_idx)
    else
       write(iulog,*) subname//': list_idx = ', list_idx
       call endrun(subname//': list_idx out of range')
@@ -977,7 +977,7 @@ subroutine rad_aer_get_mode_props(list_idx, mode_idx, opticstype, &
    use phys_prop,      only: physprop_get, ot_length
    use cam_abortutils, only: endrun
    use cam_logfile,    only: iulog
-   use radiative_aerosol_definitions, only: N_DIAG, modelist_t, ma_list
+   use radiative_aerosol_definitions, only: N_DIAG, modelist_t, modal_aerosol_list
 
    ! Return requested properties for the mode from the specified
    ! climate or diagnostic list.
@@ -1012,7 +1012,7 @@ subroutine rad_aer_get_mode_props(list_idx, mode_idx, opticstype, &
    !------------------------------------------------------------------------------------
 
    if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      mlist => ma_list(list_idx)
+      mlist => modal_aerosol_list(list_idx)
    else
       write(iulog,*) subname//': list_idx = ', list_idx
       call endrun(subname//': list_idx out of range')
@@ -1061,7 +1061,7 @@ subroutine rad_aer_get_bin_props(list_idx, bin_idx, opticstype, &
    use phys_prop,      only: physprop_get, ot_length
    use cam_abortutils, only: endrun
    use cam_logfile,    only: iulog
-   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sa_list
+   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sectional_aerosol_list
 
    ! Return requested properties for the bin from the specified
    ! climate or diagnostic list.
@@ -1104,7 +1104,7 @@ subroutine rad_aer_get_bin_props(list_idx, bin_idx, opticstype, &
    !------------------------------------------------------------------------------------
 
    if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      slist => sa_list(list_idx)
+      slist => sectional_aerosol_list(list_idx)
    else
       write(iulog,*) subname//': list_idx = ', list_idx
       call endrun(subname//': list_idx out of range')
@@ -1211,7 +1211,7 @@ subroutine rad_aer_readnl(mode_defs, bin_defs)
    use spmd_utils,     only: masterproc
    use radiative_aerosol_definitions, only: &
       cs1, verbose, N_DIAG, modes, bins, &
-      active_calls, aerosollist, ma_list, sa_list, &
+      active_calls, bulk_aerosol_list, modal_aerosol_list, sectional_aerosol_list, &
       radcnst_namelist, parse_mode_defs, parse_bin_defs, &
       list_populate, print_modes, print_bins
 
@@ -1240,9 +1240,9 @@ subroutine rad_aer_readnl(mode_defs, bin_defs)
          else
             suffix='  '
          end if
-         aerosollist(i)%list_id = suffix
-         ma_list(i)%list_id     = suffix
-         sa_list(i)%list_id     = suffix
+         bulk_aerosol_list(i)%list_id      = suffix
+         modal_aerosol_list(i)%list_id     = suffix
+         sectional_aerosol_list(i)%list_id = suffix
       end if
    end do
 
@@ -1274,10 +1274,10 @@ subroutine rad_aer_readnl(mode_defs, bin_defs)
       if (active_calls(i)) then
          ! has to be done at readnl phase as information on structure of the lists will be needed
          ! in physics/chemistry initialization.
-         call list_populate(radcnst_namelist(i), aerosollist(i), ma_list(i), sa_list(i))
+         call list_populate(radcnst_namelist(i), bulk_aerosol_list(i), modal_aerosol_list(i), sectional_aerosol_list(i))
 
          if (masterproc .and. verbose) then
-            call print_aerosol_lists(aerosollist(i), ma_list(i), sa_list(i))
+            call print_aerosol_lists(bulk_aerosol_list(i), modal_aerosol_list(i), sectional_aerosol_list(i))
          end if
       end if
    end do
@@ -1298,7 +1298,7 @@ subroutine rad_aer_init()
    use phys_prop,      only: physprop_init
    use radiative_aerosol_definitions, only: &
       N_DIAG, modes, bins, active_calls, &
-      aerosollist, ma_list, sa_list, list_resolve_physprops
+      bulk_aerosol_list, modal_aerosol_list, sectional_aerosol_list, list_resolve_physprops
 
    !REMOVECAM: aerosol_mmr_cam handles CAM-specific index resolution
    use aerosol_mmr_cam, only: aerosol_mmr_cam_init, &
@@ -1325,14 +1325,14 @@ subroutine rad_aer_init()
    do i = 0, N_DIAG
       if (active_calls(i)) then
          !REMOVECAM: resolve host-specific indices (CAM uses pbuf and state)
-         call resolve_bulk_cam_idx(aerosollist(i))
+         call resolve_bulk_cam_idx(bulk_aerosol_list(i))
          !REMOVECAM_END
-         call list_resolve_physprops(aerosollist(i), ma_list(i), sa_list(i))
+         call list_resolve_physprops(bulk_aerosol_list(i), modal_aerosol_list(i), sectional_aerosol_list(i))
       end if
    end do
 
    !REMOVECAM: history add calls for radiative aerosol diagnostics.
-   call rad_aer_diag_init(aerosollist(0))
+   call rad_aer_diag_init(bulk_aerosol_list(0))
    !REMOVECAM_END
 
 end subroutine rad_aer_init

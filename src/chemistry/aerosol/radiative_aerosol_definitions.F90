@@ -172,9 +172,9 @@ logical, public :: active_calls(0:N_DIAG) = .false.
 type(modes_t), public, target :: modes  ! mode definitions
 type(bins_t),  public, target :: bins   ! bin definitions
 
-type(aerlist_t),  public, target :: aerosollist(0:N_DIAG) ! list of aerosols used in climate/diagnostic calcs
-type(modelist_t), public, target :: ma_list(0:N_DIAG) ! list of aerosol modes used in climate/diagnostic calcs
-type(binlist_t),  public, target :: sa_list(0:N_DIAG) ! list of aerosol bins used in climate/diagnostic calcs
+type(aerlist_t),  public, target :: bulk_aerosol_list(0:N_DIAG) ! list of aerosols used in climate/diagnostic calcs
+type(modelist_t), public, target :: modal_aerosol_list(0:N_DIAG) ! list of aerosol modes used in climate/diagnostic calcs
+type(binlist_t),  public, target :: sectional_aerosol_list(0:N_DIAG) ! list of aerosol bins used in climate/diagnostic calcs
 
 !===========================
 ! Named constants for mode/species/morph validation
@@ -208,7 +208,7 @@ public :: print_modes, print_bins
 contains
 !==============================================================================
 
-subroutine list_populate(namelist, aerlist, ma_list, sa_list)
+subroutine list_populate(namelist, aerlist, modal_aerosol_list, sectional_aerosol_list)
    use cam_abortutils, only: endrun
    use cam_logfile,    only: iulog
    use spmd_utils,     only: masterproc
@@ -216,7 +216,7 @@ subroutine list_populate(namelist, aerlist, ma_list, sa_list)
    ! Populate aerosol list structures from parsed namelist specifiers.
    ! IMPORTANT: Must run at readnl time (before phys_register), because
    ! phys_register routines (e.g., modal_aero_data_reg) query
-   ! ma_list(0)%nmodes via rad_aer_get_info.
+   ! modal_aerosol_list(0)%nmodes via rad_aer_get_info.
    ! Do NOT merge with list_resolve_physprops.
    !
    ! Gas initialization is handled in rad_constituents.
@@ -224,8 +224,8 @@ subroutine list_populate(namelist, aerlist, ma_list, sa_list)
    type(rad_cnst_namelist_t), intent(in) :: namelist ! parsed namelist input for climate or diagnostic lists
 
    type(aerlist_t),        intent(inout) :: aerlist
-   type(modelist_t),       intent(inout) :: ma_list
-   type(binlist_t),        intent(inout) :: sa_list
+   type(modelist_t),       intent(inout) :: modal_aerosol_list
+   type(binlist_t),        intent(inout) :: sectional_aerosol_list
 
    ! Local variables
    integer :: ii, m, naero, nmodes, nbins
@@ -244,18 +244,18 @@ subroutine list_populate(namelist, aerlist, ma_list, sa_list)
       if (trim(namelist%type(ii)) == 'B') nbins = nbins + 1
    end do
    aerlist%numaerosols = naero
-   ma_list%nmodes      = nmodes
-   sa_list%nbins       = nbins
+   modal_aerosol_list%nmodes      = nmodes
+   sectional_aerosol_list%nbins       = nbins
 
    ! allocate storage for the aerosol and mode lists
    allocate( &
       aerlist%aer(aerlist%numaerosols),      &
-      ma_list%idx(ma_list%nmodes),           &
-      ma_list%physprop_files(ma_list%nmodes), &
-      ma_list%idx_props(ma_list%nmodes),     &
-      sa_list%idx(sa_list%nbins),           &
-      sa_list%physprop_files(sa_list%nbins), &
-      sa_list%idx_props(sa_list%nbins),     &
+      modal_aerosol_list%idx(modal_aerosol_list%nmodes),           &
+      modal_aerosol_list%physprop_files(modal_aerosol_list%nmodes), &
+      modal_aerosol_list%idx_props(modal_aerosol_list%nmodes),     &
+      sectional_aerosol_list%idx(sectional_aerosol_list%nbins),           &
+      sectional_aerosol_list%physprop_files(sectional_aerosol_list%nbins), &
+      sectional_aerosol_list%idx_props(sectional_aerosol_list%nbins),     &
       stat=istat)
    if (istat /= 0) call endrun(subname//': allocate ERROR; aero list components')
 
@@ -305,18 +305,18 @@ subroutine list_populate(namelist, aerlist, ma_list, sa_list)
 
          ! Look through the mode definitions for the name of the specified mode.  The
          ! index into the modes object all the information relevent to the mode definition.
-         ma_list%idx(ma_idx) = -1
+         modal_aerosol_list%idx(ma_idx) = -1
          do m = 1, modes%nmodes
             if (trim(namelist%camname(ii)) == trim(modes%names(m))) then
-               ma_list%idx(ma_idx) = m
+               modal_aerosol_list%idx(ma_idx) = m
                exit
             end if
          end do
-         if (ma_list%idx(ma_idx) == -1) &
+         if (modal_aerosol_list%idx(ma_idx) == -1) &
             call endrun(subname//' ERROR cannot find mode name '//trim(namelist%camname(ii)))
 
          ! Also save the name of the physprop file
-         ma_list%physprop_files(ma_idx) = namelist%radname(ii)
+         modal_aerosol_list%physprop_files(ma_idx) = namelist%radname(ii)
 
       else if (namelist%type(ii) == 'B') then
 
@@ -325,18 +325,18 @@ subroutine list_populate(namelist, aerlist, ma_list, sa_list)
 
          ! Look through the bin definitions for the name of the specified bin.  The
          ! index into the bins object all the information relevent to the bin definition.
-         sa_list%idx(sa_idx) = -1
+         sectional_aerosol_list%idx(sa_idx) = -1
          do m = 1, bins%nbins
             if (trim(namelist%camname(ii)) == trim(bins%names(m))) then
-               sa_list%idx(sa_idx) = m
+               sectional_aerosol_list%idx(sa_idx) = m
                exit
             end if
          end do
-         if (sa_list%idx(sa_idx) == -1) &
+         if (sectional_aerosol_list%idx(sa_idx) == -1) &
             call endrun(subname//' ERROR cannot find bin name '//trim(namelist%camname(ii)))
 
          ! Also save the name of the physprop file
-         sa_list%physprop_files(sa_idx) = namelist%radname(ii)
+         sectional_aerosol_list%physprop_files(sa_idx) = namelist%radname(ii)
 
       end if
    end do
@@ -345,7 +345,7 @@ end subroutine list_populate
 
 !===========================
 
-subroutine list_resolve_physprops(aerlist, ma_list, sa_list)
+subroutine list_resolve_physprops(aerlist, modal_aerosol_list, sectional_aerosol_list)
 
    ! Resolve physprop indices for bulk aerosols, modes, and bins.
    ! IMPORTANT: Must run at init time (after physprop_init), because
@@ -358,8 +358,8 @@ subroutine list_resolve_physprops(aerlist, ma_list, sa_list)
    use phys_prop, only: physprop_get_id
 
    type(aerlist_t),        intent(inout) :: aerlist
-   type(modelist_t),       intent(inout) :: ma_list
-   type(binlist_t),        intent(inout) :: sa_list
+   type(modelist_t),       intent(inout) :: modal_aerosol_list
+   type(binlist_t),        intent(inout) :: sectional_aerosol_list
 
    ! Local variables
    integer :: i
@@ -375,18 +375,18 @@ subroutine list_resolve_physprops(aerlist, ma_list, sa_list)
    end do
 
    ! Loop over modes
-   do i = 1, ma_list%nmodes
+   do i = 1, modal_aerosol_list%nmodes
 
       ! get the physprop_id from the phys_prop module
-      ma_list%idx_props(i) = physprop_get_id(ma_list%physprop_files(i))
+      modal_aerosol_list%idx_props(i) = physprop_get_id(modal_aerosol_list%physprop_files(i))
 
    end do
 
    ! Loop over bins
-   do i = 1, sa_list%nbins
+   do i = 1, sectional_aerosol_list%nbins
 
       ! get the physprop_id from the phys_prop module
-      sa_list%idx_props(i) = physprop_get_id(sa_list%physprop_files(i))
+      sectional_aerosol_list%idx_props(i) = physprop_get_id(sectional_aerosol_list%physprop_files(i))
 
    end do
 

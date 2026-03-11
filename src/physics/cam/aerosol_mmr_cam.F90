@@ -243,7 +243,7 @@ subroutine rad_cnst_get_aer_mmr_by_idx(list_idx, aer_idx, state, pbuf, mmr)
    use cam_abortutils, only: endrun
    use physics_types,  only: physics_state
    use physics_buffer, only: physics_buffer_desc, pbuf_get_field
-   use radiative_aerosol_definitions, only: N_DIAG, aerlist_t, aerosollist
+   use radiative_aerosol_definitions, only: N_DIAG, aerlist_t, bulk_aerosol_list
 
    ! Arguments
    integer,                     intent(in) :: list_idx    ! index of the climate or a diagnostic list
@@ -261,7 +261,7 @@ subroutine rad_cnst_get_aer_mmr_by_idx(list_idx, aer_idx, state, pbuf, mmr)
    !-----------------------------------------------------------------------------
 
    if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      aerlist => aerosollist(list_idx)
+      aerlist => bulk_aerosol_list(list_idx)
    else
       write(iulog,*) subname//': list_idx =', list_idx
       call endrun(subname//': list_idx out of bounds')
@@ -300,7 +300,7 @@ subroutine rad_cnst_get_mam_mmr_by_idx(list_idx, mode_idx, spec_idx, phase, stat
    use cam_abortutils, only: endrun
    use physics_types,  only: physics_state
    use physics_buffer, only: physics_buffer_desc, pbuf_get_field
-   use radiative_aerosol_definitions, only: N_DIAG, modelist_t, ma_list, modes
+   use radiative_aerosol_definitions, only: N_DIAG, modelist_t, modal_aerosol_list, modes
 
    ! Arguments
    integer,                     intent(in) :: list_idx    ! index of the climate or a diagnostic list
@@ -321,7 +321,7 @@ subroutine rad_cnst_get_mam_mmr_by_idx(list_idx, mode_idx, spec_idx, phase, stat
    !-----------------------------------------------------------------------------
 
    if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      mlist => ma_list(list_idx)
+      mlist => modal_aerosol_list(list_idx)
    else
       write(iulog,*) subname//': list_idx =', list_idx
       call endrun(subname//': list_idx out of bounds')
@@ -378,7 +378,7 @@ subroutine rad_cnst_get_bin_mmr_by_idx(list_idx, bin_idx, spec_idx, phase, state
    use cam_abortutils, only: endrun
    use physics_types,  only: physics_state
    use physics_buffer, only: physics_buffer_desc, pbuf_get_field
-   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sa_list, bins
+   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sectional_aerosol_list, bins
 
    ! Arguments
    integer,                     intent(in) :: list_idx    ! index of the climate or a diagnostic list
@@ -399,7 +399,7 @@ subroutine rad_cnst_get_bin_mmr_by_idx(list_idx, bin_idx, spec_idx, phase, state
    !-----------------------------------------------------------------------------
 
    if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      slist => sa_list(list_idx)
+      slist => sectional_aerosol_list(list_idx)
    else
       write(iulog,*) subname//': list_idx =', list_idx
       call endrun(subname//': list_idx out of bounds')
@@ -459,7 +459,7 @@ subroutine rad_cnst_get_mam_mmr_idx(mode_idx, spec_idx, idx)
 
    use cam_logfile,    only: iulog
    use cam_abortutils, only: endrun
-   use radiative_aerosol_definitions, only: modelist_t, modes, ma_list
+   use radiative_aerosol_definitions, only: modelist_t, modes, modal_aerosol_list
 
    ! Arguments
    integer, intent(in)  :: mode_idx    ! mode index
@@ -473,7 +473,7 @@ subroutine rad_cnst_get_mam_mmr_idx(mode_idx, spec_idx, idx)
    !-----------------------------------------------------------------------------
 
    ! assume climate list (i.e., species are in the constituent array)
-   mlist => ma_list(0)
+   mlist => modal_aerosol_list(0)
 
    ! Check for valid mode index
    if (mode_idx < 1  .or.  mode_idx > mlist%nmodes) then
@@ -509,7 +509,7 @@ subroutine rad_cnst_get_carma_mmr_idx(bin_idx, spec_idx, idx)
 
    use cam_logfile,    only: iulog
    use cam_abortutils, only: endrun
-   use radiative_aerosol_definitions, only: binlist_t, bins, sa_list
+   use radiative_aerosol_definitions, only: binlist_t, bins, sectional_aerosol_list
 
    ! Arguments
    integer, intent(in)  :: bin_idx     ! bin index
@@ -523,7 +523,7 @@ subroutine rad_cnst_get_carma_mmr_idx(bin_idx, spec_idx, idx)
    !-----------------------------------------------------------------------------
 
    ! assume climate list (i.e., species are in the constituent array)
-   slist => sa_list(0)
+   slist => sectional_aerosol_list(0)
 
    ! Check for valid bin index
    if (bin_idx < 1  .or.  bin_idx > slist%nbins) then
@@ -556,7 +556,7 @@ subroutine rad_cnst_get_bin_mmr(list_idx, bin_idx, phase, state, pbuf, mmr)
    use cam_abortutils, only: endrun
    use physics_types,  only: physics_state
    use physics_buffer, only: physics_buffer_desc, pbuf_get_field
-   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sa_list, bins
+   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sectional_aerosol_list, bins
 
    ! Arguments
    integer,                     intent(in) :: list_idx    ! index of the climate or a diagnostic list
@@ -576,7 +576,7 @@ subroutine rad_cnst_get_bin_mmr(list_idx, bin_idx, phase, state, pbuf, mmr)
    !-----------------------------------------------------------------------------
 
    if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      slist => sa_list(list_idx)
+      slist => sectional_aerosol_list(list_idx)
    else
       write(iulog,*) subname//': list_idx =', list_idx
       call endrun(subname//': list_idx out of bounds')
@@ -627,7 +627,7 @@ subroutine rad_cnst_get_mode_num(list_idx, mode_idx, phase, state, pbuf, num)
    use cam_abortutils, only: endrun
    use physics_types,  only: physics_state
    use physics_buffer, only: physics_buffer_desc, pbuf_get_field
-   use radiative_aerosol_definitions, only: N_DIAG, modelist_t, ma_list, modes
+   use radiative_aerosol_definitions, only: N_DIAG, modelist_t, modal_aerosol_list, modes
 
    ! Arguments
    integer,                     intent(in) :: list_idx    ! index of the climate or a diagnostic list
@@ -647,7 +647,7 @@ subroutine rad_cnst_get_mode_num(list_idx, mode_idx, phase, state, pbuf, num)
    !-----------------------------------------------------------------------------
 
    if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      mlist => ma_list(list_idx)
+      mlist => modal_aerosol_list(list_idx)
    else
       write(iulog,*) subname//': list_idx =', list_idx
       call endrun(subname//': list_idx out of bounds')
@@ -698,7 +698,7 @@ subroutine rad_cnst_get_bin_num(list_idx, bin_idx, phase, state, pbuf, num)
    use cam_abortutils, only: endrun
    use physics_types,  only: physics_state
    use physics_buffer, only: physics_buffer_desc, pbuf_get_field
-   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sa_list, bins
+   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sectional_aerosol_list, bins
 
    ! Arguments
    integer,                     intent(in) :: list_idx    ! index of the climate or a diagnostic list
@@ -718,7 +718,7 @@ subroutine rad_cnst_get_bin_num(list_idx, bin_idx, phase, state, pbuf, num)
    !-----------------------------------------------------------------------------
 
    if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      slist => sa_list(list_idx)
+      slist => sectional_aerosol_list(list_idx)
    else
       write(iulog,*) subname//': list_idx =', list_idx
       call endrun(subname//': list_idx out of bounds')
@@ -772,7 +772,7 @@ subroutine rad_cnst_get_mode_num_idx(mode_idx, cnst_idx)
 
    use cam_logfile,    only: iulog
    use cam_abortutils, only: endrun
-   use radiative_aerosol_definitions, only: modelist_t, modes, ma_list
+   use radiative_aerosol_definitions, only: modelist_t, modes, modal_aerosol_list
 
    ! Arguments
    integer,  intent(in)  :: mode_idx    ! mode index
@@ -786,7 +786,7 @@ subroutine rad_cnst_get_mode_num_idx(mode_idx, cnst_idx)
    !-----------------------------------------------------------------------------
 
    ! assume climate list
-   mlist => ma_list(0)
+   mlist => modal_aerosol_list(0)
 
    ! Check for valid mode index
    if (mode_idx < 1  .or.  mode_idx > mlist%nmodes) then
@@ -823,7 +823,7 @@ subroutine rad_cnst_get_bin_num_idx(bin_idx, cnst_idx)
 
    use cam_logfile,    only: iulog
    use cam_abortutils, only: endrun
-   use radiative_aerosol_definitions, only: binlist_t, bins, sa_list
+   use radiative_aerosol_definitions, only: binlist_t, bins, sectional_aerosol_list
 
    ! Arguments
    integer,  intent(in)  :: bin_idx    ! bin index
@@ -837,7 +837,7 @@ subroutine rad_cnst_get_bin_num_idx(bin_idx, cnst_idx)
    !-----------------------------------------------------------------------------
 
    ! assume climate list
-   slist => sa_list(0)
+   slist => sectional_aerosol_list(0)
 
    ! Check for valid bin index
    if (bin_idx < 1  .or.  bin_idx > slist%nbins) then
@@ -931,7 +931,7 @@ subroutine rad_aer_diag_out(list_idx, state, pbuf)
    use cam_history,    only: outfld
    use cam_logfile,    only: iulog
    use cam_abortutils, only: endrun
-   use radiative_aerosol_definitions, only: N_DIAG, aerlist_t, aerosollist
+   use radiative_aerosol_definitions, only: N_DIAG, aerlist_t, bulk_aerosol_list
 
    ! Arguments
    integer,                     intent(in) :: list_idx
@@ -955,7 +955,7 @@ subroutine rad_aer_diag_out(list_idx, state, pbuf)
 
    ! Associate pointer with requested aerosol list
    if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      aerlist => aerosollist(list_idx)
+      aerlist => bulk_aerosol_list(list_idx)
    else
       write(iulog,*) subname//': list_idx = ', list_idx
       call endrun(subname//': list_idx out of range')
