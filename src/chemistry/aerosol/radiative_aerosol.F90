@@ -784,7 +784,7 @@ subroutine rad_aer_get_mam_props_by_idx(list_idx, &
    character(len=32), optional, intent(out) :: spectype
 
    ! Local variables
-   integer :: m_idx, id
+   integer :: m_idx, idx
    type(modelist_t), pointer   :: mlist
    character(len=*), parameter :: subname = 'rad_aer_get_mam_props_by_idx'
    !------------------------------------------------------------------------------------
