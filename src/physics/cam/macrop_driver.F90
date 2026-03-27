@@ -18,7 +18,7 @@
   use constituents,  only: cnst_get_ind, pcnst
   use physics_buffer,    only: physics_buffer_desc, pbuf_set_field, pbuf_get_field, pbuf_old_tim_idx
   use time_manager,      only: is_first_step
-  use cldwat2m_macro,    only: ini_macro
+  use park_macrophysics, only: park_macrophysics_init
   use perf_mod,          only: t_startf, t_stopf
   use cam_logfile,       only: iulog
   use cam_abortutils,    only: endrun
@@ -40,13 +40,6 @@
   ! ------------------------- !
   ! Private Module Parameters !
   ! ------------------------- !
-
-  ! 'cu_det_st' : If .true. (.false.), detrain cumulus liquid condensate into the pre-existing liquid stratus
-  !               (environment) without (with) macrophysical evaporation. If there is no pre-esisting stratus,
-  !               evaporate cumulus liquid condensate. This option only influences the treatment of cumulus
-  !               liquid condensate, not cumulus ice condensate.
-
-  logical, parameter :: cu_det_st  = .false.
 
   ! Parameters used for selecting generalized critical RH for liquid and ice stratus
   integer :: rhminl_opt = 0
@@ -204,6 +197,7 @@ end subroutine macrop_driver_readnl
     use physics_buffer, only : pbuf_get_index
     use cam_history,     only: addfld, add_default
     use convect_shallow, only: convect_shallow_use_shfrc
+    use cloud_fraction,  only: cldfrc_getparams
 
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
@@ -214,11 +208,27 @@ end subroutine macrop_driver_readnl
     integer              :: history_budget_histfile_num ! output history file number for budget fields
     integer :: istat
 
+    ! Variables for park_macrophysics_init
+    real(r8)             :: rhminl_val, rhminl_adj_land_val, rhminh_val, premit_val, premib_val
+    character(len=512)   :: errmsg
+    integer              :: errflg
+
     character(len=*), parameter :: subname = 'macrop_driver_init'
     !-----------------------------------------------------------------------
 
+    ! Get cloud fraction parameters for macrophysics initialization
+    call cldfrc_getparams(rhminl_out=rhminl_val, rhminl_adj_land_out=rhminl_adj_land_val, &
+         rhminh_out=rhminh_val, premit_out=premit_val, premib_out=premib_val)
+
     ! Initialization routine for cloud macrophysics
-    call ini_macro(rhminl_opt, rhmini_opt)
+    call park_macrophysics_init(rhminl_opt, rhmini_opt, &
+         rhminl_val, rhminl_adj_land_val, rhminh_val, premit_val, premib_val, &
+         iulog, masterproc, errmsg, errflg)
+    if (errflg /= 0) call endrun(subname // ':: park_macrophysics_init error: ' // trim(errmsg))
+
+    ! Register diagnostic fields previously in ini_macro
+    call addfld('RHMIN_LIQ', (/ 'lev' /), 'A', 'fraction', 'Default critical RH for liquid-stratus')
+    call addfld('RHMIN_ICE', (/ 'lev' /), 'A', 'fraction', 'Default critical RH for    ice-stratus')
 
     call phys_getopts(history_aerosol_out              = history_aerosol      , &
                       history_budget_out               = history_budget       , &
@@ -375,10 +385,11 @@ end subroutine macrop_driver_readnl
   use physics_types,    only: physics_ptend_sum,  physics_state_copy
   use physics_types,    only: physics_state_dealloc
   use cam_history,      only: outfld
-  use constituents,     only: cnst_get_ind, pcnst
-  use cldwat2m_macro,   only: mmacro_pcond
-  use physconst,        only: cpair, tmelt, gravit, cappa, rair, pref, lapse_rate
+  use constituents,     only: cnst_get_ind, pcnst, qmin
+  use park_macrophysics, only: park_macrophysics_detrain_run, park_macrophysics_run
+  use physconst,        only: cpair, tmelt, gravit, cappa, rair, pref, lapse_rate, rh2o
   use time_manager,     only: get_nstep
+  use ccpp_constituent_prop_mod, only: ccpp_constituent_prop_ptr_t, ccpp_const_props
 
   use ref_pres,         only: top_lev => trop_cloud_top_lev
 
@@ -574,6 +585,10 @@ end subroutine macrop_driver_readnl
   real(r8), pointer, dimension(:,:) :: deepcu      ! deep convection cloud fraction
   real(r8), pointer, dimension(:,:) :: shallowcu   ! shallow convection cloud fraction
 
+  ! Diagnostic outputs from park_macrophysics_run
+  real(r8) :: rhmin_liq_diag(pcols,pver)
+  real(r8) :: rhmin_ice_diag(pcols,pver)
+
   ! For CCPPized schemes
   character(len=512)   :: errmsg
   integer              :: errflg
@@ -668,88 +683,19 @@ end subroutine macrop_driver_readnl
      ! This is the key procesure generating upper-level cirrus clouds.
      ! The unit of dlf : [ kg/kg/s ]
 
-   det_s(:)   = 0._r8
-   det_ice(:) = 0._r8
-
-   dpdlfliq = 0._r8
-   dpdlfice = 0._r8
-   shdlfliq = 0._r8
-   shdlfice = 0._r8
-   dpdlft   = 0._r8
-   shdlft   = 0._r8
-
-   do k = top_lev, pver
-   do i = 1, state_loc%ncol
-      if( state_loc%t(i,k) > 268.15_r8 ) then
-          dum1 = 0.0_r8
-      elseif( state_loc%t(i,k) < 238.15_r8 ) then
-          dum1 = 1.0_r8
-      else
-          dum1 = ( 268.15_r8 - state_loc%t(i,k) ) / 30._r8
-      endif
-
-     ! If detrainment was done elsewhere, still update the variables used for output
-     ! assuming that the temperature split between liquid and ice is the same as assumed
-     ! here.
-     if (do_detrain) then
-        ptend_loc%q(i,k,ixcldliq) = dlf(i,k) * ( 1._r8 - dum1 )
-        ptend_loc%q(i,k,ixcldice) = dlf(i,k) * dum1
-      ! dum2                      = dlf(i,k) * ( 1._r8 - dum1 )
-        ptend_loc%q(i,k,ixnumliq) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) * ( 1._r8 - dum1 ) ) / &
-             (4._r8*3.14_r8* 8.e-6_r8**3*997._r8) + & ! Deep    Convection
-             3._r8 * (                         dlf2(i,k)    * ( 1._r8 - dum1 ) ) / &
-             (4._r8*3.14_r8*10.e-6_r8**3*997._r8)     ! Shallow Convection
-      ! dum2                      = dlf(i,k) * dum1
-        ptend_loc%q(i,k,ixnumice) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) *  dum1 ) / &
-             (4._r8*3.14_r8*25.e-6_r8**3*500._r8) + & ! Deep    Convection
-             3._r8 * (                         dlf2(i,k)    *  dum1 ) / &
-             (4._r8*3.14_r8*50.e-6_r8**3*500._r8)     ! Shallow Convection
-        ptend_loc%s(i,k)          = dlf(i,k) * dum1 * latice
-       else
-          ptend_loc%q(i,k,ixcldliq) = 0._r8
-          ptend_loc%q(i,k,ixcldice) = 0._r8
-          ptend_loc%q(i,k,ixnumliq) = 0._r8
-          ptend_loc%q(i,k,ixnumice) = 0._r8
-          ptend_loc%s(i,k)          = 0._r8
-     end if
-
-     ! Only rliq is saved from deep convection, which is the reserved liquid.  We need to keep
-     !   track of the integrals of ice and static energy that is effected from conversion to ice
-     !   so that the energy checker doesn't complain.
-       det_s(i)                  = det_s(i) + ptend_loc%s(i,k)*state_loc%pdel(i,k)/gravit
-       det_ice(i)                = det_ice(i) - ptend_loc%q(i,k,ixcldice)*state_loc%pdel(i,k)/gravit
-
-     ! Targetted detrainment of convective liquid water either directly into the
-     ! existing liquid stratus or into the environment.
-      if( cu_det_st ) then
-          dlf_T(i,k)  = ptend_loc%s(i,k)/cpair
-          dlf_qv(i,k) = 0._r8
-          dlf_ql(i,k) = ptend_loc%q(i,k,ixcldliq)
-          dlf_qi(i,k) = ptend_loc%q(i,k,ixcldice)
-          dlf_nl(i,k) = ptend_loc%q(i,k,ixnumliq)
-          dlf_ni(i,k) = ptend_loc%q(i,k,ixnumice)
-          ptend_loc%q(i,k,ixcldliq) = 0._r8
-          ptend_loc%q(i,k,ixcldice) = 0._r8
-          ptend_loc%q(i,k,ixnumliq) = 0._r8
-          ptend_loc%q(i,k,ixnumice) = 0._r8
-          ptend_loc%s(i,k)          = 0._r8
-          dpdlfliq(i,k)             = 0._r8
-          dpdlfice(i,k)             = 0._r8
-          shdlfliq(i,k)             = 0._r8
-          shdlfice(i,k)             = 0._r8
-          dpdlft  (i,k)             = 0._r8
-          shdlft  (i,k)             = 0._r8
-       else
-          dpdlfliq(i,k) = ( dlf(i,k) - dlf2(i,k) ) * ( 1._r8 - dum1 )
-          dpdlfice(i,k) = ( dlf(i,k) - dlf2(i,k) ) * ( dum1 )
-          dpdlft  (i,k) = ( dlf(i,k) - dlf2(i,k) ) * dum1 * latice/cpair
-
-          shdlfliq(i,k) = dlf2(i,k) * ( 1._r8 - dum1 )
-          shdlfice(i,k) = dlf2(i,k) * ( dum1 )
-          shdlft  (i,k) = dlf2(i,k) * dum1 * latice/cpair
-      endif
-   end do
-   end do
+   ! Call portable detrainment scheme
+   call park_macrophysics_detrain_run( &
+        ncol, pver, top_lev, &
+        latice, cpair, gravit, &
+        do_detrain, &
+        state_loc%t(:,:), state_loc%pdel(:,:), dlf(:,:), dlf2(:,:), &
+        ptend_loc%q(:,:,ixcldliq), ptend_loc%q(:,:,ixcldice), &
+        ptend_loc%q(:,:,ixnumliq), ptend_loc%q(:,:,ixnumice), ptend_loc%s(:,:), &
+        det_s, det_ice, &
+        dpdlfliq, dpdlfice, shdlfliq, shdlfice, dpdlft, shdlft, &
+        dlf_T, dlf_qv, dlf_ql, dlf_qi, dlf_nl, dlf_ni, &
+        errmsg, errflg)
+   if (errflg /= 0) call endrun('macrop_driver_tend: park_macrophysics_detrain_run error: ' // trim(errmsg))
 
    call outfld( 'DPDLFLIQ ', dpdlfliq, pcols, lchnk )
    call outfld( 'DPDLFICE ', dpdlfice, pcols, lchnk )
@@ -760,7 +706,7 @@ end subroutine macrop_driver_readnl
 
    call outfld( 'ZMDLF',     dlf     , pcols, state_loc%lchnk )
 
-   det_ice(:ncol) = det_ice(:ncol)/1000._r8  ! divide by density of water
+   ! det_ice division by density of water is now inside park_macrophysics_detrain_run
 
    ! Add the detrainment tendency to the output tendency
    call physics_ptend_init(ptend, state%psetcols, 'macrop')
@@ -928,86 +874,41 @@ end subroutine macrop_driver_readnl
 
    call t_startf('mmacro_pcond')
 
-   zeros(:ncol,top_lev:pver)  = 0._r8
-   qc(:ncol,top_lev:pver) = state_loc%q(:ncol,top_lev:pver,ixcldliq)
-   qi(:ncol,top_lev:pver) = state_loc%q(:ncol,top_lev:pver,ixcldice)
-   nc(:ncol,top_lev:pver) = state_loc%q(:ncol,top_lev:pver,ixnumliq)
-   ni(:ncol,top_lev:pver) = state_loc%q(:ncol,top_lev:pver,ixnumice)
+ ! Call portable Park macrophysics scheme.
+ ! This handles: advective tendency computation, mmacro_pcond body, and ast computation.
+ ! tcwat/qcwat/lcwat/iccwat/nlwat/niwat are updated in-place for save-for-next-timestep
+ ! (but will be overwritten below with post-physics_update equilibrium state).
 
- ! In CAM5, 'microphysical forcing' ( CC_... ) and 'the other advective forcings' ( ttend, ... )
- ! are separately provided into the prognostic microp_driver macrophysics scheme. This is an
- ! attempt to resolve in-cloud and out-cloud forcings.
+   call park_macrophysics_run( &
+        ncol, pver, top_lev, get_nstep(), &
+        dtime, &
+        cpair, latvap, latice, rh2o, gravit, rair, &
+        ccpp_const_props, qmin, &
+        state_loc%t(:,:), state_loc%q(:,:,1), &
+        state_loc%q(:,:,ixcldliq), state_loc%q(:,:,ixcldice), &
+        state_loc%q(:,:,ixnumliq), state_loc%q(:,:,ixnumice), &
+        state_loc%pmid(:,:), state_loc%pdel(:,:), &
+        tcwat, qcwat, lcwat, iccwat, nlwat, niwat, &
+        CC_T, CC_qv, CC_ql, CC_qi, CC_nl, CC_ni, CC_qlst, &
+        dlf_T, dlf_qv, dlf_ql, dlf_qi, dlf_nl, dlf_ni, &
+        concld_old, concld, clrw_old, clri_old, &
+        landfrac, snowh, &
+        do_cldice, &
+        tlat, qvlat, qcten, qiten, ncten, niten, &
+        cmeliq, qvadj, qladj, qiadj, qllim, qilim, &
+        cld, alst, aist, qlst, qist, ast, &
+        rhmin_liq_diag, rhmin_ice_diag, &
+        errmsg, errflg)
+   if (errflg /= 0) call endrun('macrop_driver_tend: park_macrophysics_run error: ' // trim(errmsg))
 
-   if( get_nstep() .le. 1 ) then
-       tcwat(:ncol,top_lev:pver)   = state_loc%t(:ncol,top_lev:pver)
-       qcwat(:ncol,top_lev:pver)   = state_loc%q(:ncol,top_lev:pver,1)
-       lcwat(:ncol,top_lev:pver)   = qc(:ncol,top_lev:pver) + qi(:ncol,top_lev:pver)
-       iccwat(:ncol,top_lev:pver)  = qi(:ncol,top_lev:pver)
-       nlwat(:ncol,top_lev:pver)   = nc(:ncol,top_lev:pver)
-       niwat(:ncol,top_lev:pver)   = ni(:ncol,top_lev:pver)
-       ttend(:ncol,:)   = 0._r8
-       qtend(:ncol,:)   = 0._r8
-       ltend(:ncol,:)   = 0._r8
-       itend(:ncol,:)   = 0._r8
-       nltend(:ncol,:)  = 0._r8
-       nitend(:ncol,:)  = 0._r8
-       CC_T(:ncol,:)    = 0._r8
-       CC_qv(:ncol,:)   = 0._r8
-       CC_ql(:ncol,:)   = 0._r8
-       CC_qi(:ncol,:)   = 0._r8
-       CC_nl(:ncol,:)   = 0._r8
-       CC_ni(:ncol,:)   = 0._r8
-       CC_qlst(:ncol,:) = 0._r8
-   else
-       ttend(:ncol,top_lev:pver)   = ( state_loc%t(:ncol,top_lev:pver)   -  tcwat(:ncol,top_lev:pver)) * rdtime &
-            - CC_T(:ncol,top_lev:pver)
-       qtend(:ncol,top_lev:pver)   = ( state_loc%q(:ncol,top_lev:pver,1) -  qcwat(:ncol,top_lev:pver)) * rdtime &
-            - CC_qv(:ncol,top_lev:pver)
-       ltend(:ncol,top_lev:pver)   = ( qc(:ncol,top_lev:pver) + qi(:ncol,top_lev:pver) - lcwat(:ncol,top_lev:pver) ) * rdtime &
-            - (CC_ql(:ncol,top_lev:pver) + CC_qi(:ncol,top_lev:pver))
-       itend(:ncol,top_lev:pver)   = ( qi(:ncol,top_lev:pver)         - iccwat(:ncol,top_lev:pver)) * rdtime &
-            - CC_qi(:ncol,top_lev:pver)
-       nltend(:ncol,top_lev:pver)  = ( nc(:ncol,top_lev:pver)         -  nlwat(:ncol,top_lev:pver)) * rdtime &
-            - CC_nl(:ncol,top_lev:pver)
-       nitend(:ncol,top_lev:pver)  = ( ni(:ncol,top_lev:pver)         -  niwat(:ncol,top_lev:pver)) * rdtime &
-            - CC_ni(:ncol,top_lev:pver)
-   endif
-   lmitend(:ncol,top_lev:pver) = ltend(:ncol,top_lev:pver) - itend(:ncol,top_lev:pver)
-
-   t_inout(:ncol,top_lev:pver)  =  tcwat(:ncol,top_lev:pver)
-   qv_inout(:ncol,top_lev:pver) =  qcwat(:ncol,top_lev:pver)
-   ql_inout(:ncol,top_lev:pver) =  lcwat(:ncol,top_lev:pver) - iccwat(:ncol,top_lev:pver)
-   qi_inout(:ncol,top_lev:pver) = iccwat(:ncol,top_lev:pver)
-   nl_inout(:ncol,top_lev:pver) =  nlwat(:ncol,top_lev:pver)
-   ni_inout(:ncol,top_lev:pver) =  niwat(:ncol,top_lev:pver)
-
- ! Liquid Microp_Driver Macrophysics.
- ! The main roles of this subroutines are
- ! (1) compute net condensation rate of stratiform liquid ( cmeliq )
- ! (2) compute liquid stratus and ice stratus fractions.
- ! Note 'ttend...' are advective tendencies except microphysical process while
- !      'CC...'    are microphysical tendencies.
-
-   call mmacro_pcond( lchnk, ncol, dtime, state_loc%pmid, state_loc%pdel,        &
-                      t_inout, qv_inout, ql_inout, qi_inout, nl_inout, ni_inout, &
-                      ttend, qtend, lmitend, itend, nltend, nitend,              &
-                      CC_T, CC_qv, CC_ql, CC_qi, CC_nl, CC_ni, CC_qlst,          &
-                      dlf_T, dlf_qv, dlf_ql, dlf_qi, dlf_nl, dlf_ni,             &
-                      concld_old, concld, clrw_old, clri_old, landfrac, snowh,   &
-                      tlat, qvlat, qcten, qiten, ncten, niten,                   &
-                      cmeliq, qvadj, qladj, qiadj, qllim, qilim,                 &
-                      cld, alst, aist, qlst, qist, do_cldice )
+   call outfld( 'RHMIN_LIQ', rhmin_liq_diag, pcols, lchnk )
+   call outfld( 'RHMIN_ICE', rhmin_ice_diag, pcols, lchnk )
 
  ! Copy of concld/fice to put in physics buffer
  ! Below are used only for convective cloud.
 
    fice_ql(:ncol,:top_lev-1)     = 0._r8
    fice_ql(:ncol,top_lev:pver)   = fice(:ncol,top_lev:pver)
-
-
- ! Compute net stratus fraction using maximum over-lapping assumption
-   ast(:ncol,:top_lev-1) = 0._r8
-   ast(:ncol,top_lev:pver) = max( alst(:ncol,top_lev:pver), aist(:ncol,top_lev:pver) )
 
    call t_stopf('mmacro_pcond')
 
