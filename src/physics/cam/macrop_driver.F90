@@ -221,9 +221,18 @@ end subroutine macrop_driver_readnl
          rhminh_out=rhminh_val, premit_out=premit_val, premib_out=premib_val)
 
     ! Initialization routine for cloud macrophysics
-    call park_macrophysics_init(rhminl_opt, rhmini_opt, &
-         rhminl_val, rhminl_adj_land_val, rhminh_val, premit_val, premib_val, &
-         iulog, masterproc, errmsg, errflg)
+    call park_macrophysics_init( &
+         rhminl_opt_in      = rhminl_opt, &
+         rhmini_opt_in      = rhmini_opt, &
+         rhminl_in          = rhminl_val, &
+         rhminl_adj_land_in = rhminl_adj_land_val, &
+         rhminh_in          = rhminh_val, &
+         premit_in          = premit_val, &
+         premib_in          = premib_val, &
+         iulog_in           = iulog, &
+         masterproc_in      = masterproc, &
+         errmsg             = errmsg, &
+         errflg             = errflg)
     if (errflg /= 0) call endrun(subname // ':: park_macrophysics_init error: ' // trim(errmsg))
 
     ! Register diagnostic fields previously in ini_macro
@@ -683,18 +692,51 @@ end subroutine macrop_driver_readnl
      ! This is the key procesure generating upper-level cirrus clouds.
      ! The unit of dlf : [ kg/kg/s ]
 
+   !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
+   det_s(:)     = 0._r8
+   det_ice(:)   = 0._r8
+   dpdlfliq(:,:) = 0._r8
+   dpdlfice(:,:) = 0._r8
+   shdlfliq(:,:) = 0._r8
+   shdlfice(:,:) = 0._r8
+   dpdlft(:,:)   = 0._r8
+   shdlft(:,:)   = 0._r8
+   !REMOVECAM_END
+
    ! Call portable detrainment scheme
    call park_macrophysics_detrain_run( &
-        ncol, pver, top_lev, &
-        latice, cpair, gravit, &
-        do_detrain, &
-        state_loc%t(:,:), state_loc%pdel(:,:), dlf(:,:), dlf2(:,:), &
-        ptend_loc%q(:,:,ixcldliq), ptend_loc%q(:,:,ixcldice), &
-        ptend_loc%q(:,:,ixnumliq), ptend_loc%q(:,:,ixnumice), ptend_loc%s(:,:), &
-        det_s, det_ice, &
-        dpdlfliq, dpdlfice, shdlfliq, shdlfice, dpdlft, shdlft, &
-        dlf_T, dlf_qv, dlf_ql, dlf_qi, dlf_nl, dlf_ni, &
-        errmsg, errflg)
+        ncol        = ncol, &
+        pver        = pver, &
+        top_lev     = top_lev, &
+        latice      = latice, &
+        cpair       = cpair, &
+        gravit      = gravit, &
+        do_detrain  = do_detrain, &
+        t           = state_loc%t(:ncol,:), &
+        pdel        = state_loc%pdel(:ncol,:), &
+        dlf         = dlf(:ncol,:), &
+        dlf2        = dlf2(:ncol,:), &
+        tend_cldliq = ptend_loc%q(:ncol,:,ixcldliq), &
+        tend_cldice = ptend_loc%q(:ncol,:,ixcldice), &
+        tend_numliq = ptend_loc%q(:ncol,:,ixnumliq), &
+        tend_numice = ptend_loc%q(:ncol,:,ixnumice), &
+        tend_s      = ptend_loc%s(:ncol,:), &
+        det_s       = det_s(:ncol), &
+        det_ice     = det_ice(:ncol), &
+        dpdlfliq    = dpdlfliq(:ncol,:), &
+        dpdlfice    = dpdlfice(:ncol,:), &
+        shdlfliq    = shdlfliq(:ncol,:), &
+        shdlfice    = shdlfice(:ncol,:), &
+        dpdlft      = dpdlft(:ncol,:), &
+        shdlft      = shdlft(:ncol,:), &
+        dlf_T       = dlf_T(:ncol,:), &
+        dlf_qv      = dlf_qv(:ncol,:), &
+        dlf_ql      = dlf_ql(:ncol,:), &
+        dlf_qi      = dlf_qi(:ncol,:), &
+        dlf_nl      = dlf_nl(:ncol,:), &
+        dlf_ni      = dlf_ni(:ncol,:), &
+        errmsg      = errmsg, &
+        errflg      = errflg)
    if (errflg /= 0) call endrun('macrop_driver_tend: park_macrophysics_detrain_run error: ' // trim(errmsg))
 
    call outfld( 'DPDLFLIQ ', dpdlfliq, pcols, lchnk )
@@ -879,26 +921,94 @@ end subroutine macrop_driver_readnl
  ! tcwat/qcwat/lcwat/iccwat/nlwat/niwat are updated in-place for save-for-next-timestep
  ! (but will be overwritten below with post-physics_update equilibrium state).
 
+   !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
+   tlat(:,:)           = 0._r8
+   qvlat(:,:)          = 0._r8
+   qcten(:,:)          = 0._r8
+   qiten(:,:)          = 0._r8
+   ncten(:,:)          = 0._r8
+   niten(:,:)          = 0._r8
+   cmeliq(:,:)         = 0._r8
+   qvadj(:,:)          = 0._r8
+   qladj(:,:)          = 0._r8
+   qiadj(:,:)          = 0._r8
+   qllim(:,:)          = 0._r8
+   qilim(:,:)          = 0._r8
+   cld(:,:)            = 0._r8
+   alst(:,:)           = 0._r8
+   aist(:,:)           = 0._r8
+   qlst(:,:)           = 0._r8
+   qist(:,:)           = 0._r8
+   ast(:,:)            = 0._r8
+   rhmin_liq_diag(:,:) = 0._r8
+   rhmin_ice_diag(:,:) = 0._r8
+   !REMOVECAM_END
+
    call park_macrophysics_run( &
-        ncol, pver, top_lev, get_nstep(), &
-        dtime, &
-        cpair, latvap, latice, rh2o, gravit, rair, &
-        ccpp_const_props, qmin, &
-        state_loc%t(:,:), state_loc%q(:,:,1), &
-        state_loc%q(:,:,ixcldliq), state_loc%q(:,:,ixcldice), &
-        state_loc%q(:,:,ixnumliq), state_loc%q(:,:,ixnumice), &
-        state_loc%pmid(:,:), state_loc%pdel(:,:), &
-        tcwat, qcwat, lcwat, iccwat, nlwat, niwat, &
-        CC_T, CC_qv, CC_ql, CC_qi, CC_nl, CC_ni, CC_qlst, &
-        dlf_T, dlf_qv, dlf_ql, dlf_qi, dlf_nl, dlf_ni, &
-        concld_old, concld, clrw_old, clri_old, &
-        landfrac, snowh, &
-        do_cldice, &
-        tlat, qvlat, qcten, qiten, ncten, niten, &
-        cmeliq, qvadj, qladj, qiadj, qllim, qilim, &
-        cld, alst, aist, qlst, qist, ast, &
-        rhmin_liq_diag, rhmin_ice_diag, &
-        errmsg, errflg)
+        ncol        = ncol, &
+        pver        = pver, &
+        top_lev     = top_lev, &
+        nstep       = get_nstep(), &
+        dtime       = dtime, &
+        cpair_in    = cpair, &
+        latvap_in   = latvap, &
+        latice_in   = latice, &
+        const_props = ccpp_const_props, &
+        qmin        = qmin(:), &
+        t           = state_loc%t(:ncol,:), &
+        q_wv        = state_loc%q(:ncol,:,1), &
+        cldliq      = state_loc%q(:ncol,:,ixcldliq), &
+        cldice      = state_loc%q(:ncol,:,ixcldice), &
+        numliq      = state_loc%q(:ncol,:,ixnumliq), &
+        numice      = state_loc%q(:ncol,:,ixnumice), &
+        pmid        = state_loc%pmid(:ncol,:), &
+        pdel        = state_loc%pdel(:ncol,:), &
+        tcwat       = tcwat(:ncol,:), &
+        qcwat       = qcwat(:ncol,:), &
+        lcwat       = lcwat(:ncol,:), &
+        iccwat      = iccwat(:ncol,:), &
+        nlwat       = nlwat(:ncol,:), &
+        niwat       = niwat(:ncol,:), &
+        CC_T        = CC_T(:ncol,:), &
+        CC_qv       = CC_qv(:ncol,:), &
+        CC_ql       = CC_ql(:ncol,:), &
+        CC_qi       = CC_qi(:ncol,:), &
+        CC_nl       = CC_nl(:ncol,:), &
+        CC_ni       = CC_ni(:ncol,:), &
+        CC_qlst     = CC_qlst(:ncol,:), &
+        dlf_T       = dlf_T(:ncol,:), &
+        dlf_qv      = dlf_qv(:ncol,:), &
+        dlf_ql      = dlf_ql(:ncol,:), &
+        dlf_qi      = dlf_qi(:ncol,:), &
+        dlf_nl      = dlf_nl(:ncol,:), &
+        dlf_ni      = dlf_ni(:ncol,:), &
+        concld_old  = concld_old(:ncol,:), &
+        concld      = concld(:ncol,:), &
+        landfrac    = landfrac(:ncol), &
+        snowh       = snowh(:ncol), &
+        do_cldice   = do_cldice, &
+        tlat        = tlat(:ncol,:), &
+        qvlat       = qvlat(:ncol,:), &
+        qcten       = qcten(:ncol,:), &
+        qiten       = qiten(:ncol,:), &
+        ncten       = ncten(:ncol,:), &
+        niten       = niten(:ncol,:), &
+        cmeliq      = cmeliq(:ncol,:), &
+        qvadj       = qvadj(:ncol,:), &
+        qladj       = qladj(:ncol,:), &
+        qiadj       = qiadj(:ncol,:), &
+        qllim       = qllim(:ncol,:), &
+        qilim       = qilim(:ncol,:), &
+        cld         = cld(:ncol,:), &
+        alst        = alst(:ncol,:), &
+        aist        = aist(:ncol,:), &
+        qlst        = qlst(:ncol,:), &
+        qist        = qist(:ncol,:), &
+        ast         = ast(:ncol,:), &
+        rhmin_liq   = rhmin_liq_diag(:ncol,:), &
+        rhmin_ice   = rhmin_ice_diag(:ncol,:), &
+        errmsg      = errmsg, &
+        errflg      = errflg)
    if (errflg /= 0) call endrun('macrop_driver_tend: park_macrophysics_run error: ' // trim(errmsg))
 
    call outfld( 'RHMIN_LIQ', rhmin_liq_diag, pcols, lchnk )

@@ -327,14 +327,14 @@
    subroutine park_macrophysics_run( &
        ncol, pver, top_lev, nstep, &
        dtime, &
-       cpair_in, latvap_in, latice_in, rh2o, gravit, rair, &
+       cpair_in, latvap_in, latice_in, &
        const_props, qmin, &
        t, q_wv, cldliq, cldice, numliq, numice, &
        pmid, pdel, &
        tcwat, qcwat, lcwat, iccwat, nlwat, niwat, &
        CC_T, CC_qv, CC_ql, CC_qi, CC_nl, CC_ni, CC_qlst, &
        dlf_T, dlf_qv, dlf_ql, dlf_qi, dlf_nl, dlf_ni, &
-       concld_old, concld, clrw_old, clri_old, &
+       concld_old, concld, &
        landfrac, snowh, &
        do_cldice, &
        tlat, qvlat, qcten, qiten, ncten, niten, &
@@ -352,9 +352,6 @@
    real(kind_phys), intent(in) :: cpair_in
    real(kind_phys), intent(in) :: latvap_in
    real(kind_phys), intent(in) :: latice_in
-   real(kind_phys), intent(in) :: rh2o
-   real(kind_phys), intent(in) :: gravit
-   real(kind_phys), intent(in) :: rair
 
    type(ccpp_constituent_prop_ptr_t), intent(in) :: const_props(:)
    real(kind_phys), intent(in) :: qmin(:)
@@ -393,8 +390,6 @@
 
    real(kind_phys), intent(in)    :: concld_old(:,:)
    real(kind_phys), intent(in)    :: concld(:,:)
-   real(kind_phys), intent(in)    :: clrw_old(:,:)
-   real(kind_phys), intent(in)    :: clri_old(:,:)
 
    real(kind_phys), intent(in)    :: landfrac(:)
    real(kind_phys), intent(in)    :: snowh(:)
@@ -513,7 +508,6 @@
    real(kind_phys) ni_dprime(ncol,pver)                    ! Grid-mean ni after 'fice_force' on ni_prime
    real(kind_phys) ni_star(ncol,pver)                      ! Grid-mean ni after 'instratus_condensate' on ni_dprime
 
-   real(kind_phys) a_st(ncol,pver)                         ! Stratus fraction of equilibrium reference state
    real(kind_phys) a_st_0(ncol,pver)                       ! Stratus fraction at '_0' state
    real(kind_phys) a_st_star(ncol,pver)                    ! Stratus fraction at '_star' state
 
@@ -594,14 +588,11 @@
    real(kind_phys) QQ_final(ncol,pver)
    real(kind_phys) QQw_final(ncol,pver)
    real(kind_phys) QQi_final(ncol,pver)
-   real(kind_phys) QQn_final(ncol,pver)
    real(kind_phys) QQnl_final(ncol,pver)
    real(kind_phys) QQni_final(ncol,pver)
 
-   real(kind_phys) QQ_all(ncol,pver)         ! QQw_all    + QQi_all
    real(kind_phys) QQw_all(ncol,pver)        ! QQw_final  + QQw1  + QQw2  + qlten_pwi1 + qlten_pwi2 + A_ql_adj [kg/kg/s]
    real(kind_phys) QQi_all(ncol,pver)        ! QQi_final  + QQi1  + QQi2  + qiten_pwi1 + qiten_pwi2 + A_qi_adj [kg/kg/s]
-   real(kind_phys) QQn_all(ncol,pver)        ! QQnl_all   + QQni_all
    real(kind_phys) QQnl_all(ncol,pver)       ! QQnl_final + QQnl1 + QQnl2 + nlten_pwi1 + nlten_pwi2 + ACnl [#/kg/s]
    real(kind_phys) QQni_all(ncol,pver)       ! QQni_final + QQni1 + QQni2 + niten_pwi1 + niten_pwi2 + ACni [#/kg/s]
 
@@ -616,9 +607,6 @@
    real(kind_phys) betast                                  ! = alpha*dqsdT
    real(kind_phys) gammal                                  ! = alpha + (latvap/cpair)*beta
    real(kind_phys) gammai                                  ! = alpha + ((latvap+latice)/cpair)*beta
-   real(kind_phys) gammaQ                                  ! = alpha + (latvap/cpair)*beta
-   real(kind_phys) deltal                                  ! = 1 + a_st*(latvap/cpair)*(betast/alpha)
-   real(kind_phys) deltai                                  ! = 1 + a_st*((latvap+latice)/cpair)*(betast/alpha)
    real(kind_phys) A_Tc                                    ! Advective external forcing of Tc [K/s]
    real(kind_phys) A_qt                                    ! Advective external forcing of qt [kg/kg/s]
    real(kind_phys) C_Tc                                    ! Microphysical forcing of Tc [K/s]
@@ -630,7 +618,6 @@
 
    real(kind_phys) dqlstdt                                 ! d(ql_st)/dt [kg/kg/s]
    real(kind_phys) dalstdt                                 ! d(al_st)/dt  [1/s]
-   real(kind_phys) dastdt                                  ! d(a_st)/dt  [1/s]
 
    real(kind_phys) anic                                    ! Fractional area of non-cumulus and non-ice stratus fraction
    real(kind_phys) GG                                      ! G_nc(i,k)/anic
@@ -856,7 +843,6 @@
      ni_dprime(:ncol,:) = 0._kind_phys
      ni_star(:ncol,:)   = 0._kind_phys
 
-     a_st(:ncol,:)      = 0._kind_phys
      a_st_0(:ncol,:)    = 0._kind_phys
      a_st_star(:ncol,:) = 0._kind_phys
 
@@ -944,14 +930,11 @@
      QQ_final(:ncol,:)  = 0._kind_phys
      QQw_final(:ncol,:) = 0._kind_phys
      QQi_final(:ncol,:) = 0._kind_phys
-     QQn_final(:ncol,:) = 0._kind_phys
      QQnl_final(:ncol,:) = 0._kind_phys
      QQni_final(:ncol,:) = 0._kind_phys
 
-     QQ_all(:ncol,:)    = 0._kind_phys
      QQw_all(:ncol,:)   = 0._kind_phys
      QQi_all(:ncol,:)   = 0._kind_phys
-     QQn_all(:ncol,:)   = 0._kind_phys
      QQnl_all(:ncol,:)  = 0._kind_phys
      QQni_all(:ncol,:)  = 0._kind_phys
 
@@ -1117,7 +1100,6 @@
    qi_mm(:ncol,top_lev:)  = qi_0(:ncol,top_lev:)
    al_st(:ncol,top_lev:)  = al_st_0(:ncol,top_lev:)
    ai_st(:ncol,top_lev:)  = ai_st_0(:ncol,top_lev:)
-   a_st(:ncol,top_lev:)   = a_st_0(:ncol,top_lev:)
    ql_st(:ncol,top_lev:)  = ql_st_0(:ncol,top_lev:)
    qi_st(:ncol,top_lev:)  = qi_st_0(:ncol,top_lev:)
    nl(:ncol,top_lev:)     = nl_0(:ncol,top_lev:)
@@ -1178,7 +1160,6 @@
 
       ai_st(:ncol,k)  =  (1._kind_phys-a_cu(:ncol,k))*ai_st_nc(:ncol,k)
       al_st(:ncol,k)  =  (1._kind_phys-a_cu(:ncol,k))*al_st_nc(:ncol,k)
-      a_st(:ncol,k)   =  max(al_st(:ncol,k),ai_st(:ncol,k))
 
       do i = 1, ncol
 
@@ -1191,9 +1172,6 @@
          betast =  alpha*dqsdT_b(i)
          gammal =  alpha + (latvap/cpair)*beta
          gammai =  alpha + ((latvap+latice)/cpair)*beta
-         gammaQ =  alpha + (latvap/cpair)*beta
-         deltal =  1._kind_phys + a_st(i,k)*(latvap/cpair)*(betast/alpha)
-         deltai =  1._kind_phys + a_st(i,k)*((latvap+latice)/cpair)*(betast/alpha)
          A_Tc   =  ttend(i,k)+A_T_adj(i,k)-(latvap/cpair)*(lmitend(i,k)+A_ql_adj(i,k))-((latvap+latice)/cpair)*(itend(i,k)+A_qi_adj(i,k))
          A_qt   =  qtend(i,k) + A_qv_adj(i,k) + lmitend(i,k) + A_ql_adj(i,k) + itend(i,k) + A_qi_adj(i,k)
          C_Tc   =  CC_T_loc(i,k) - (latvap/cpair)*CC_ql_loc(i,k) - ((latvap+latice)/cpair)*CC_qi_loc(i,k)
@@ -1438,7 +1416,6 @@
    qi_mm(:ncol,top_lev:)  = qi_star(:ncol,top_lev:)
    al_st(:ncol,top_lev:)  = alst(:ncol,top_lev:)
    ai_st(:ncol,top_lev:)  = aist(:ncol,top_lev:)
-   a_st(:ncol,top_lev:)   = a_st_star(:ncol,top_lev:)
    ql_st(:ncol,top_lev:)  = qlst(:ncol,top_lev:)
    qi_st(:ncol,top_lev:)  = qist(:ncol,top_lev:)
    nl(:ncol,top_lev:)     = nl_star(:ncol,top_lev:)
@@ -1465,15 +1442,12 @@
         qlten_pwi1(:ncol,top_lev:) + qlten_pwi2(:ncol,top_lev:) + A_ql_adj(:ncol,top_lev:)
    QQi_all(:ncol,top_lev:)    = QQi_prog(:ncol,top_lev:)  + QQi1(:ncol,top_lev:) + QQi2(:ncol,top_lev:) + &
         qiten_pwi1(:ncol,top_lev:) + qiten_pwi2(:ncol,top_lev:) + A_qi_adj(:ncol,top_lev:)
-   QQ_all(:ncol,top_lev:)     = QQw_all(:ncol,top_lev:)   + QQi_all(:ncol,top_lev:)
    QQnl_final(:ncol,top_lev:) = QQnl_prog(:ncol,top_lev:)
    QQni_final(:ncol,top_lev:) = QQni_prog(:ncol,top_lev:)
-   QQn_final(:ncol,top_lev:)  = QQnl_final(:ncol,top_lev:) + QQni_final(:ncol,top_lev:)
    QQnl_all(:ncol,top_lev:)   = QQnl_prog(:ncol,top_lev:)  + QQnl1(:ncol,top_lev:) + QQnl2(:ncol,top_lev:) + &
         nlten_pwi1(:ncol,top_lev:) + nlten_pwi2(:ncol,top_lev:) + ACnl(:ncol,top_lev:) + A_nl_adj(:ncol,top_lev:)
    QQni_all(:ncol,top_lev:)   = QQni_prog(:ncol,top_lev:)  + QQni1(:ncol,top_lev:) + QQni2(:ncol,top_lev:) + &
         niten_pwi1(:ncol,top_lev:) + niten_pwi2(:ncol,top_lev:) + ACni(:ncol,top_lev:) + A_ni_adj(:ncol,top_lev:)
-   QQn_all(:ncol,top_lev:)    = QQnl_all(:ncol,top_lev:)   + QQni_all(:ncol,top_lev:)
    cmeliq(:ncol,top_lev:)     = QQ_final(:ncol,top_lev:)
    qvadj(:ncol,top_lev:)      = qvten_pwi1(:ncol,top_lev:) + qvten_pwi2(:ncol,top_lev:) + A_qv_adj(:ncol,top_lev:)
    qladj(:ncol,top_lev:)      = qlten_pwi1(:ncol,top_lev:) + qlten_pwi2(:ncol,top_lev:) + A_ql_adj(:ncol,top_lev:)
@@ -1646,13 +1620,8 @@
    real(kind_phys) al0_st
    real(kind_phys) ai0_st_nc
    real(kind_phys) ai0_st
-   real(kind_phys) a0_st
    real(kind_phys) ql0_nc
    real(kind_phys) qi0_nc
-   real(kind_phys) qc0_nc
-   real(kind_phys) ql0_st
-   real(kind_phys) qi0_st
-   real(kind_phys) qc0_st
    real(kind_phys) T
    real(kind_phys) qv
    real(kind_phys) ql
@@ -1673,7 +1642,6 @@
    real(kind_phys) al_st_nc
    real(kind_phys) ai_st_nc
    real(kind_phys) G_nc
-   real(kind_phys) a_st
    real(kind_phys) al_st
    real(kind_phys) ai_st
    real(kind_phys) Tmin0
@@ -1766,13 +1734,11 @@
                            rhmaxi, rhmini, rhminl, rhminl_adj_land, rhminh)
           ai0_st  = (1._kind_phys-a_dc-a_sc)*ai0_st_nc
           al0_st  = (1._kind_phys-a_dc-a_sc)*al0_st_nc
-          a0_st   = max(ai0_st,al0_st)
           idxmod  = 1
       else
           ai0_st  = (1._kind_phys-a_dc-a_sc)*ai0_st_nc_in(i)
           al0_st  = (1._kind_phys-a_dc-a_sc)*al0_st_nc_in(i)
       endif
-      a0_st   = max(ai0_st,al0_st)
 
       ! ----------------------- !
       ! Handling of input state !
@@ -1780,7 +1746,6 @@
 
       ql0_nc  = max(0._kind_phys,ql0-a_dc*ql_dc-a_sc*ql_sc)
       qi0_nc  = max(0._kind_phys,qi0-a_dc*qi_dc-a_sc*qi_sc)
-      qc0_nc  = ql0_nc + qi0_nc
 
       Tmin0 = T0 - (latvap/cpair)*ql0
       Tmax0 = T0 + ((latvap+latice)/cpair)*qv0
@@ -1949,8 +1914,6 @@
          al_st  = (1._kind_phys-a_dc-a_sc)*al0_st_nc_in(i)
      endif
 
-     a_st  = max(ai_st,al_st)
-
      if( al_st .eq. 0._kind_phys ) then
          ql_st = 0._kind_phys
      else
@@ -2045,10 +2008,8 @@
    real(kind_phys) muQ0, muQ
    real(kind_phys) ql_nc0, qi_nc0, qc_nc0, qc_nc
    real(kind_phys) fice0, fice
-   real(kind_phys) ficeg0, ficeg
-   real(kind_phys) esat0
    real(kind_phys) qsat0
-   real(kind_phys) dqcncdt, dastdt, dUdt
+   real(kind_phys) dqcncdt, dUdt
    real(kind_phys) alpha, beta
    real(kind_phys) U, U_nc
    real(kind_phys) al_st_nc, G_nc
@@ -2070,7 +2031,6 @@
    qi_nc0 = max(0._kind_phys,qi0-a_dc*qi_dc-a_sc*qi_sc)
    qc_nc0 = max(0._kind_phys,ql0+qi0-a_dc*(ql_dc+qi_dc)-a_sc*(ql_sc+qi_sc))
    fice0  = 0._kind_phys
-   ficeg0 = 0._kind_phys
    muQ0   = 1._kind_phys
 
    ! ------------ !
