@@ -996,12 +996,18 @@ subroutine gw_drag_cam_front_diag_init(use_gw_front, use_gw_front_igw, pgwv, gw_
      ! Output for gravity waves from frontogenesis (C&M scheme)
      call gw_spec_addflds(pgwv, gw_dc, prefix=cm_pf, scheme="C&M", &
           history_defaults=history_waccm)
+
+     call addfld('UBT_LIM_RATIO_FRONT', (/ 'lev' /), 'A', '1', &
+          'ubt tndmax limiter ratio (<=1 where clipped), frontogenesis GW')
   end if
 
   if (use_gw_front_igw) then
      ! Output for inertial gravity waves from frontogenesis (C&M IGW scheme)
      call gw_spec_addflds(pgwv_long, gw_dc_long, prefix=cm_igw_pf, scheme="C&M IGW", &
           history_defaults=history_waccm)
+
+     call addfld('UBT_LIM_RATIO_FRONT_IGW', (/ 'lev' /), 'A', '1', &
+          'ubt tndmax limiter ratio (<=1 where clipped), frontogenesis inertial GW')
   end if
 
 end subroutine gw_drag_cam_front_diag_init
@@ -1048,6 +1054,9 @@ subroutine gw_drag_cam_oro_diag_init()
     call add_default('TAUGWY  ', 1, ' ')
   end if
 
+  call addfld('UBT_LIM_RATIO_OROGW', (/ 'lev' /), 'A', '1', &
+      'ubt tndmax limiter ratio (<=1 where clipped), orographic GW')
+
 end subroutine gw_drag_cam_oro_diag_init
 
 subroutine gw_drag_cam_rdg_diag_init(use_gw_rdg_beta,use_gw_rdg_gamma)
@@ -1086,6 +1095,9 @@ subroutine gw_drag_cam_rdg_diag_init(use_gw_rdg_beta,use_gw_rdg_gamma)
         call add_default('TAUARDGBETAX', 1, ' ')
         call add_default('TAUARDGBETAY  ', 1, ' ')
      end if
+
+     call addfld('UBT_LIM_RATIO_RDGBETA', (/ 'lev' /), 'A', '1', &
+          'ubt tndmax limiter ratio (<=1 where clipped), ridge beta GW')
   end if
 
   if (use_gw_rdg_gamma) then
@@ -1106,6 +1118,8 @@ subroutine gw_drag_cam_rdg_diag_init(use_gw_rdg_beta,use_gw_rdg_gamma)
           'V wind tendency from ridge 6     ')
      call register_vector_field('UTRDGGM','VTRDGGM')
 
+     call addfld('UBT_LIM_RATIO_RDGGAMMA', (/ 'lev' /), 'A', '1', &
+          'ubt tndmax limiter ratio (<=1 where clipped), ridge gamma GW')
   end if
 end subroutine gw_drag_cam_rdg_diag_init
 !==========================================================================
@@ -1147,6 +1161,9 @@ subroutine gw_drag_cam_beres_diag_init(use_gw_convect_dp,use_gw_convect_sh, gw_d
         call add_default('HDEPTH   ', 1, ' ')
         call add_default('MAXQ0    ', 1, ' ')
      end if
+
+     call addfld('UBT_LIM_RATIO_BERESDP', (/ 'lev' /), 'A', '1', &
+          'ubt tndmax limiter ratio (<=1 where clipped), Beres deep convective GW')
   end if
 
   if (use_gw_convect_sh) then
@@ -1166,6 +1183,9 @@ subroutine gw_drag_cam_beres_diag_init(use_gw_convect_dp,use_gw_convect_sh, gw_d
         call add_default('SHDEPTH  ', 1, ' ')
         call add_default('SMAXQ0   ', 1, ' ')
      end if
+
+     call addfld('UBT_LIM_RATIO_BERESSH', (/ 'lev' /), 'A', '1', &
+          'ubt tndmax limiter ratio (<=1 where clipped), Beres shallow convective GW')
   end if
 
 end subroutine gw_drag_cam_beres_diag_init
@@ -1229,6 +1249,9 @@ subroutine gw_drag_cam_movmtn_diag_init(use_gw_movmtn_pbl, file_name, psteer, pl
           'Gravity Wave Moving Mountain - Y-momflux from CLUBB to GW')
      call addfld ('XPWP_SRC_MOVMTN',horiz_only,'I','m+2 s-2', &
           'Gravity Wave Moving Mountain - flux source for moving mtn')
+
+     call addfld('UBT_LIM_RATIO_MOVMTN', (/ 'lev' /), 'A', '1', &
+          'ubt tndmax limiter ratio (<=1 where clipped), moving mountain GW')
   end if
 
 end subroutine gw_drag_cam_movmtn_diag_init
@@ -1317,6 +1340,16 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
   real(r8) :: utgw(pcols, pver) ! zonal wind tendency
   real(r8) :: vtgw(pcols, pver) ! meridional wind tendency
   real(r8) :: qtgw(pcols,pver,pcnst) ! constituents tendencies
+
+  ! Diagnostic: tndmax limiter ratio (<=1 where clipped, =1 otherwise) per scheme.
+  real(r8) :: ubt_lim_ratio_orogw(pcols, pver)
+  real(r8) :: ubt_lim_ratio_rdgbeta(pcols, pver)
+  real(r8) :: ubt_lim_ratio_rdggamma(pcols, pver)
+  real(r8) :: ubt_lim_ratio_front(pcols, pver)
+  real(r8) :: ubt_lim_ratio_front_igw(pcols, pver)
+  real(r8) :: ubt_lim_ratio_movmtn(pcols, pver)
+  real(r8) :: ubt_lim_ratio_beresdp(pcols, pver)
+  real(r8) :: ubt_lim_ratio_beressh(pcols, pver)
 
   ! effective gw diffusivity at interfaces needed for output
   ! sum from the two types of spectral GW
@@ -1491,6 +1524,7 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
     CS(:) = 0._r8
     steer_level(:) = 0._r8
     xpwp_src(:) = 0._r8
+    ubt_lim_ratio_movmtn(:,:) = 1._r8
 
     call gravity_wave_drag_moving_mountain_run( &
       ncol                = ncol, &
@@ -1548,6 +1582,7 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
       CS                  = CS(:ncol), &
       steer_level         = steer_level(:ncol), &
       xpwp_src            = xpwp_src(:ncol), &
+      ubt_lim_ratio       = ubt_lim_ratio_movmtn(:ncol,:pver), &
       errmsg              = errmsg, &
       errflg              = errflg)
 
@@ -1585,6 +1620,7 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
     call outfld('CS_MOVMTN', CS, pcols, lchnk)
     call outfld('STEER_LEVEL_MOVMTN', steer_level, pcols, lchnk )
     call outfld('XPWP_SRC_MOVMTN', xpwp_src, pcols, lchnk )
+    call outfld('UBT_LIM_RATIO_MOVMTN', ubt_lim_ratio_movmtn, pcols, lchnk)
   end if
 
   ! Convective gravity waves (Beres scheme, deep).
@@ -1595,6 +1631,7 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
     taucd_north(:,:) = 0._r8
     hdepth(:) = 0._r8
     maxq0(:) = 0._r8
+    ubt_lim_ratio_beresdp(:,:) = 1._r8
 
     call gravity_wave_drag_convection_deep_run( &
           ncol            = ncol, &
@@ -1645,6 +1682,7 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
           taucd_east      = taucd_east(:ncol,:pverp), &
           taucd_south     = taucd_south(:ncol,:pverp), &
           taucd_north     = taucd_north(:ncol,:pverp), &
+          ubt_lim_ratio   = ubt_lim_ratio_beresdp(:ncol,:pver), &
           errmsg          = errmsg, &
           errflg          = errflg)
 
@@ -1672,12 +1710,14 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
     call outfld('NETDT', ttend_dp_arr, pcols, lchnk)
     call outfld('HDEPTH', hdepth/1000._r8, pcols, lchnk)
     call outfld('MAXQ0', maxq0, pcols, lchnk)
+    call outfld('UBT_LIM_RATIO_BERESDP', ubt_lim_ratio_beresdp, pcols, lchnk)
   end if
 
   ! Convective gravity waves (Beres scheme, shallow).
   if (use_gw_convect_sh) then
     hdepth(:) = 0._r8
     maxq0(:) = 0._r8
+    ubt_lim_ratio_beressh(:,:) = 1._r8
 
     call gravity_wave_drag_convection_shallow_run( &
           ncol            = ncol, &
@@ -1724,6 +1764,7 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
           egwdffi_tot     = egwdffi_tot(:ncol,:pverp), &
           dttdf           = dttdf(:ncol,:pver), &
           dttke           = dttke(:ncol,:pver), &
+          ubt_lim_ratio   = ubt_lim_ratio_beressh(:ncol,:pver), &
           errmsg          = errmsg, &
           errflg          = errflg)
 
@@ -1744,6 +1785,7 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
     call outfld('SNETDT',  ttend_sh, pcols, lchnk)
     call outfld('SHDEPTH', hdepth/1000._r8, pcols, lchnk)
     call outfld('SMAXQ0',  maxq0, pcols, lchnk)
+    call outfld('UBT_LIM_RATIO_BERESSH', ubt_lim_ratio_beressh, pcols, lchnk)
   end if
 
   ! Call the CCPPized subroutine
@@ -1757,6 +1799,7 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
     utend3(:,:) = 0._r8
     utend4(:,:) = 0._r8
     utend5(:,:) = 0._r8
+    ubt_lim_ratio_front(:,:) = 1._r8
 
     call gravity_wave_drag_frontogenesis_run( &
          ncol             = ncol, &
@@ -1809,6 +1852,7 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
          utend3           = utend3(:ncol,:pver), &
          utend4           = utend4(:ncol,:pver), &
          utend5           = utend5(:ncol,:pver), &
+         ubt_lim_ratio    = ubt_lim_ratio_front(:ncol,:pver), &
          flx_heat         = flx_heat(:ncol), &
          errmsg           = errmsg, &
          errflg           = errflg)
@@ -1840,9 +1884,11 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
     call outfld (trim(cm_pf)//'TAUN', taucd_north, pcols, lchnk)
     call outfld (trim(cm_pf)//'TAUS', taucd_south, pcols, lchnk)
     call outfld (trim(cm_pf)//'TAUNET', taucd_east + taucd_west, pcols, lchnk)
+    call outfld('UBT_LIM_RATIO_FRONT', ubt_lim_ratio_front, pcols, lchnk)
   endif
 
   if(use_gw_front_igw) then
+    ubt_lim_ratio_front_igw(:,:) = 1._r8
     call gravity_wave_drag_frontogenesis_inertial_run( &
          ncol             = ncol, &
          pver             = pver, &
@@ -1885,6 +1931,7 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
          qtgw             = qtgw(:ncol,:pver,:), &
          dttdf            = dttdf(:ncol,:pver), &
          dttke            = dttke(:ncol,:pver), &
+         ubt_lim_ratio    = ubt_lim_ratio_front_igw(:ncol,:pver), &
          flx_heat         = flx_heat(:ncol), &
          errmsg           = errmsg, &
          errflg           = errflg)
@@ -1892,12 +1939,15 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
     if(errflg /= 0) then
       call endrun("gravity_wave_drag_frontogenesis_inertial_run: " // errmsg)
     endif
+
+    call outfld('UBT_LIM_RATIO_FRONT_IGW', ubt_lim_ratio_front_igw, pcols, lchnk)
   endif
 
   if(use_gw_oro) then
     tau0x(:) = 0._r8
     tau0y(:) = 0._r8
     taua(:,:) = 0._r8
+    ubt_lim_ratio_orogw(:,:) = 1._r8
 
     call gravity_wave_drag_orographic_run( &
       ncol              = ncol, &
@@ -1946,6 +1996,7 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
       tau0x             = tau0x(:ncol), &
       tau0y             = tau0y(:ncol), &
       taua              = taua(:ncol,:pverp), &
+      ubt_lim_ratio     = ubt_lim_ratio_orogw(:ncol,:pver), &
       flx_heat          = flx_heat(:ncol), &
       errmsg            = errmsg, &
       errflg            = errflg)
@@ -1962,9 +2013,11 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
     call outfld('TTGWSKEORO', dttke / cpair,  pcols, lchnk)
     call outfld('TAUGWX', tau0x, pcols, lchnk)
     call outfld('TAUGWY', tau0y, pcols, lchnk)
+    call outfld('UBT_LIM_RATIO_OROGW', ubt_lim_ratio_orogw, pcols, lchnk)
   endif
 
   if (use_gw_rdg_beta) then
+    ubt_lim_ratio_rdgbeta(:,:) = 1._r8
     ! Save state at top of routine
     ! Useful for unit testing checks
     call outfld('UEGW', state1%u ,  ncol, lchnk)
@@ -2026,6 +2079,7 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
       utgw                    = utgw(:ncol,:pver), &
       vtgw                    = vtgw(:ncol,:pver), &
       ttgw                    = ttgw(:ncol,:pver), &
+      ubt_lim_ratio           = ubt_lim_ratio_rdgbeta(:ncol,:pver), &
       errmsg                  = errmsg, &
       errflg                  = errflg)
 
@@ -2042,9 +2096,13 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
      call outfld('TAUARDGBETAX', tauardgx, ncol, lchnk)
      call outfld('TAUARDGBETAY', tauardgy, ncol, lchnk)
 
+     call outfld('UBT_LIM_RATIO_RDGBETA', ubt_lim_ratio_rdgbeta, pcols, lchnk)
+
   end if
 
   if (use_gw_rdg_gamma) then
+    ubt_lim_ratio_rdggamma(:,:) = 1._r8
+
     ! Save state at top of routine
     ! Useful for unit testing checks
     call outfld('UEGW', state1%u ,  ncol, lchnk)
@@ -2104,6 +2162,7 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
       utgw                    = utgw(:ncol,:pver), &
       vtgw                    = vtgw(:ncol,:pver), &
       ttgw                    = ttgw(:ncol,:pver), &
+      ubt_lim_ratio           = ubt_lim_ratio_rdggamma(:ncol,:pver), &
       errmsg                  = errmsg, &
       errflg                  = errflg)
 
@@ -2119,6 +2178,8 @@ subroutine gw_drag_cam_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
 
     call outfld('TAUARDGGAMMAX', tauardgx, ncol, lchnk)
     call outfld('TAUARDGGAMMAY', tauardgy, ncol, lchnk)
+
+    call outfld('UBT_LIM_RATIO_RDGGAMMA', ubt_lim_ratio_rdggamma, pcols, lchnk)
   end if
 
   ! Call the CCPPized subroutine to clean up
