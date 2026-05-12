@@ -3,16 +3,18 @@
 !----------------------------------------------------------------------
 module mo_tuvx
 
+#ifdef USE_TUVX
    use musica_map,              only : map_t
    use musica_string,           only : string_t
-   use ppgrid,                  only : pver, & ! number of vertical layers
-                                       pverp   ! number of vertical interfaces (pver + 1)
-   use shr_kind_mod,            only : r8 => shr_kind_r8, cl=>shr_kind_cl
    use tuvx_core,               only : core_t
    use tuvx_grid_from_host,     only : grid_updater_t
    use tuvx_profile_from_host,  only : profile_updater_t
    use tuvx_radiator_from_host, only : radiator_updater_t
+#endif
 
+   use ppgrid,                  only : pver, & ! number of vertical layers
+                                       pverp   ! number of vertical interfaces (pver + 1)
+   use shr_kind_mod,            only : r8 => shr_kind_r8, cl=>shr_kind_cl
    use interpolate_data, only : lininterp_init, lininterp, interp_type
    use physics_buffer,  only : pbuf_get_field, pbuf_get_index, physics_buffer_desc
    use radconstants, only : nswbands
@@ -38,6 +40,7 @@ module mo_tuvx
    public :: tuvx_finalize
    public :: tuvx_active
 
+#ifdef USE_TUVX
    ! Inidices for grid updaters
    integer, parameter :: NUM_GRIDS = 2             ! number of grids that CAM will update at runtime
    integer, parameter :: GRID_INDEX_HEIGHT     = 1 ! Height grid index
@@ -141,10 +144,6 @@ module mo_tuvx
    end type diagnostic_t
    type(diagnostic_t), allocatable :: diagnostics(:)
 
-   ! namelist options
-   character(len=cl) :: tuvx_config_path = 'NONE'  ! absolute path to TUVX configuration file
-   logical, protected :: tuvx_active = .false.
-
   integer :: swaertau_idx   = -1       ! shortwave aerosol extinction optical depth. tau
   integer :: swaertauw_idx  = -1       ! shortwave aerosol extinction optical depth * single scattering albedo. tau*w
   integer :: swaertauwg_idx = -1       ! shortwave aerosol extinction optical depth * single scattering albedo * asymmetry parameter. tau*w*g
@@ -154,6 +153,11 @@ module mo_tuvx
   type (interp_type) :: interp_wgts
   real(r8) :: rrtmg_wavelength(nswbands-1)
   integer :: nwave
+#endif
+
+   ! namelist options
+   character(len=cl) :: tuvx_config_path = 'NONE'  ! absolute path to TUVX configuration file
+   logical, protected :: tuvx_active = .false.
 
 !================================================================================================
 contains
@@ -163,7 +167,7 @@ contains
    ! registers fields in the physics buffer
    !-----------------------------------------------------------------------
    subroutine tuvx_register( )
-
+#ifdef USE_TUVX
       use mo_jeuv,        only : nIonRates
       use physics_buffer, only : pbuf_add_field, dtype_r8
       use ppgrid,         only : pcols ! maximum number of columns
@@ -190,7 +194,9 @@ contains
       call pbuf_add_field('SWCLDTAU',   'global',dtype_r8,(/pcols,pver,nswbands/), swcldtau_idx)   ! shortwave tau
       call pbuf_add_field('SWCLDTAUW',  'global',dtype_r8,(/pcols,pver,nswbands/), swcldtauw_idx)  ! shortwave tau * w
       call pbuf_add_field('SWCLDTAUWG', 'global',dtype_r8,(/pcols,pver,nswbands/), swcldtauwg_idx) ! shortwave tau * w * g
-
+#else
+      return
+#endif
    end subroutine tuvx_register
 
 !================================================================================================
@@ -239,6 +245,13 @@ contains
          call endrun(subname // ' : must set tuvx_config_path when TUV-X is active')
       end if
 
+#ifndef USE_TUVX
+      if (tuvx_active) then
+         call endrun(subname // ': tuvx_active is set but CAM was not built with USE_TUVX. ' // &
+            'Add -tuvx to CAM_CONFIG_OPTS to enable TUV-x support.')
+      end if
+#endif
+
       if (is_main_task) then
          write(iulog,*) 'tuvx_readnl: tuvx_config_path = ', trim(tuvx_config_path)
          write(iulog,*) 'tuvx_readnl: tuvx_active = ', tuvx_active
@@ -252,7 +265,7 @@ contains
    ! Initializes TUV-x for photolysis calculations
    !-----------------------------------------------------------------------
    subroutine tuvx_init( photon_file, electron_file, max_solar_zenith_angle, pbuf2d )
-
+#ifdef USE_TUVX
       use infnan,                  only : nan, assignment(=)
       use mo_chem_utls,            only : get_spc_ndx, get_inv_ndx
       use mo_jeuv,                 only : neuv ! number of extreme-UV rates
@@ -271,8 +284,7 @@ contains
       use tuvx_profile_warehouse,  only : profile_warehouse_t
       use tuvx_radiator_warehouse, only : radiator_warehouse_t
       use time_manager,            only : is_first_step
-
-      use physics_buffer,  only: pbuf_get_index
+      use physics_buffer,          only : pbuf_get_index
 
       character(len=*), intent(in) :: photon_file   ! photon file used in extended-UV module setup
       character(len=*), intent(in) :: electron_file ! electron file used in extended-UV module setup
@@ -551,7 +563,14 @@ contains
       deallocate(wc)
 
       if( is_main_task ) call log_initialization( labels )
+#else
+      character(len=*), intent(in) :: photon_file
+      character(len=*), intent(in) :: electron_file
+      real(r8),         intent(in) :: max_solar_zenith_angle
+      type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
+      return
+#endif
    end subroutine tuvx_init
 
 !================================================================================================
@@ -560,7 +579,7 @@ contains
    ! Updates TUV-x profiles that depend on time but not space
    !-----------------------------------------------------------------------
    subroutine tuvx_timestep_init( )
-
+#ifdef USE_TUVX
       integer :: i_thread
 
       if( .not. tuvx_active ) return
@@ -570,7 +589,9 @@ contains
             call set_et_flux( tuvx )
          end associate
       end do
-
+#else
+      return
+#endif
    end subroutine tuvx_timestep_init
 
 !================================================================================================
@@ -614,6 +635,7 @@ contains
       real(r8), intent(in)    :: liquid_water_content(ncol,pver)    ! liquid water content (kg/kg)
       real(r8), intent(inout) :: photolysis_rates(ncol,pver,phtcnt) ! photolysis rate
                                                                     !   constants (1/s)
+#ifdef USE_TUVX
       integer :: ipht, k, idose
       integer  :: i_col   ! column index
       integer  :: i_level ! vertical level index
@@ -797,7 +819,9 @@ contains
          end do
          call outfld('CPE_jO3b', cpe_jo3_b(:ncol,:), ncol, lchnk )
       end if
-
+#else
+      return
+#endif
    end subroutine tuvx_get_photo_rates
 
 !================================================================================================
@@ -806,7 +830,7 @@ contains
    ! Cleans up memory associated with TUV-x calculators
    !-----------------------------------------------------------------------
    subroutine tuvx_finalize( )
-
+#ifdef USE_TUVX
       integer :: i_core, i_diag
 
       if( allocated( tuvx_ptrs ) ) then
@@ -828,16 +852,19 @@ contains
       if (allocated(dose_rate_hist_name)) then
          deallocate(dose_rate_hist_name)
       end if
-
+#else
+      return
+#endif
    end subroutine tuvx_finalize
 
 !================================================================================================
 !================================================================================================
 !
-! Support functions
+! Support functions (only compiled when USE_TUVX is defined)
 !
 !================================================================================================
 !================================================================================================
+#ifdef USE_TUVX
 
    !-----------------------------------------------------------------------
    ! Returns the id of the current OpenMP thread, or 1 if not
@@ -2028,6 +2055,8 @@ contains
       jno(:pver) = work_jno(:pver)
 
    end subroutine calculate_jno
+
+#endif /* USE_TUVX */
 
 !================================================================================================
 
