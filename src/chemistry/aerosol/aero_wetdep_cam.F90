@@ -20,12 +20,11 @@ module aero_wetdep_cam
 
   use aerosol_properties_mod, only: aero_name_len
   use aerosol_properties_mod, only: aerosol_properties
-  use modal_aerosol_properties_mod, only: modal_aerosol_properties
-  use carma_aerosol_properties_mod, only: carma_aerosol_properties
 
   use aerosol_state_mod, only: aerosol_state, ptr2d_t
   use aerosol_instances_mod, only: aerosol_instances_get_state, &
                                    aerosol_instances_get_props, &
+                                   aerosol_instances_get_props_by_model, &
                                    aerosol_instances_get_num_models
 
   use aero_convproc, only: aero_convproc_readnl, aero_convproc_init, aero_convproc_intr
@@ -175,15 +174,17 @@ contains
 
     call rad_aer_get_info(0, nmodes=nmodes, nbins=nbins)
 
+    ! use the registry's persistent climate-list properties instances
+    ! (aerosol_instances_init has already run during phys_init)
     if (nmodes>0) then
-       aero_props => modal_aerosol_properties()
+       aero_props => aerosol_instances_get_props_by_model('modal', 0)
        if (.not.associated(aero_props)) then
-          call endrun(subrname//' : construction of aero_props modal_aerosol_properties object failed')
+          call endrun(subrname//' : modal aerosol properties instance not available')
        end if
     else if (nbins>0) then
-       aero_props => carma_aerosol_properties()
+       aero_props => aerosol_instances_get_props_by_model('carma', 0)
        if (.not.associated(aero_props)) then
-          call endrun(subrname//' : construction of aero_props carma_aerosol_properties object failed')
+          call endrun(subrname//' : carma aerosol properties instance not available')
        end if
     else
        call endrun(subrname//' : cannot determine aerosol model')

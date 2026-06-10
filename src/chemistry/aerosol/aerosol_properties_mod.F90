@@ -1,41 +1,23 @@
 module aerosol_properties_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
 
+  ! The field kind taxonomy (AERO_FIELD_*, phase selectors) and the source
+  ! descriptor mapping live with the aerosol description (the lowest-level
+  ! aerosol module); re-exported here for consumers.
+  use aerosol_description_mod, only: AERO_FIELD_ADVECTED, AERO_FIELD_STORED, &
+                                     AERO_FIELD_DERIVED, AERO_FIELD_ABSENT, &
+                                     AERO_AMBIENT, AERO_CLDBRNE, &
+                                     field_kind_from_source, &
+                                     aerosol_description_t, rad_list_view_t
+
   implicit none
 
   private
 
   public :: aerosol_properties
   public :: field_kind_from_source
-
-  ! Field kind classifications for each (bin, species, phase), where:
-  !   bin = aerosol bin or mode (MAM mode, CARMA bin, individual bulk aerosol for BAM)
-  !   species = index 0 is the "bin number" field, others are individual species
-  !             (e.g., 'sulfate', 'p-organic', 'dust')
-  !   phase = ambient, cloud-borne
-
-  ! ADVECTED: (e.g., MAM interstitial mmr and numbers, CARMA interstitial mmr)
-  !   Sourced from host constituent.
-  !   Read  via pointer or fill.
-  !   Write via physics tendencies for constituents.
-  integer, public, parameter :: AERO_FIELD_ADVECTED = 1
-  ! STORED: (e.g., MAM qqcw)
-  !   Sourced from pbuf (CAM) or host non-advected constituent (SIMA).
-  !   Read  via pointer or fill.
-  !   Write via pointer only.
-  integer, public, parameter :: AERO_FIELD_STORED   = 2
-  ! DERIVED: (e.g., BAM number concentrations; CARMA number concentrations)
-  !   Sourced by deriving on demand from other fields.
-  !   Read  via fill only, there is no pointer access.
-  !   Write to a derived quantity is meaningless.
-  integer, public, parameter :: AERO_FIELD_DERIVED  = 3
-  ! ABSENT: (e.g., BAM cloud-borne phase)
-  !   This quantity is meaningless for this aerosol model.
-  integer, public, parameter :: AERO_FIELD_ABSENT   = 4
-
-  ! phase selectors for field_kind
-  integer, public, parameter :: AERO_AMBIENT = 1
-  integer, public, parameter :: AERO_CLDBRNE = 2
+  public :: AERO_FIELD_ADVECTED, AERO_FIELD_STORED, AERO_FIELD_DERIVED, AERO_FIELD_ABSENT
+  public :: AERO_AMBIENT, AERO_CLDBRNE
 
   ! Aerosol model capability query keys -- used as arguments to supports()
   !
@@ -59,11 +41,13 @@ module aerosol_properties_mod
   !! aerosol_properties class can be extended for a specific aerosol package.
   type, abstract :: aerosol_properties
      private
-     integer :: nbins_ = 0  ! number of aerosol bins
-     integer :: ncnst_tot_ = 0 ! total number of constituents
-     integer, allocatable :: nmasses_(:) ! number of species masses
-     integer, allocatable :: nspecies_(:) ! number of species
-     integer, allocatable :: indexer_(:,:) ! unique indices of the aerosol elements
+     ! normalized structural description of the aerosol model (shared across
+     ! radiation lists) and this instance's radiation list view over it;
+     ! non-owning, set at initialization. All structural queries (bin and
+     ! species counts, element indexing, host field names, field kinds)
+     ! read through these.
+     type(aerosol_description_t), pointer :: desc_ => null()
+     type(rad_list_view_t),       pointer :: view_ => null()
      real(r8), allocatable :: alogsig_(:) ! natural log of geometric deviation of the number distribution for aerosol bin
      real(r8), allocatable :: f1_(:) ! eq 28 Abdul-Razzak et al 1998
      real(r8), allocatable :: f2_(:) ! eq 29 Abdul-Razzak et al 1998
@@ -77,14 +61,10 @@ module aerosol_properties_mod
      real(r8) :: soa_equivso4_factor_ = -huge(1._r8)
      real(r8) :: pom_equivso4_factor_ = -huge(1._r8)
      integer, public :: list_idx_ = 0 ! radiation list index (0=climate)
-     ! field kind of each (bin, species 0:max nspecies, AERO_AMBIENT:AERO_CLDBRNE)
-     ! entry; species 0 is the bin number field; set at construction
-     integer, allocatable :: field_kind_(:,:,:)
    contains
      procedure :: list_idx => get_list_idx
      procedure :: initialize => aero_props_init
      procedure :: field_kind
-     procedure :: field_kind_set
      procedure :: num_derived_working_entries
      procedure :: supports
      procedure :: nbins => get_nbins
@@ -107,11 +87,13 @@ module aerosol_properties_mod
      procedure(aero_number_transported), deferred :: number_transported
      procedure(aero_props_get), deferred :: get
      procedure(aero_actfracs), deferred :: actfracs
-     procedure(aero_num_names), deferred :: num_names
-     procedure(aero_mmr_names), deferred :: mmr_names
-     procedure(aero_amb_num_name), deferred :: amb_num_name
-     procedure(aero_amb_mmr_name), deferred :: amb_mmr_name
-     procedure(aero_species_type), deferred :: species_type
+     ! structural queries with base implementations reading the description
+     ! and view; overridable where a model's semantics differ
+     procedure :: num_names
+     procedure :: mmr_names
+     procedure :: amb_num_name
+     procedure :: amb_mmr_name
+     procedure :: species_type
      procedure(aero_icenuc_updates_num), deferred :: icenuc_updates_num
      procedure(aero_icenuc_updates_mmr), deferred :: icenuc_updates_mmr
      procedure(aero_apply_num_limits), deferred :: apply_number_limits
@@ -121,8 +103,8 @@ module aerosol_properties_mod
      procedure(aero_soluble), deferred :: soluble
      procedure(aero_min_mass_mean_rad), deferred :: min_mass_mean_rad
      procedure :: optics_params
-     procedure(aero_physprop_id), deferred :: physprop_id
-     procedure(aero_bin_name), deferred :: bin_name
+     procedure :: physprop_id
+     procedure :: bin_name
      procedure(aero_scav_diam), deferred :: scav_diam
      procedure(aero_resuspension_resize), deferred :: resuspension_resize
      procedure(aero_rebin_bulk_fluxes), deferred :: rebin_bulk_fluxes
@@ -175,27 +157,6 @@ module aerosol_properties_mod
      end subroutine aero_props_get
 
      !------------------------------------------------------------------------
-     ! returns the physprop ID for a given bin index
-     !------------------------------------------------------------------------
-     integer function aero_physprop_id(self, bin_ndx)
-       import :: aerosol_properties
-       class(aerosol_properties), intent(in) :: self
-       integer, intent(in) :: bin_ndx
-     end function aero_physprop_id
-
-     !------------------------------------------------------------------------
-     ! returns species type
-     !------------------------------------------------------------------------
-     subroutine aero_species_type(self, bin_ndx, species_ndx, spectype)
-       import :: aerosol_properties
-       class(aerosol_properties), intent(in) :: self
-       integer, intent(in) :: bin_ndx           ! bin number
-       integer, intent(in) :: species_ndx       ! species number
-       character(len=*), intent(out) :: spectype ! species type
-
-     end subroutine aero_species_type
-
-     !------------------------------------------------------------------------
      ! returns mass and number activation fractions
      !------------------------------------------------------------------------
      subroutine aero_actfracs(self, bin_ndx, smc, smax, fn, fm )
@@ -208,52 +169,6 @@ module aerosol_properties_mod
        real(r8),intent(out) :: fm       ! activation fraction for aerosol mass
 
      end subroutine aero_actfracs
-
-     !------------------------------------------------------------------------
-     ! returns constituents names of aerosol number mixing ratios
-     !------------------------------------------------------------------------
-     subroutine aero_num_names(self, bin_ndx, name_a, name_c)
-       import :: aerosol_properties
-       class(aerosol_properties), intent(in) :: self
-       integer, intent(in) :: bin_ndx           ! bin number
-       character(len=*), intent(out) :: name_a ! constituent name of ambient aerosol number dens
-       character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol number dens
-     end subroutine aero_num_names
-
-     !------------------------------------------------------------------------
-     ! returns constituents names of aerosol mass mixing ratios
-     !------------------------------------------------------------------------
-     subroutine aero_mmr_names(self, bin_ndx, species_ndx, name_a, name_c)
-       import :: aerosol_properties
-       class(aerosol_properties), intent(in) :: self
-       integer, intent(in) :: bin_ndx           ! bin number
-       integer, intent(in) :: species_ndx       ! species number
-       character(len=*), intent(out) :: name_a ! constituent name of ambient aerosol MMR
-       character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol MMR
-     end subroutine aero_mmr_names
-
-     !------------------------------------------------------------------------
-     ! returns constituent name of ambient aerosol number mixing ratios
-     !------------------------------------------------------------------------
-     subroutine aero_amb_num_name(self, bin_ndx, name)
-       import :: aerosol_properties
-       class(aerosol_properties), intent(in) :: self
-       integer, intent(in) :: bin_ndx          ! bin number
-       character(len=*), intent(out) :: name  ! constituent name of ambient aerosol number dens
-
-     end subroutine aero_amb_num_name
-
-     !------------------------------------------------------------------------
-     ! returns constituent name of ambient aerosol mass mixing ratios
-     !------------------------------------------------------------------------
-     subroutine aero_amb_mmr_name(self, bin_ndx, species_ndx, name)
-       import :: aerosol_properties
-       class(aerosol_properties), intent(in) :: self
-       integer, intent(in) :: bin_ndx           ! bin number
-       integer, intent(in) :: species_ndx       ! species number
-       character(len=*), intent(out) :: name   ! constituent name of ambient aerosol MMR
-
-     end subroutine aero_amb_mmr_name
 
      !------------------------------------------------------------------------------
      ! returns radius^3 (m3) of a given bin number
@@ -345,18 +260,6 @@ module aerosol_properties_mod
      end function aero_soluble
 
      !------------------------------------------------------------------------------
-     ! returns name for a given aerosol bin
-     !------------------------------------------------------------------------------
-     function aero_bin_name(self, bin_ndx) result(name)
-       import :: aerosol_properties, r8, aero_name_len
-       class(aerosol_properties), intent(in) :: self
-       integer, intent(in) :: bin_ndx  ! bin number
-
-       character(len=aero_name_len) :: name
-
-     end function aero_bin_name
-
-     !------------------------------------------------------------------------------
      ! returns scavenging diameter for a given aerosol bin number
      !------------------------------------------------------------------------------
      function aero_scav_diam(self, bin_ndx) result(diam)
@@ -421,26 +324,27 @@ contains
 
   !------------------------------------------------------------------------------
   ! object initializer
+  !
+  ! Structural data (bin and species counts, element indexing, host field
+  ! names, field kinds) is carried by the description and view; only the
+  ! per-list physprop-derived numeric arrays are stored per instance.
   !------------------------------------------------------------------------------
-  subroutine aero_props_init(self, nbin, ncnst, nspec, nmasses, alogsig, f1,f2, ierr, list_idx, &
+  subroutine aero_props_init(self, desc, view, alogsig, f1,f2, ierr, &
                              dgnum, dgnumhi, dgnumlo, rhcrystal, rhdeliques)
     class(aerosol_properties), intent(inout) :: self
-    integer, intent(in) :: nbin               ! number of bins
-    integer, intent(in) :: ncnst              ! total number of constituents
-    integer, intent(in) :: nspec(nbin)        ! number of species in each bin
-    integer, intent(in) :: nmasses(nbin)      ! number of masses in each bin
-    real(r8),intent(in) :: alogsig(nbin)      ! natural log of the standard deviation (sigma) of the aerosol bins
-    real(r8),intent(in) :: f1(nbin)           ! eq 28 Abdul-Razzak et al 1998
-    real(r8),intent(in) :: f2(nbin)           ! eq 29 Abdul-Razzak et al 1998
+    type(aerosol_description_t), target, intent(in) :: desc ! normalized structural description
+    type(rad_list_view_t),       target, intent(in) :: view ! radiation list view over the description
+    real(r8),intent(in) :: alogsig(view%nbins)  ! natural log of the standard deviation (sigma) of the aerosol bins
+    real(r8),intent(in) :: f1(view%nbins)       ! eq 28 Abdul-Razzak et al 1998
+    real(r8),intent(in) :: f2(view%nbins)       ! eq 29 Abdul-Razzak et al 1998
     integer,intent(out) :: ierr
-    integer, optional, intent(in) :: list_idx ! radiation list index (0=climate)
-    real(r8), optional, intent(in) :: dgnum(nbin)      ! geometric mean diameter (m)
-    real(r8), optional, intent(in) :: dgnumhi(nbin)    ! upper bound diameter (m)
-    real(r8), optional, intent(in) :: dgnumlo(nbin)    ! lower bound diameter (m)
-    real(r8), optional, intent(in) :: rhcrystal(nbin)  ! crystallization RH
-    real(r8), optional, intent(in) :: rhdeliques(nbin) ! deliquescence RH
+    real(r8), optional, intent(in) :: dgnum(view%nbins)      ! geometric mean diameter (m)
+    real(r8), optional, intent(in) :: dgnumhi(view%nbins)    ! upper bound diameter (m)
+    real(r8), optional, intent(in) :: dgnumlo(view%nbins)    ! lower bound diameter (m)
+    real(r8), optional, intent(in) :: rhcrystal(view%nbins)  ! crystallization RH
+    real(r8), optional, intent(in) :: rhdeliques(view%nbins) ! deliquescence RH
 
-    integer :: imas,ibin,indx
+    integer :: nbin
     character(len=*),parameter :: prefix = 'aerosol_properties::aero_props_init: '
 
     real(r8), parameter :: spechygro_so4 = 0.507_r8          ! Sulfate hygroscopicity
@@ -449,14 +353,11 @@ contains
 
     ierr = 0
 
-    allocate(self%nspecies_(nbin),stat=ierr)
-    if( ierr /= 0 ) then
-       return
-    end if
-    allocate(self%nmasses_(nbin),stat=ierr)
-    if( ierr /= 0 ) then
-       return
-    end if
+    self%desc_ => desc
+    self%view_ => view
+
+    nbin = view%nbins
+
     allocate(self%alogsig_(nbin),stat=ierr)
     if( ierr /= 0 ) then
        return
@@ -490,30 +391,6 @@ contains
        if( ierr /= 0 ) return
     end if
 
-    allocate( self%indexer_(nbin,0:maxval(nmasses)),stat=ierr )
-    if( ierr /= 0 ) then
-       return
-    end if
-
-    ! Local indexing compresses the mode and number/mass indices into one index.
-    ! This indexing is used by the pointer arrays used to reference state and pbuf
-    ! fields. We add number = 0, total mass = 1 (if available), and mass from each
-    ! constituency into mm.
-
-    self%indexer_ = -1
-    indx = 0
-
-    do ibin=1,nbin
-       do imas = 0,nmasses(ibin)
-          indx = indx+1
-          self%indexer_(ibin,imas) = indx
-       end do
-    end do
-
-    self%nbins_ = nbin
-    self%ncnst_tot_ = ncnst
-    self%nmasses_(:) = nmasses(:)
-    self%nspecies_(:) = nspec(:)
     self%alogsig_(:) = alogsig(:)
     self%f1_(:) = f1(:)
     self%f2_(:) = f2(:)
@@ -537,32 +414,9 @@ contains
     self%soa_equivso4_factor_ = spechygro_soa/spechygro_so4
     self%pom_equivso4_factor_ = spechygro_pom/spechygro_so4
 
-    if (present(list_idx)) then
-       self%list_idx_ = list_idx
-    else
-       self%list_idx_ = 0
-    end if
+    self%list_idx_ = view%list_idx
 
   end subroutine aero_props_init
-
-  !------------------------------------------------------------------------------
-  ! sets the field kind table -- called once at construction by the concrete
-  ! class constructors, which build the table from the parsed per-entry source
-  ! data and apply any model overrides (e.g., derived numbers)
-  !------------------------------------------------------------------------------
-  subroutine field_kind_set(self, kinds, ierr)
-    class(aerosol_properties), intent(inout) :: self
-    integer, intent(in) :: kinds(1:,0:,1:) ! (bin, species 0:max nspecies, AERO_AMBIENT:AERO_CLDBRNE)
-    integer, intent(out) :: ierr
-
-    allocate(self%field_kind_(size(kinds,1), 0:ubound(kinds,2), size(kinds,3)), stat=ierr)
-    if (ierr /= 0) then
-       return
-    end if
-
-    self%field_kind_(:,0:,:) = kinds(:,0:,:)
-
-  end subroutine field_kind_set
 
   !------------------------------------------------------------------------------
   ! returns the field kind (AERO_FIELD_ADVECTED, ..._STORED, ..._DERIVED or
@@ -574,7 +428,7 @@ contains
     integer, intent(in) :: species_ndx ! species index; 0 selects the bin number field
     integer, intent(in) :: phase       ! AERO_AMBIENT or AERO_CLDBRNE
 
-    field_kind = self%field_kind_(bin_ndx, species_ndx, phase)
+    field_kind = self%desc_%field_kind(self%view_%bin_idx(bin_ndx), species_ndx, phase)
   end function field_kind
 
   !------------------------------------------------------------------------------
@@ -585,13 +439,14 @@ contains
   pure integer function num_derived_working_entries(self)
     class(aerosol_properties), intent(in) :: self
 
-    integer :: m, l, phase
+    integer :: m, mm, l, phase
 
     num_derived_working_entries = 0
     do phase = AERO_AMBIENT, AERO_CLDBRNE
-       do m = 1, self%nbins_
-          do l = 0, self%nspecies_(m)
-             if (self%field_kind_(m, l, phase) == AERO_FIELD_DERIVED) then
+       do m = 1, self%view_%nbins
+          mm = self%view_%bin_idx(m)
+          do l = 0, self%desc_%nspecies(mm)
+             if (self%desc_%field_kind(mm, l, phase) == AERO_FIELD_DERIVED) then
                 num_derived_working_entries = num_derived_working_entries + 1
              end if
           end do
@@ -612,43 +467,14 @@ contains
   end function supports
 
   !------------------------------------------------------------------------------
-  ! maps a host aerosol-list source descriptor onto a field kind:
-  ! 'A' state constituent (advected); 'N' pbuf-resident (non-advected);
-  ! 'Z' zero / blank -- no such field for this model
-  !------------------------------------------------------------------------------
-  integer function field_kind_from_source(source)
-    use cam_abortutils, only: endrun
-
-    character(len=*), intent(in) :: source
-
-    select case (source(1:1))
-    case ('A')
-       field_kind_from_source = AERO_FIELD_ADVECTED
-    case ('N')
-       field_kind_from_source = AERO_FIELD_STORED
-    case ('Z', ' ')
-       field_kind_from_source = AERO_FIELD_ABSENT
-    case default
-       field_kind_from_source = AERO_FIELD_ABSENT
-       call endrun('field_kind_from_source: unrecognized source: '//source)
-    end select
-  end function field_kind_from_source
-
-  !------------------------------------------------------------------------------
   ! Object clean
   !------------------------------------------------------------------------------
   subroutine aero_props_final(self)
     class(aerosol_properties), intent(inout) :: self
 
-    if (allocated(self%nspecies_)) then
-       deallocate(self%nspecies_)
-    end if
-    if (allocated(self%nmasses_)) then
-       deallocate(self%nmasses_)
-    end if
-    if (allocated(self%indexer_)) then
-       deallocate(self%indexer_)
-    endif
+    nullify(self%desc_)
+    nullify(self%view_)
+
     if (allocated(self%alogsig_)) then
        deallocate(self%alogsig_)
     endif
@@ -673,12 +499,7 @@ contains
     if (allocated(self%rhdeliques_)) then
        deallocate(self%rhdeliques_)
     endif
-    if (allocated(self%field_kind_)) then
-       deallocate(self%field_kind_)
-    endif
 
-    self%nbins_ = 0
-    self%ncnst_tot_ = 0
     self%list_idx_ = 0
 
   end subroutine aero_props_final
@@ -691,7 +512,7 @@ contains
     integer, intent(in) :: bin_ndx           ! bin number
     integer :: val
 
-    val = self%nspecies_(bin_ndx)
+    val = self%desc_%nspecies(self%view_%bin_idx(bin_ndx))
   end function nspecies_per_bin
 
   !------------------------------------------------------------------------------
@@ -699,9 +520,9 @@ contains
   !------------------------------------------------------------------------------
   pure function nspecies_all_bins(self) result(arr)
     class(aerosol_properties), intent(in) :: self
-    integer :: arr(self%nbins_)
+    integer :: arr(self%view_%nbins)
 
-    arr(:) = self%nspecies_(:)
+    arr(:) = self%desc_%nspecies(self%view_%bin_idx(:))
 
   end function nspecies_all_bins
 
@@ -713,7 +534,7 @@ contains
     integer, intent(in) :: bin_ndx           ! bin number
     integer :: val
 
-    val = self%nmasses_(bin_ndx)
+    val = self%desc_%nmasses(self%view_%bin_idx(bin_ndx))
   end function n_masses_per_bin
 
   !------------------------------------------------------------------------------
@@ -721,9 +542,9 @@ contains
   !------------------------------------------------------------------------------
   pure function n_masses_all_bins(self) result(arr)
     class(aerosol_properties), intent(in) :: self
-    integer :: arr(self%nbins_)
+    integer :: arr(self%view_%nbins)
 
-    arr(:) = self%nmasses_(:)
+    arr(:) = self%desc_%nmasses(self%view_%bin_idx(:))
   end function n_masses_all_bins
 
   !------------------------------------------------------------------------------
@@ -734,7 +555,7 @@ contains
     integer, intent(in) :: bin_ndx           ! bin number
     integer, intent(in) :: species_ndx       ! species number
 
-    indexer = self%indexer_(bin_ndx,species_ndx)
+    indexer = self%view_%indexer(bin_ndx,species_ndx)
   end function indexer
 
   !------------------------------------------------------------------------------
@@ -744,7 +565,7 @@ contains
     class(aerosol_properties), intent(in) :: self
     integer :: nbins
 
-    nbins = self%nbins_
+    nbins = self%view_%nbins
   end function get_nbins
 
   !------------------------------------------------------------------------------
@@ -753,8 +574,108 @@ contains
   pure integer function ncnst_tot(self)
     class(aerosol_properties), intent(in) :: self
 
-    ncnst_tot = self%ncnst_tot_
+    ncnst_tot = self%view_%ncnst_tot
   end function ncnst_tot
+
+  !------------------------------------------------------------------------
+  ! returns constituents names of aerosol number mixing ratios
+  !------------------------------------------------------------------------
+  subroutine num_names(self, bin_ndx, name_a, name_c)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: bin_ndx           ! bin number
+    character(len=*), intent(out) :: name_a ! constituent name of ambient aerosol number dens
+    character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol number dens
+
+    name_a = self%desc_%camname_num_a(self%view_%bin_idx(bin_ndx))
+    name_c = self%desc_%camname_num_c(self%view_%bin_idx(bin_ndx))
+  end subroutine num_names
+
+  !------------------------------------------------------------------------
+  ! returns constituents names of aerosol mass mixing ratios; species
+  ! index 0 selects the bin total-mass field (blank where a model has none)
+  !------------------------------------------------------------------------
+  subroutine mmr_names(self, bin_ndx, species_ndx, name_a, name_c)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: bin_ndx           ! bin number
+    integer, intent(in) :: species_ndx       ! species number
+    character(len=*), intent(out) :: name_a ! constituent name of ambient aerosol MMR
+    character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol MMR
+
+    integer :: mm
+
+    mm = self%view_%bin_idx(bin_ndx)
+
+    if (species_ndx > 0) then
+       name_a = self%desc_%camname_mmr_a(mm, species_ndx)
+       name_c = self%desc_%camname_mmr_c(mm, species_ndx)
+    else
+       name_a = self%desc_%camname_mass_a(mm)
+       name_c = self%desc_%camname_mass_c(mm)
+    end if
+  end subroutine mmr_names
+
+  !------------------------------------------------------------------------
+  ! returns constituent name of ambient aerosol number mixing ratios
+  !------------------------------------------------------------------------
+  subroutine amb_num_name(self, bin_ndx, name)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: bin_ndx          ! bin number
+    character(len=*), intent(out) :: name  ! constituent name of ambient aerosol number dens
+
+    name = self%desc_%camname_num_a(self%view_%bin_idx(bin_ndx))
+  end subroutine amb_num_name
+
+  !------------------------------------------------------------------------
+  ! returns constituent name of ambient aerosol mass mixing ratios; species
+  ! index 0 selects the bin total-mass field (blank where a model has none)
+  !------------------------------------------------------------------------
+  subroutine amb_mmr_name(self, bin_ndx, species_ndx, name)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: bin_ndx           ! bin number
+    integer, intent(in) :: species_ndx       ! species number
+    character(len=*), intent(out) :: name   ! constituent name of ambient aerosol MMR
+
+    if (species_ndx > 0) then
+       name = self%desc_%camname_mmr_a(self%view_%bin_idx(bin_ndx), species_ndx)
+    else
+       name = self%desc_%camname_mass_a(self%view_%bin_idx(bin_ndx))
+    end if
+  end subroutine amb_mmr_name
+
+  !------------------------------------------------------------------------
+  ! returns species type
+  !------------------------------------------------------------------------
+  subroutine species_type(self, bin_ndx, species_ndx, spectype)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: bin_ndx           ! bin number
+    integer, intent(in) :: species_ndx       ! species number
+    character(len=*), intent(out) :: spectype ! species type
+
+    spectype = self%desc_%spec_type(self%view_%bin_idx(bin_ndx), species_ndx)
+  end subroutine species_type
+
+  !------------------------------------------------------------------------
+  ! returns the physprop ID for a given bin index, as resolved for this
+  ! instance's radiation list
+  !------------------------------------------------------------------------
+  integer function physprop_id(self, bin_ndx)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: bin_ndx
+
+    physprop_id = self%view_%physprop_id(bin_ndx)
+  end function physprop_id
+
+  !------------------------------------------------------------------------------
+  ! returns name for a given aerosol bin
+  !------------------------------------------------------------------------------
+  function bin_name(self, bin_ndx) result(name)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: bin_ndx  ! bin number
+
+    character(len=aero_name_len) :: name
+
+    name = self%desc_%bin_name(self%view_%bin_idx(bin_ndx))
+  end function bin_name
 
   !------------------------------------------------------------------------------
   ! returns the natural log of geometric standard deviation of the number distribution for aerosol bin
@@ -849,9 +770,9 @@ contains
     !-------------------------------------------------------------------------
 
     class(aerosol_properties), intent(in) :: self
-    real(r8), intent(in)  :: zeta(self%nbins_) ! Abdul-Razzak and Ghan eq 10
-    real(r8), intent(in)  :: eta(self%nbins_)  ! Abdul-Razzak and Ghan eq 11
-    real(r8), intent(in)  :: smc(self%nbins_)  ! critical supersaturation
+    real(r8), intent(in)  :: zeta(self%view_%nbins) ! Abdul-Razzak and Ghan eq 10
+    real(r8), intent(in)  :: eta(self%view_%nbins)  ! Abdul-Razzak and Ghan eq 11
+    real(r8), intent(in)  :: smc(self%view_%nbins)  ! critical supersaturation
 
     real(r8) :: smax ! maximum supersaturation
 
@@ -863,7 +784,7 @@ contains
     real(r8), parameter :: large_maxsat = 1.e20_r8  ! for small eta
 
     smax=0.0_r8
-    nbins = self%nbins_
+    nbins = self%view_%nbins
 
     check_loop: do m=1,nbins
        if((zeta(m) > 1.e5_r8*eta(m)) .or. (smc(m)*smc(m) > 1.e5_r8*eta(m))) then

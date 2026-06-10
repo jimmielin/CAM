@@ -2,8 +2,8 @@ module modal_aerosol_properties_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
   use physconst, only: pi
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
-  use aerosol_properties_mod, only: field_kind_from_source, aero_has_working_state_table
-  use aerosol_properties_mod, only: AERO_AMBIENT, AERO_CLDBRNE
+  use aerosol_properties_mod, only: aero_has_working_state_table
+  use aerosol_description_mod, only: aerosol_description_t, rad_list_view_t
   use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_mode_props, rad_aer_get_props
   use modal_aero_data, only: specmw_amode
   implicit none
@@ -35,16 +35,10 @@ module modal_aerosol_properties_mod
      procedure :: get
      procedure :: amcube
      procedure :: actfracs
-     procedure :: num_names
-     procedure :: mmr_names
-     procedure :: amb_num_name
-     procedure :: amb_mmr_name
-     procedure :: species_type
      procedure :: icenuc_updates_num
      procedure :: icenuc_updates_mmr
      procedure :: apply_number_limits
      procedure :: hetfrz_species
-     procedure :: physprop_id
      procedure :: soluble
      procedure :: min_mass_mean_rad
      procedure :: bin_name
@@ -68,20 +62,17 @@ contains
 
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
-  function constructor(list_idx) result(newobj)
-    use radiative_aerosol_definitions, only: modes, modal_aerosol_list
+  function constructor(desc, view) result(newobj)
 
-    integer, optional, intent(in) :: list_idx ! radiation list index (0=climate)
+    type(aerosol_description_t), target, intent(in) :: desc ! normalized structural description
+    type(rad_list_view_t),       target, intent(in) :: view ! radiation list view over the description
     type(modal_aerosol_properties), pointer :: newobj
 
-    integer :: l, m, nmodes, ncnst_tot, mm, itmp
-    integer, allocatable :: kinds(:,:,:)
-    integer :: list_idx_loc
+    integer :: l, m, nmodes, mm, itmp
     real(r8) :: dgnumlo_val
     real(r8) :: dgnumhi_val
     real(r8) :: dgnum_val
     real(r8) :: rhcrystal_val, rhdeliques_val
-    integer,allocatable :: nspecies(:)
     real(r8),allocatable :: sigmag(:)
     real(r8),allocatable :: alogsig(:)
     real(r8),allocatable :: f1(:)
@@ -97,22 +88,14 @@ contains
 
     integer :: npoa, nsoa, nbc
 
-    list_idx_loc = 0
-    if (present(list_idx)) list_idx_loc = list_idx
-
     allocate(newobj,stat=ierr)
     if( ierr /= 0 ) then
        nullify(newobj)
        return
     end if
 
-    call rad_aer_get_info(list_idx_loc, nmodes=nmodes)
+    nmodes = view%nbins
 
-    allocate(nspecies(nmodes),stat=ierr)
-    if( ierr /= 0 ) then
-       nullify(newobj)
-       return
-    end if
     allocate(alogsig(nmodes),stat=ierr)
     if( ierr /= 0 ) then
        nullify(newobj)
@@ -161,14 +144,8 @@ contains
        return
     end if
 
-    ncnst_tot = 0
-
     do m = 1, nmodes
-       call rad_aer_get_info(list_idx_loc, m, nspec=nspecies(m))
-
-       ncnst_tot =  ncnst_tot + nspecies(m) + 1
-
-       call rad_aer_get_mode_props(list_idx_loc, m, sigmag=sigmag(m), &
+       call rad_aer_get_mode_props(view%list_idx, m, sigmag=sigmag(m), &
                                     dgnum=dgnum_val, dgnumhi=dgnumhi_val, dgnumlo=dgnumlo_val, &
                                     rhcrystal=rhcrystal_val, rhdeliques=rhdeliques_val)
 
@@ -206,33 +183,13 @@ contains
        end do
     end do
 
-    call newobj%initialize(nmodes,ncnst_tot,nspecies,nspecies,alogsig,f1,f2,ierr,list_idx_loc, &
+    call newobj%initialize(desc,view,alogsig,f1,f2,ierr, &
                            dgnum=dgnum_arr,dgnumhi=dgnumhi_arr,dgnumlo=dgnumlo_arr, &
                            rhcrystal=rhcrystal_arr,rhdeliques=rhdeliques_arr)
-
-    ! field kind table built from the parsed per-entry source data
-    ! ('A' advected constituent, 'N' pbuf-resident); no modal overrides
-    allocate(kinds(nmodes,0:maxval(nspecies),AERO_AMBIENT:AERO_CLDBRNE),stat=ierr)
     if( ierr /= 0 ) then
        nullify(newobj)
        return
     end if
-    kinds(:,:,:) = -1
-    do m = 1, nmodes
-       mm = modal_aerosol_list(list_idx_loc)%idx(m)
-       kinds(m,0,AERO_AMBIENT) = field_kind_from_source(modes%comps(mm)%source_num_a)
-       kinds(m,0,AERO_CLDBRNE) = field_kind_from_source(modes%comps(mm)%source_num_c)
-       do l = 1, nspecies(m)
-          kinds(m,l,AERO_AMBIENT) = field_kind_from_source(modes%comps(mm)%source_mmr_a(l))
-          kinds(m,l,AERO_CLDBRNE) = field_kind_from_source(modes%comps(mm)%source_mmr_c(l))
-       end do
-    end do
-    call newobj%field_kind_set(kinds, ierr)
-    if( ierr /= 0 ) then
-       nullify(newobj)
-       return
-    end if
-    deallocate(kinds)
 
     npoa = 0
     nsoa = 0
@@ -354,7 +311,6 @@ contains
        nullify(newobj)
        return
     end if
-    deallocate(nspecies)
     deallocate(alogsig)
     deallocate(sigmag)
     deallocate(f1)
@@ -483,19 +439,6 @@ contains
 
   end subroutine get
 
-  !------------------------------------------------------------------------
-  ! returns the physprop ID for a given bin (mode) index
-  !------------------------------------------------------------------------
-  integer function physprop_id(self, bin_ndx)
-    use radiative_aerosol, only: rad_aer_mode_physprop_id
-
-    class(modal_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx
-
-    physprop_id = rad_aer_mode_physprop_id(self%list_idx_, bin_ndx)
-
-  end function physprop_id
-
   !------------------------------------------------------------------------------
   ! returns radius^3 (m3) of a given bin number
   !------------------------------------------------------------------------------
@@ -533,69 +476,6 @@ contains
     fm = 0.5_r8*(1._r8-erf(y))
 
   end subroutine actfracs
-
-  !------------------------------------------------------------------------
-  ! returns constituents names of aerosol number mixing ratios
-  !------------------------------------------------------------------------
-  subroutine num_names(self, bin_ndx, name_a, name_c)
-    class(modal_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx           ! bin number
-    character(len=*), intent(out) :: name_a ! constituent name of ambient aerosol number dens
-    character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol number dens
-
-    call rad_aer_get_info(self%list_idx_,bin_ndx, num_name=name_a, num_name_cw=name_c)
-  end subroutine num_names
-
-  !------------------------------------------------------------------------
-  ! returns constituents names of aerosol mass mixing ratios
-  !------------------------------------------------------------------------
-  subroutine mmr_names(self, bin_ndx, species_ndx, name_a, name_c)
-    class(modal_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx           ! bin number
-    integer, intent(in) :: species_ndx       ! species number
-    character(len=*), intent(out) :: name_a ! constituent name of ambient aerosol MMR
-    character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol MMR
-
-    call rad_aer_get_info(self%list_idx_, bin_ndx, species_ndx, spec_name=name_a, spec_name_cw=name_c)
-  end subroutine mmr_names
-
-  !------------------------------------------------------------------------
-  ! returns constituent name of ambient aerosol number mixing ratios
-  !------------------------------------------------------------------------
-  subroutine amb_num_name(self, bin_ndx, name)
-    class(modal_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx           ! bin number
-    character(len=*), intent(out) :: name   ! constituent name of ambient aerosol number dens
-
-    call rad_aer_get_info(self%list_idx_,bin_ndx, num_name=name)
-
-  end subroutine amb_num_name
-
-  !------------------------------------------------------------------------
-  ! returns constituent name of ambient aerosol mass mixing ratios
-  !------------------------------------------------------------------------
-  subroutine amb_mmr_name(self, bin_ndx, species_ndx, name)
-    class(modal_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx           ! bin number
-    integer, intent(in) :: species_ndx       ! species number
-    character(len=*), intent(out) :: name   ! constituent name of ambient aerosol MMR
-
-    call rad_aer_get_info(self%list_idx_, bin_ndx, species_ndx, spec_name=name)
-
-  end subroutine amb_mmr_name
-
-  !------------------------------------------------------------------------
-  ! returns species type
-  !------------------------------------------------------------------------
-  subroutine species_type(self, bin_ndx, species_ndx, spectype)
-    class(modal_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx           ! bin number
-    integer, intent(in) :: species_ndx       ! species number
-    character(len=*), intent(out) :: spectype ! species type
-
-    call rad_aer_get_info(self%list_idx_, bin_ndx, species_ndx, spec_type=spectype)
-
-  end subroutine species_type
 
   !------------------------------------------------------------------------------
   ! returns TRUE if Ice Nucleation tendencies are applied to given aerosol bin number
@@ -763,6 +643,12 @@ contains
 
   !------------------------------------------------------------------------------
   ! returns name for a given aerosol bin
+  !
+  ! Overrides the base implementation: for modal aerosols this has always
+  ! returned the mode TYPE ('accum', 'coarse', ...), not the mode name, and
+  ! consumers rely on that. The same data is held in the description as
+  ! bin_type; this can migrate off the facade together with the other
+  ! mode_type reads (soluble, hetfrz_species, ...).
   !------------------------------------------------------------------------------
   function bin_name(self, bin_ndx) result(name)
     class(modal_aerosol_properties), intent(in) :: self

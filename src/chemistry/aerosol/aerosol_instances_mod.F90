@@ -33,6 +33,7 @@ module aerosol_instances_mod
 
   use aerosol_properties_mod,        only: aerosol_properties
   use aerosol_state_mod,             only: aerosol_state
+  use aerosol_description_mod,       only: aerosol_description_t, rad_list_view_t
   use radiative_aerosol_definitions, only: N_DIAG
 
   implicit none
@@ -41,6 +42,8 @@ module aerosol_instances_mod
   public :: aerosol_instances_init
   public :: aerosol_instances_init_states
   public :: aerosol_instances_get_props
+  public :: aerosol_instances_get_props_by_model
+  public :: aerosol_instances_get_description
   public :: aerosol_instances_get_state
   public :: aerosol_instances_get_num_models
   public :: aerosol_instances_is_active
@@ -56,6 +59,16 @@ module aerosol_instances_mod
   type :: aero_state_entry_t
      class(aerosol_state),      pointer :: obj => null()
   end type aero_state_entry_t
+
+  ! Normalized structural descriptions, one per active aerosol model,
+  ! dimensioned (iaermod); built once at aerosol_instances_init and
+  ! immutable afterwards.
+  type(aerosol_description_t), allocatable, target :: aero_desc_all(:)
+
+  ! Per-list views over the descriptions, dimensioned (iaermod, 0:N_DIAG);
+  ! built once at aerosol_instances_init. Entries for (model, list) pairs
+  ! with no members remain empty (nbins=0).
+  type(rad_list_view_t), allocatable, target :: aero_views_all(:,:)
 
   ! Persistent aerosol properties objects
   ! dimensioned (iaermod, 0:N_DIAG).
@@ -95,7 +108,11 @@ contains
   ! is associated or not.
   subroutine aerosol_instances_init()
     use radiative_aerosol, only: rad_aer_get_info
-    use radiative_aerosol_definitions, only: active_calls
+    use radiative_aerosol_definitions, only: active_calls, modes, bins, bulk_aerosol_list, &
+                                             modal_aerosol_list, sectional_aerosol_list
+    use aerosol_description_mod, only: build_modal_description, build_carma_description, &
+                                       build_bulk_description, &
+                                       build_modal_view, build_carma_view, build_bulk_view
     use modal_aerosol_properties_mod, only: modal_aerosol_properties
     use carma_aerosol_properties_mod, only: carma_aerosol_properties
     use bulk_aerosol_properties_mod,  only: bulk_aerosol_properties
@@ -126,13 +143,40 @@ contains
 
     if (num_aero_models_ < 1) return
 
+    ! Build the normalized structural description for each active model from
+    ! the parsed and host-resolved definitions.
+    allocate(aero_desc_all(num_aero_models_), stat=istat)
+    if (istat /= 0) then
+       call endrun(subname//'allocation error: aero_desc_all')
+    end if
+
+    iaermod = 0
+    if (modal_active_) then
+       iaermod = iaermod + 1
+       call build_modal_description(modes, aero_desc_all(iaermod))
+    end if
+    if (carma_active_) then
+       iaermod = iaermod + 1
+       call build_carma_description(bins, aero_desc_all(iaermod))
+    end if
+    if (bulk_active_) then
+       iaermod = iaermod + 1
+       call build_bulk_description(bulk_aerosol_list, active_calls, aero_desc_all(iaermod))
+    end if
+
     allocate(aero_props_all(num_aero_models_, 0:N_DIAG), stat=istat)
     if (istat /= 0) then
        call endrun(subname//'allocation error: aero_props_all')
     end if
 
+    allocate(aero_views_all(num_aero_models_, 0:N_DIAG), stat=istat)
+    if (istat /= 0) then
+       call endrun(subname//'allocation error: aero_views_all')
+    end if
+
     do ilist = 0, N_DIAG
-       ! only populate aerosol properties for active climate/diagnostic lists.
+       ! only populate views and aerosol properties for active
+       ! climate/diagnostic lists.
        if (.not. active_calls(ilist)) cycle
 
        call rad_aer_get_info(ilist, nmodes=nmodes, nbins=nbins, naero=nbulk_aerosols)
@@ -141,19 +185,28 @@ contains
        if (modal_active_) then
           iaermod = iaermod + 1
           if (nmodes > 0) then
-             aero_props_all(iaermod, ilist)%obj => modal_aerosol_properties(ilist)
+             call build_modal_view(aero_desc_all(iaermod), modal_aerosol_list(ilist), &
+                                   ilist, aero_views_all(iaermod, ilist))
+             aero_props_all(iaermod, ilist)%obj => &
+                  modal_aerosol_properties(aero_desc_all(iaermod), aero_views_all(iaermod, ilist))
           end if
        end if
        if (carma_active_) then
           iaermod = iaermod + 1
           if (nbins > 0) then
-             aero_props_all(iaermod, ilist)%obj => carma_aerosol_properties(ilist)
+             call build_carma_view(aero_desc_all(iaermod), sectional_aerosol_list(ilist), &
+                                   ilist, aero_views_all(iaermod, ilist))
+             aero_props_all(iaermod, ilist)%obj => &
+                  carma_aerosol_properties(aero_desc_all(iaermod), aero_views_all(iaermod, ilist))
           end if
        end if
        if (bulk_active_) then
           iaermod = iaermod + 1
           if (nbulk_aerosols > 0) then
-             aero_props_all(iaermod, ilist)%obj => bulk_aerosol_properties(ilist)
+             call build_bulk_view(aero_desc_all(iaermod), bulk_aerosol_list(ilist), &
+                                  ilist, aero_views_all(iaermod, ilist))
+             aero_props_all(iaermod, ilist)%obj => &
+                  bulk_aerosol_properties(aero_desc_all(iaermod), aero_views_all(iaermod, ilist))
           end if
        end if
     end do
@@ -227,6 +280,53 @@ contains
 
   end function aerosol_instances_get_props
 
+  ! Return a pointer to the aerosol_properties object for the given aerosol
+  ! model name ('modal', 'carma', or 'bulk') and radiation list.  Returns
+  ! null when the model is inactive or has no entries in the specified list.
+  function aerosol_instances_get_props_by_model(model_name, list_idx) result(props)
+    character(len=*), intent(in) :: model_name ! 'modal', 'carma', or 'bulk'
+    integer,          intent(in) :: list_idx   ! radiation list index (0=climate, 1..N_DIAG)
+    class(aerosol_properties), pointer :: props
+
+    integer :: iaermod
+
+    nullify(props)
+
+    iaermod = 0
+    if (modal_active_) then
+       iaermod = iaermod + 1
+       if (trim(model_name) == 'modal') then
+          props => aero_props_all(iaermod, list_idx)%obj
+          return
+       end if
+    end if
+    if (carma_active_) then
+       iaermod = iaermod + 1
+       if (trim(model_name) == 'carma') then
+          props => aero_props_all(iaermod, list_idx)%obj
+          return
+       end if
+    end if
+    if (bulk_active_) then
+       iaermod = iaermod + 1
+       if (trim(model_name) == 'bulk') then
+          props => aero_props_all(iaermod, list_idx)%obj
+          return
+       end if
+    end if
+
+  end function aerosol_instances_get_props_by_model
+
+  ! Return a pointer to the normalized structural description for the given
+  ! aerosol model index.
+  function aerosol_instances_get_description(iaermod) result(desc)
+    integer, intent(in) :: iaermod   ! aerosol model index (1..num_aero_models)
+    type(aerosol_description_t), pointer :: desc
+
+    desc => aero_desc_all(iaermod)
+
+  end function aerosol_instances_get_description
+
   ! Return the number of aerosol models active at runtime.
   pure integer function aerosol_instances_get_num_models()
     aerosol_instances_get_num_models = num_aero_models_
@@ -280,6 +380,15 @@ contains
           end do
        end do
        deallocate(aero_props_all)
+    end if
+
+    ! Deallocate views and descriptions (allocatable components are released
+    ! with them)
+    if (allocated(aero_views_all)) then
+       deallocate(aero_views_all)
+    end if
+    if (allocated(aero_desc_all)) then
+       deallocate(aero_desc_all)
     end if
 
     num_aero_models_ = 0

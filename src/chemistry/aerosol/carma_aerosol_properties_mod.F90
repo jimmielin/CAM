@@ -2,11 +2,10 @@ module carma_aerosol_properties_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
   use physconst, only: pi
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
-  use aerosol_properties_mod, only: field_kind_from_source, aero_has_working_state_table
-  use aerosol_properties_mod, only: AERO_AMBIENT, AERO_CLDBRNE, AERO_FIELD_DERIVED
-  use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_bin_props_by_idx, &
-                               rad_aer_get_info_by_bin, rad_aer_get_info_by_bin_spec, &
-                               rad_aer_bin_physprop_id
+  use aerosol_properties_mod, only: aero_has_working_state_table
+  use aerosol_description_mod, only: aerosol_description_t, rad_list_view_t
+  use radiative_aerosol, only: rad_aer_get_bin_props_by_idx, &
+                               rad_aer_get_info_by_bin, rad_aer_get_info_by_bin_spec
   use infnan, only: nan, assignment(=)
 
   implicit none
@@ -23,19 +22,12 @@ module carma_aerosol_properties_mod
      procedure :: get
      procedure :: amcube
      procedure :: actfracs
-     procedure :: num_names
-     procedure :: mmr_names
-     procedure :: amb_num_name
-     procedure :: amb_mmr_name
-     procedure :: species_type
      procedure :: icenuc_updates_num
      procedure :: icenuc_updates_mmr
      procedure :: apply_number_limits
      procedure :: hetfrz_species
-     procedure :: physprop_id
      procedure :: soluble
      procedure :: min_mass_mean_rad
-     procedure :: bin_name
      procedure :: scav_diam
      procedure :: resuspension_resize
      procedure :: rebin_bulk_fluxes
@@ -56,24 +48,20 @@ contains
 
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
-  function constructor(list_idx) result(newobj)
-    use radiative_aerosol_definitions, only: bins, sectional_aerosol_list
+  function constructor(desc, view) result(newobj)
 
-    integer, optional, intent(in) :: list_idx ! radiation list index (0=climate)
+    type(aerosol_description_t), target, intent(in) :: desc ! normalized structural description
+    type(rad_list_view_t),       target, intent(in) :: view ! radiation list view over the description
     type(carma_aerosol_properties), pointer :: newobj
 
-    integer :: l, m, nbins, ncnst_tot, mm
-    integer, allocatable :: kinds(:,:,:)
-    integer :: list_idx_loc
-    integer,allocatable :: nspecies(:)
-    integer,allocatable :: nmasses(:)
+    integer :: m, nbins
     real(r8),allocatable :: alogsig(:)
     real(r8),allocatable :: f1(:)
     real(r8),allocatable :: f2(:)
     integer :: ierr
 
     integer, pointer :: ibl(:)
-    integer :: ii, imx, imx_num, imx_mmr, ipr, ipr_num, ipr_mmr
+    integer :: ii, l, imx, imx_num, imx_mmr, ipr, ipr_num, ipr_mmr
     character(len=32) :: spectype
     character(len=32) :: bin_name
     character(len=32) :: bin_name_l    ! bin name of the larger bin
@@ -82,27 +70,14 @@ contains
     integer, allocatable :: imx_mmr_bl(:) ! index used to map pure sulfate bin to mixed sulfate bin for mmr
     integer, allocatable :: imx_num_bl(:) ! index used to map pure sulfate bin to mixed sulfate bin for num
 
-    list_idx_loc = 0
-    if (present(list_idx)) list_idx_loc = list_idx
-
     allocate(newobj,stat=ierr)
     if( ierr /= 0 ) then
        nullify(newobj)
        return
     end if
 
-    call rad_aer_get_info( list_idx_loc, nbins=nbins)
+    nbins = view%nbins
 
-    allocate( nspecies(nbins),stat=ierr )
-    if( ierr /= 0 ) then
-       nullify(newobj)
-       return
-    end if
-    allocate( nmasses(nbins),stat=ierr )
-    if( ierr /= 0 ) then
-       nullify(newobj)
-       return
-    end if
     allocate( alogsig(nbins),stat=ierr )
     if( ierr /= 0 ) then
        nullify(newobj)
@@ -119,60 +94,21 @@ contains
        return
     end if
 
-    ncnst_tot = 0
-
-    do m = 1, nbins
-       call rad_aer_get_info_by_bin(list_idx_loc, m, nspec=nspecies(m))
-       ncnst_tot = ncnst_tot + nspecies(m) + 1
-       nmasses(m) = nspecies(m)
-    end do
-
     alogsig(:) = log(2._r8)
     f1 = 1._r8
     f2 = 1._r8
 
-    call newobj%initialize(nbins,ncnst_tot,nspecies,nmasses,alogsig,f1,f2,ierr,list_idx_loc)
+    call newobj%initialize(desc,view,alogsig,f1,f2,ierr)
     if( ierr /= 0 ) then
        nullify(newobj)
        return
     end if
 
-    ! field kind table built from the parsed per-entry source data:
-    !  A - advected constituent
-    !  N - pbuf (CAM), non-advected constituent (SIMA)
-    !
-    ! Special note for CARMA: Bin numbers for CARMA in both ambient and cloud-borne phases
-    ! are derived from bin mass via the fixed bin radius and not stored in the host model,
-    ! so it is a "derived" quantity.
-    allocate(kinds(nbins,0:maxval(nspecies),AERO_AMBIENT:AERO_CLDBRNE),stat=ierr)
-    if( ierr /= 0 ) then
-       nullify(newobj)
-       return
-    end if
-    kinds(:,:,:) = -1
-    do m = 1, nbins
-       mm = sectional_aerosol_list(list_idx_loc)%idx(m)
-       kinds(m,0,AERO_AMBIENT) = AERO_FIELD_DERIVED
-       kinds(m,0,AERO_CLDBRNE) = AERO_FIELD_DERIVED
-       do l = 1, nspecies(m)
-          kinds(m,l,AERO_AMBIENT) = field_kind_from_source(bins%comps(mm)%source_mmr_a(l))
-          kinds(m,l,AERO_CLDBRNE) = field_kind_from_source(bins%comps(mm)%source_mmr_c(l))
-       end do
-    end do
-    call newobj%field_kind_set(kinds, ierr)
-    if( ierr /= 0 ) then
-       nullify(newobj)
-       return
-    end if
-    deallocate(kinds)
-
-    deallocate(nspecies)
-    deallocate(nmasses)
     deallocate(alogsig)
     deallocate(f1)
     deallocate(f2)
 
-    allocate(newobj%ibl(ncnst_tot),stat=ierr)
+    allocate(newobj%ibl(newobj%ncnst_tot()),stat=ierr)
     if( ierr /= 0 ) then
        nullify(newobj)
        return
@@ -377,17 +313,6 @@ contains
 
   end subroutine get
 
-  !------------------------------------------------------------------------
-  ! returns the physprop ID for a given bin index
-  !------------------------------------------------------------------------
-  integer function physprop_id(self, bin_ndx)
-    class(carma_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx
-
-    physprop_id = rad_aer_bin_physprop_id(self%list_idx_, bin_ndx)
-
-  end function physprop_id
-
   !------------------------------------------------------------------------------
   ! returns radius^3 (m3) of a given bin number
   !------------------------------------------------------------------------------
@@ -422,79 +347,6 @@ contains
     end if
 
   end subroutine actfracs
-
-  !------------------------------------------------------------------------
-  ! returns constituents names of aerosol number mixing ratios
-  !------------------------------------------------------------------------
-  subroutine num_names(self, bin_ndx, name_a, name_c)
-    class(carma_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx           ! bin number
-    character(len=*), intent(out) :: name_a ! constituent name of ambient aerosol number dens
-    character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol number dens
-
-    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, num_name=name_a, num_name_cw=name_c)
-
-  end subroutine num_names
-
-  !------------------------------------------------------------------------
-  ! returns constituents names of aerosol mass mixing ratios
-  !------------------------------------------------------------------------
-  subroutine mmr_names(self, bin_ndx, species_ndx, name_a, name_c)
-    class(carma_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx           ! bin number
-    integer, intent(in) :: species_ndx       ! species number
-    character(len=*), intent(out) :: name_a ! constituent name of ambient aerosol MMR
-    character(len=*), intent(out) :: name_c ! constituent name of cloud-borne aerosol MMR
-
-    if (species_ndx>0) then
-       call rad_aer_get_info_by_bin_spec(self%list_idx_, bin_ndx, species_ndx, spec_name=name_a, spec_name_cw=name_c)
-    else
-       call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx,  mmr_name=name_a, mmr_name_cw=name_c)
-    end if
-
-  end subroutine mmr_names
-
-  !------------------------------------------------------------------------
-  ! returns constituent name of ambient aerosol number mixing ratios
-  !------------------------------------------------------------------------
-  subroutine amb_num_name(self, bin_ndx, name)
-    class(carma_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx           ! bin number
-    character(len=*), intent(out) :: name   ! constituent name of ambient aerosol number dens
-
-    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, num_name=name)
-
-  end subroutine amb_num_name
-
-  !------------------------------------------------------------------------
-  ! returns constituent name of ambient aerosol mass mixing ratios
-  !------------------------------------------------------------------------
-  subroutine amb_mmr_name(self, bin_ndx, species_ndx, name)
-    class(carma_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx           ! bin number
-    integer, intent(in) :: species_ndx       ! species number
-    character(len=*), intent(out) :: name   ! constituent name of ambient aerosol MMR
-
-    if (species_ndx>0) then
-       call rad_aer_get_info_by_bin_spec(self%list_idx_, bin_ndx, species_ndx, spec_name=name)
-    else
-       call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx,  mmr_name=name)
-    end if
-
-  end subroutine amb_mmr_name
-
-  !------------------------------------------------------------------------
-  ! returns species type
-  !------------------------------------------------------------------------
-  subroutine species_type(self, bin_ndx, species_ndx, spectype)
-    class(carma_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx           ! bin number
-    integer, intent(in) :: species_ndx       ! species number
-    character(len=*), intent(out) :: spectype ! species type
-
-    call rad_aer_get_info_by_bin_spec(self%list_idx_, bin_ndx, species_ndx, spec_type=spectype)
-
-  end subroutine species_type
 
   !------------------------------------------------------------------------------
   ! returns TRUE if Ice Nucleation tendencies are applied to given aerosol bin number
@@ -601,19 +453,6 @@ contains
     minrad = 0.0_r8
 
   end function min_mass_mean_rad
-
-  !------------------------------------------------------------------------------
-  ! returns name for a given aerosol bin
-  !------------------------------------------------------------------------------
-  function bin_name(self, bin_ndx) result(name)
-    class(carma_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx  ! bin number
-
-    character(len=32) name
-
-    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=name)
-
-  end function bin_name
 
   !------------------------------------------------------------------------------
   ! returns scavenging diameter (cm) for a given aerosol bin number

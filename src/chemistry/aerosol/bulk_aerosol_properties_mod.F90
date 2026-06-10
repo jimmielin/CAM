@@ -8,10 +8,9 @@ module bulk_aerosol_properties_mod
   use string_utils, only : to_lower
 
   use aerosol_properties_mod, only: aerosol_properties
-  use aerosol_properties_mod, only: field_kind_from_source
-  use aerosol_properties_mod, only: AERO_AMBIENT, AERO_CLDBRNE, AERO_FIELD_DERIVED, AERO_FIELD_ABSENT
+  use aerosol_description_mod, only: aerosol_description_t, rad_list_view_t
 
-  use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props
+  use radiative_aerosol, only: rad_aer_get_props
   use shr_infnan_mod, only: nan => shr_infnan_nan, assignment(=)
 
   implicit none
@@ -39,10 +38,8 @@ module bulk_aerosol_properties_mod
      procedure :: icenuc_updates_mmr
      procedure :: apply_number_limits
      procedure :: hetfrz_species
-     procedure :: physprop_id
      procedure :: soluble
      procedure :: min_mass_mean_rad
-     procedure :: bin_name
      procedure :: scav_diam
      procedure :: resuspension_resize
      procedure :: rebin_bulk_fluxes
@@ -61,22 +58,16 @@ contains
 
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
-  function constructor(list_idx) result(newobj)
-    use radiative_aerosol_definitions, only: bulk_aerosol_list
+  function constructor(desc, view) result(newobj)
 
-    integer, optional, intent(in) :: list_idx ! radiation list index (0=climate)
+    type(aerosol_description_t), target, intent(in) :: desc ! normalized structural description
+    type(rad_list_view_t),       target, intent(in) :: view ! radiation list view over the description
     type(bulk_aerosol_properties), pointer :: newobj
 
-    integer,allocatable :: kinds(:,:,:)
-    integer,allocatable :: nspecies(:)
     real(r8),allocatable :: alogsig(:)
     real(r8),allocatable :: f1(:)
     integer :: ierr, naero, i
-    integer :: list_idx_loc
     real(r8) :: dispersion_val
-
-    list_idx_loc = 0
-    if (present(list_idx)) list_idx_loc = list_idx
 
     allocate(newobj,stat=ierr)
     if( ierr /= 0 ) then
@@ -84,14 +75,9 @@ contains
        return
     end if
 
-    call rad_aer_get_info(list_idx_loc, naero=naero)
-
     ! Here treat each aerosol as a separate bin
-    allocate( nspecies(naero),stat=ierr )
-    if( ierr /= 0 ) then
-       nullify(newobj)
-       return
-    end if
+    naero = view%nbins
+
     allocate( alogsig(naero),stat=ierr )
     if( ierr /= 0 ) then
        nullify(newobj)
@@ -103,59 +89,21 @@ contains
        return
     end if
 
-    ! Bulk aerosols have 1 chemical species in each bin
-    nspecies(:) = 1
-
     ! Read actual dispersion (sigma_logr) from physprop files
     do i = 1, naero
-       call rad_aer_get_props(list_idx_loc, i, dispersion_aer=dispersion_val)
+       call rad_aer_get_props(view%list_idx, i, dispersion_aer=dispersion_val)
        alogsig(i) = log(dispersion_val)
     end do
     f1(:) = 1._r8
 
-    ! For bulk aerosols, the number of bins and total number of constituents are
-    ! the same (naero) -- one constituent (species and mass) per bin.
-    call newobj%initialize(nbin=naero, ncnst=naero, nspec=nspecies, nmasses=nspecies, &
-                           alogsig=alogsig, f1=f1, f2=f1, ierr=ierr, list_idx=list_idx_loc)
+    call newobj%initialize(desc, view, alogsig=alogsig, f1=f1, f2=f1, ierr=ierr)
     if( ierr /= 0 ) then
        nullify(newobj)
        return
     end if
 
-    ! field kind table: ambient mass from the parsed per-entry source data
-    ! ('A' advected constituent, 'N' pbuf (CAM)/non-advected (SIMA),
-    !  e.g. prescribed aerosol), with the model overrides that the BAM ambient number is
-    ! derived from mass (via num_to_mass) and BAM has no cloud-borne phase
-    allocate(kinds(naero,0:1,AERO_AMBIENT:AERO_CLDBRNE),stat=ierr)
-    if( ierr /= 0 ) then
-       nullify(newobj)
-       return
-    end if
-    do i = 1, naero
-       ! species_ndx 0 refers to the bin's number field and 1..nspecies(bin) to its mass
-       ! species (same convention as the species indexer). Each bulk "bin" holds exactly
-       ! one species, so index 0 is its number concentration -- always derived from mass
-       ! via num_to_mass -- and index 1 is its mass mmr, classified from the rad list
-       ! source descriptor.
-       kinds(i,0,AERO_AMBIENT) = AERO_FIELD_DERIVED
-       kinds(i,1,AERO_AMBIENT) = field_kind_from_source(bulk_aerosol_list(list_idx_loc)%aer(i)%source)
-       kinds(i,:,AERO_CLDBRNE) = AERO_FIELD_ABSENT
-    end do
-    call newobj%field_kind_set(kinds, ierr)
-    if( ierr /= 0 ) then
-       nullify(newobj)
-       return
-    end if
-    deallocate(kinds)
-
-    deallocate(nspecies)
     deallocate(alogsig)
     deallocate(f1)
-
-    if( ierr /= 0 ) then
-       nullify(newobj)
-       return
-    end if
 
   end function constructor
 
@@ -272,19 +220,6 @@ contains
 
   end subroutine get
 
-  !------------------------------------------------------------------------
-  ! returns the physprop ID for a given bin (aerosol) index
-  !------------------------------------------------------------------------
-  integer function physprop_id(self, bin_ndx)
-    use radiative_aerosol, only: rad_aer_bulk_physprop_id
-
-    class(bulk_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx
-
-    physprop_id = rad_aer_bulk_physprop_id(self%list_idx_, bin_ndx)
-
-  end function physprop_id
-
   !------------------------------------------------------------------------------
   ! returns radius^3 (m3) of a given bin number
   !------------------------------------------------------------------------------
@@ -374,6 +309,10 @@ contains
 
   !------------------------------------------------------------------------
   ! returns species type
+  !
+  ! Overrides the base implementation: bulk aerosol definitions carry no
+  ! species class, so the description's spec_type table is blank for bulk.
+  ! The type is derived from the physprop file's aerosol name instead.
   !------------------------------------------------------------------------
   subroutine species_type(self, bin_ndx, species_ndx, spectype)
     class(bulk_aerosol_properties), intent(in) :: self
@@ -475,32 +414,6 @@ contains
     minrad = 0._r8
 
   end function min_mass_mean_rad
-
-  !------------------------------------------------------------------------------
-  ! returns name for a given aerosol bin
-  !------------------------------------------------------------------------------
-  function bin_name(self, bin_ndx) result(name)
-    use aerosol_properties_mod, only: aero_name_len
-
-    class(bulk_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: bin_ndx  ! bin number
-
-    character(len=aero_name_len) :: name
-    character(len=64), allocatable :: names(:)
-    integer :: naer, astat
-
-    call rad_aer_get_info(self%list_idx_, naero=naer)
-
-    allocate( names(naer), stat=astat)
-    if( astat/= 0 ) call endrun('bulk_aerosol_properties_mod%bin_name: names allocate error')
-
-    call rad_aer_get_info(self%list_idx_, aernames=names)
-
-    name = names(bin_ndx)
-
-    deallocate(names)
-
-  end function bin_name
 
   !------------------------------------------------------------------------------
   ! returns scavenging diameter (cm) for a given aerosol bin number
