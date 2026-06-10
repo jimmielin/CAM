@@ -401,7 +401,7 @@ subroutine carma_aero_gasaerexch_sub(  state, &
   real(r8), pointer :: dqdt_soa(:,:)
 
   real(r8) :: rhoair(pcols,pver)
-  real(r8), pointer :: nmr(:,:)
+  real(r8) :: nmr(pcols,pver)
   class(aerosol_state), pointer :: aero_state
 
 !----------------------------------------------------------------------

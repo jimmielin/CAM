@@ -6,6 +6,35 @@ module aerosol_properties_mod
   private
 
   public :: aerosol_properties
+  public :: field_kind_from_source
+
+  ! Field kind classification (see design doc section 4.2). One per
+  ! (bin, species, phase) entry; species index 0 selects the bin number field.
+  integer, public, parameter :: AERO_FIELD_ADVECTED = 1
+    ! Host constituent updated via the host tendency mechanism (ptend / CCPP
+    ! tendencies). Read: pointer getter legal. Mutate: tendencies ONLY.
+  integer, public, parameter :: AERO_FIELD_STORED   = 2
+    ! Host-resident but NOT updated via the tendency mechanism. CAM: pbuf fields
+    ! (MAM qqcw, ...). Read: pointer getter legal. Mutate: in place through the
+    ! pointer, sole-owner contract.
+  integer, public, parameter :: AERO_FIELD_DERIVED  = 3
+    ! Computed on demand from other fields (BAM number; CARMA number).
+    ! Read: fill getter ONLY. Mutation is meaningless and impossible by
+    ! construction (no pointer is ever returned).
+  integer, public, parameter :: AERO_FIELD_ABSENT   = 4
+    ! Does not exist for this model (BAM cloud-borne). Consumers skip;
+    ! fill getters return zeros as a read convenience.
+
+  ! phase selectors for field_kind
+  integer, public, parameter :: AERO_AMBIENT = 1
+  integer, public, parameter :: AERO_CLDBRNE = 2
+
+  ! Aerosol model capabilities -- arguments to supports() (design doc section
+  ! 4.7). A capability is declared by overriding supports(); the base class
+  ! returns .false. for everything. Further capabilities are added by the
+  ! development phase that first guards on them.
+  integer, public, parameter :: aerocap_working_state_table = 1
+    ! get_states-style working-state table over all bins/species is supported
 
   !> aerosol_properties defines the configuration of any aerosol package (using
   !! any aerosol representation) based on user specification. These values are
@@ -39,9 +68,15 @@ module aerosol_properties_mod
      real(r8) :: soa_equivso4_factor_ = -huge(1._r8)
      real(r8) :: pom_equivso4_factor_ = -huge(1._r8)
      integer, public :: list_idx_ = 0 ! radiation list index (0=climate)
+     ! field kind of each (bin, species 0:max nspecies, AERO_AMBIENT:AERO_CLDBRNE)
+     ! entry; species 0 is the bin number field; set at construction
+     integer, allocatable :: field_kind_(:,:,:)
    contains
      procedure :: list_idx => get_list_idx
      procedure :: initialize => aero_props_init
+     procedure :: field_kind
+     procedure :: field_kind_set
+     procedure :: supports
      procedure :: nbins => get_nbins
      procedure :: ncnst_tot
      procedure,private :: nspecies_per_bin
@@ -501,6 +536,73 @@ contains
   end subroutine aero_props_init
 
   !------------------------------------------------------------------------------
+  ! sets the field kind table -- called once at construction by the concrete
+  ! class constructors, which build the table from the parsed per-entry source
+  ! data and apply any model overrides (e.g., derived numbers)
+  !------------------------------------------------------------------------------
+  subroutine field_kind_set(self, kinds, ierr)
+    class(aerosol_properties), intent(inout) :: self
+    integer, intent(in) :: kinds(1:,0:,1:) ! (bin, species 0:max nspecies, AERO_AMBIENT:AERO_CLDBRNE)
+    integer, intent(out) :: ierr
+
+    allocate(self%field_kind_(size(kinds,1), 0:ubound(kinds,2), size(kinds,3)), stat=ierr)
+    if (ierr /= 0) then
+       return
+    end if
+
+    self%field_kind_(:,0:,:) = kinds(:,0:,:)
+
+  end subroutine field_kind_set
+
+  !------------------------------------------------------------------------------
+  ! returns the field kind (AERO_FIELD_ADVECTED, ..._STORED, ..._DERIVED or
+  ! ..._ABSENT) of the given (bin, species, phase) entry
+  !------------------------------------------------------------------------------
+  pure integer function field_kind(self, bin_ndx, species_ndx, phase)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: bin_ndx     ! bin index
+    integer, intent(in) :: species_ndx ! species index; 0 selects the bin number field
+    integer, intent(in) :: phase       ! AERO_AMBIENT or AERO_CLDBRNE
+
+    field_kind = self%field_kind_(bin_ndx, species_ndx, phase)
+  end function field_kind
+
+  !------------------------------------------------------------------------------
+  ! returns TRUE if the aerosol model provides the given capability
+  ! (aerocap_* constant); models declare capabilities by overriding this --
+  ! everything defaults to unsupported
+  !------------------------------------------------------------------------------
+  logical function supports(self, capability)
+    class(aerosol_properties), intent(in) :: self
+    integer, intent(in) :: capability ! aerocap_* constant
+
+    supports = .false.
+  end function supports
+
+  !------------------------------------------------------------------------------
+  ! maps a host aerosol-list source descriptor onto a field kind:
+  ! 'A' state constituent (advected); 'N' pbuf-resident (non-advected);
+  ! 'Z' zero / blank -- no such field for this model
+  !------------------------------------------------------------------------------
+  integer function field_kind_from_source(source)
+    use cam_abortutils, only: endrun
+
+    character(len=*), intent(in) :: source
+
+    select case (source(1:1))
+    case ('A')
+       field_kind_from_source = AERO_FIELD_ADVECTED
+    case ('N')
+       field_kind_from_source = AERO_FIELD_STORED
+    case ('Z', ' ')
+       field_kind_from_source = AERO_FIELD_ABSENT
+    case default
+       field_kind_from_source = AERO_FIELD_ABSENT
+       call endrun('field_kind_from_source: unrecognized source: '//source)
+    end select
+  end function field_kind_from_source
+
+  !------------------------------------------------------------------------------
   ! Object clean
   !------------------------------------------------------------------------------
   subroutine aero_props_final(self)
@@ -538,6 +640,9 @@ contains
     endif
     if (allocated(self%rhdeliques_)) then
        deallocate(self%rhdeliques_)
+    endif
+    if (allocated(self%field_kind_)) then
+       deallocate(self%field_kind_)
     endif
 
     self%nbins_ = 0

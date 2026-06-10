@@ -373,7 +373,7 @@ subroutine dropmixnuc( aero_props, aero_state, &
 
    ! Init pointers to mode number and specie mass mixing ratios in
    ! intersitial and cloud borne phases.
-   call aero_state%get_states( aero_props, raer, qqcw )
+   call aero_state%get_states( raer, qqcw )
 
    factnum = 0._r8
    wtke = 0._r8
@@ -390,8 +390,7 @@ subroutine dropmixnuc( aero_props, aero_state, &
 
    phase = 1 ! interstitial
    do m = 1, nbin
-      call aero_state%loadaer( aero_props, &
-           ncol, pver, &
+      call aero_state%loadaer( &
            m, cs, phase, na(:,:,m), va(:,:,m), &
            hy(:,:,m), errnum, errstr)
       if (errnum/=0) then
@@ -1503,8 +1502,7 @@ subroutine ccncalc(aero_state, aero_props, state, cs, ccn)
    phase=3 ! interstitial+cloudborne
 
    do m = 1, nbin
-      call aero_state%loadaer( aero_props, &
-           ncol, pver, &
+      call aero_state%loadaer( &
            m, cs, phase, naerosol(:,:,m), vaerosol(:,:,m), &
            hygro(:,:,m), errnum, errstr)
       if (errnum/=0) then

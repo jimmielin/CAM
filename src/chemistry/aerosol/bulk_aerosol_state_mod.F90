@@ -32,20 +32,15 @@ module bulk_aerosol_state_mod
       type(physics_buffer_desc), pointer :: pbuf(:) => null()
       !REMOVECAM_END
 
-      ! Per-object workspace for derived number mixing ratio.
-      ! Allocated in constructor, deallocated in destructor.
-      real(r8), pointer :: num_work_(:,:) => null()   ! (horizontal_dimension, vertical_layer_dimension)
-      real(r8), pointer :: zero_fld_(:,:) => null()   ! (horizontal_dimension, vertical_layer_dimension)
-
    contains
 
      procedure :: get_transported
      procedure :: set_transported
      procedure :: ambient_total_bin_mmr
-     procedure :: get_ambient_mmr
-     procedure :: get_cldbrne_mmr
-     procedure :: get_ambient_num
-     procedure :: get_cldbrne_num
+     procedure :: alias_ambient_mmr
+     procedure :: alias_cldbrne_mmr
+     procedure :: alias_ambient_num
+     procedure :: alias_cldbrne_num
      procedure :: get_states
      procedure :: icenuc_size_wght_arr
      procedure :: icenuc_size_wght_val
@@ -61,6 +56,7 @@ module bulk_aerosol_state_mod
      procedure :: convcld_actfrac
      procedure :: wgtpct
      procedure :: aqu_gain_binfraction
+     procedure :: derive_ambient_num
      procedure :: get_bulk_num_and_mass
      ! for bit-for-bit
      procedure :: nuclice_get_numdens => nuclice_get_numdens_bam
@@ -77,12 +73,10 @@ contains
 
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
-  function constructor(ncol,state,pbuf,list_idx) result(newobj)
-    !REMOVECAM: host-model specific dimensions
-    use ppgrid,           only: pcols, pver
-    !REMOVECAM_END
-
+  function constructor(props,ncol,nlev,state,pbuf,list_idx) result(newobj)
+    class(aerosol_properties), pointer, intent(in) :: props
     integer, intent(in) :: ncol
+    integer, intent(in) :: nlev
     type(physics_state), target :: state
     type(physics_buffer_desc), pointer :: pbuf(:)
     integer, intent(in), optional :: list_idx
@@ -96,23 +90,16 @@ contains
        return
     end if
 
+    newobj%props_ => props
     newobj%state => state
     newobj%pbuf => pbuf
 
     ! set number of active columns internally to prevent loops from accessing beyond
     ! meaningful data in arrays
-    call newobj%set_ncol(ncol)
+    newobj%ncol_ = ncol
+    newobj%nlev_ = nlev
 
-    if (present(list_idx)) call newobj%set_list_idx(list_idx)
-
-    ! Allocate per-object workspace for derived number fields.
-    ! Thread-safe: in CAM, each chunk has its own state object.
-    allocate(newobj%num_work_(pcols, pver), stat=ierr)
-    if (ierr /= 0) call endrun('bulk_aerosol_state constructor: num_work_ allocation error')
-    newobj%num_work_(:,:) = 0._r8
-    allocate(newobj%zero_fld_(pcols, pver), stat=ierr)
-    if (ierr /= 0) call endrun('bulk_aerosol_state constructor: zero_fld_ allocation error')
-    newobj%zero_fld_(:,:) = 0._r8
+    if (present(list_idx)) newobj%list_idx_ = list_idx
 
   end function constructor
 
@@ -121,17 +108,9 @@ contains
   subroutine destructor(self)
     type(bulk_aerosol_state), intent(inout) :: self
 
+    nullify(self%props_)
     nullify(self%state)
     nullify(self%pbuf)
-
-    if (associated(self%num_work_)) then
-       deallocate(self%num_work_)
-       nullify(self%num_work_)
-    end if
-    if (associated(self%zero_fld_)) then
-       deallocate(self%zero_fld_)
-       nullify(self%zero_fld_)
-    end if
 
   end subroutine destructor
 
@@ -160,9 +139,8 @@ contains
   !------------------------------------------------------------------------
   ! Total aerosol mass mixing ratio for a bin in a given grid box location (column and layer)
   !------------------------------------------------------------------------
-  function ambient_total_bin_mmr(self, aero_props, bin_ndx, col_ndx, lyr_ndx) result(mmr_tot)
+  function ambient_total_bin_mmr(self, bin_ndx, col_ndx, lyr_ndx) result(mmr_tot)
     class(bulk_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props
     integer, intent(in) :: bin_ndx      ! bin index
     integer, intent(in) :: col_ndx      ! column index
     integer, intent(in) :: lyr_ndx      ! vertical layer index
@@ -170,7 +148,7 @@ contains
     real(r8) :: mmr_tot                 ! mass mixing ratios totaled for all species
     real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
 
-    call self%get_ambient_mmr(species_ndx=1, bin_ndx=bin_ndx, mmr=mmr)
+    call self%ambient_mmr_ptr(species_ndx=1, bin_ndx=bin_ndx, mmr=mmr)
 
     mmr_tot = mmr(col_ndx, lyr_ndx)
 
@@ -179,7 +157,7 @@ contains
   !------------------------------------------------------------------------------
   ! returns ambient aerosol mass mixing ratio for a given species index and bin index
   !------------------------------------------------------------------------------
-  subroutine get_ambient_mmr(self, species_ndx, bin_ndx, mmr)
+  subroutine alias_ambient_mmr(self, species_ndx, bin_ndx, mmr)
     class(bulk_aerosol_state), intent(in) :: self
     integer, intent(in) :: species_ndx  ! species index
     integer, intent(in) :: bin_ndx      ! bin index
@@ -189,29 +167,48 @@ contains
     ! bin_ndx is used to identify each individual bulk aerosol.
     call rad_cnst_get_aer_mmr(self%list_idx_, bin_ndx, self%state, self%pbuf, mmr)
 
-  end subroutine get_ambient_mmr
+  end subroutine alias_ambient_mmr
 
   !------------------------------------------------------------------------------
   ! returns cloud-borne aerosol number mixing ratio for a given species index and bin index
   !------------------------------------------------------------------------------
-  subroutine get_cldbrne_mmr(self, species_ndx, bin_ndx, mmr)
+  subroutine alias_cldbrne_mmr(self, species_ndx, bin_ndx, mmr)
     class(bulk_aerosol_state), intent(in) :: self
     integer, intent(in) :: species_ndx  ! species index
     integer, intent(in) :: bin_ndx      ! bin index
     real(r8), pointer :: mmr(:,:)       ! mass mixing ratios (ncol,nlev)
 
-    ! BAM has no cloud-borne aerosol equivalent, return zero array.
-    mmr => self%zero_fld_
+    ! BAM has no cloud-borne aerosol phase (field_kind ABSENT) -- there is no
+    ! host-resident field to alias. Unreachable through the guarded
+    ! cldbrne_mmr_ptr accessor; the get_cldbrne_mmr fill getter returns zeros.
+    call endrun('bulk_aerosol_state alias_cldbrne_mmr: no host-resident cloud-borne field for bulk aerosols')
 
-  end subroutine get_cldbrne_mmr
+  end subroutine alias_cldbrne_mmr
 
   !------------------------------------------------------------------------------
   ! returns ambient aerosol number mixing ratio for a given species index and bin index
   !------------------------------------------------------------------------------
-  subroutine get_ambient_num(self, bin_ndx, num)
+  subroutine alias_ambient_num(self, bin_ndx, num)
     class(bulk_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_ndx     ! bin index
     real(r8), pointer   :: num(:,:)    ! number mixing ratio (#/kg)
+
+    ! The BAM ambient number is derived from mass (field_kind DERIVED) -- there
+    ! is no host-resident field to alias. Unreachable through the guarded
+    ! ambient_num_ptr accessor; use the get_ambient_num fill getter, which
+    ! dispatches to derive_ambient_num.
+    call endrun('bulk_aerosol_state alias_ambient_num: no host-resident number field for bulk aerosols')
+
+  end subroutine alias_ambient_num
+
+  !------------------------------------------------------------------------------
+  ! derives the ambient aerosol number mixing ratio for a given bin index into
+  ! the caller's array
+  !------------------------------------------------------------------------------
+  subroutine derive_ambient_num(self, bin_ndx, num)
+    class(bulk_aerosol_state), intent(in) :: self
+    integer, intent(in) :: bin_ndx     ! bin index
+    real(r8), intent(out) :: num(:,:)  ! number mixing ratio (#/kg)
 
     real(r8), pointer :: mmr(:,:)
     real(r8)          :: ntm
@@ -220,45 +217,43 @@ contains
 
     ! Derive number mixing ratio from mass: num = mmr * num_to_mass_aer (* bam_sulfate_scale for sulfate).
     ! This matches the inline computation formerly in microp_aero.F90 and nucleate_ice_cam.F90.
-    ! Computed into per-object workspace (num_work_); callers must use or copy before the next call.
     ! Only active columns (1:ncol) are computed to avoid FPE on uninitialised padding columns.
 
     nc = self%ncol()
 
-    call self%get_ambient_mmr(species_ndx=1, bin_ndx=bin_ndx, mmr=mmr)
+    call self%ambient_mmr_ptr(species_ndx=1, bin_ndx=bin_ndx, mmr=mmr)
     call rad_aer_get_props(self%list_idx_, bin_ndx, num_to_mass_aer=ntm, aername=aname)
 
     ! Apply bam_sulfate_scale to sulfate/volcanic aerosol
     select case ( to_lower( aname(:4) ) )
     case ('sulf', 'volc') ! both treated as 'sulfate' in aero_props%get type.
-       self%num_work_(:nc,:) = mmr(:nc,:) * ntm * bam_sulfate_scale
+       num(:nc,:) = mmr(:nc,:) * ntm * bam_sulfate_scale
     case default
-       self%num_work_(:nc,:) = mmr(:nc,:) * ntm
+       num(:nc,:) = mmr(:nc,:) * ntm
     end select
 
-    num => self%num_work_
-
-  end subroutine get_ambient_num
+  end subroutine derive_ambient_num
 
   !------------------------------------------------------------------------------
   ! returns cloud-borne aerosol number mixing ratio for a given species index and bin index
   !------------------------------------------------------------------------------
-  subroutine get_cldbrne_num(self, bin_ndx, num)
+  subroutine alias_cldbrne_num(self, bin_ndx, num)
     class(bulk_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_ndx             ! bin index
     real(r8), pointer :: num(:,:)
 
-    ! BAM has no cloud-borne equivalent, return zero array.
-    num => self%zero_fld_
+    ! BAM has no cloud-borne aerosol phase (field_kind ABSENT) -- there is no
+    ! host-resident field to alias. Unreachable through the guarded
+    ! cldbrne_num_ptr accessor; the get_cldbrne_num fill getter returns zeros.
+    call endrun('bulk_aerosol_state alias_cldbrne_num: no host-resident cloud-borne field for bulk aerosols')
 
-  end subroutine get_cldbrne_num
+  end subroutine alias_cldbrne_num
 
   !------------------------------------------------------------------------------
   ! returns interstitial and cloud-borne aerosol states
   !------------------------------------------------------------------------------
-  subroutine get_states( self, aero_props, raer, qqcw )
+  subroutine get_states( self, raer, qqcw )
     class(bulk_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props
     type(ptr2d_t), intent(out) :: raer(:)
     type(ptr2d_t), intent(out) :: qqcw(:)
 
@@ -269,18 +264,16 @@ contains
   !------------------------------------------------------------------------------
   ! return aerosol bin size weights for a given bin
   !------------------------------------------------------------------------------
-  subroutine icenuc_size_wght_arr(self, bin_ndx, ncol, nlev, species_type, use_preexisting_ice, wght)
+  subroutine icenuc_size_wght_arr(self, bin_ndx, species_type, use_preexisting_ice, wght)
     class(bulk_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_ndx                ! bin number
-    integer, intent(in) :: ncol                ! number of columns
-    integer, intent(in) :: nlev                ! number of vertical levels
     character(len=*), intent(in) :: species_type  ! species type
     logical, intent(in) :: use_preexisting_ice ! pre-existing ice flag
     real(r8), intent(out) :: wght(:,:)
 
     ! Empirical 1/25 scaling factor for BAM ice nucleation number densities.
     ! This was previously hardcoded inline in nucleate_ice_cam.F90:633.
-    wght(:ncol,:nlev) = 1._r8 / 25._r8
+    wght(:self%ncol_,:self%nlev_) = 1._r8 / 25._r8
 
   end subroutine icenuc_size_wght_arr
 
@@ -304,14 +297,11 @@ contains
   !------------------------------------------------------------------------------
   ! returns aerosol type weights for a given aerosol type and bin
   !------------------------------------------------------------------------------
-  subroutine icenuc_type_wght(self, bin_ndx, ncol, nlev, species_type, aero_props, rho, wght, cloud_borne)
+  subroutine icenuc_type_wght(self, bin_ndx, species_type, rho, wght, cloud_borne)
 
     class(bulk_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_ndx                ! bin number
-    integer, intent(in) :: ncol                   ! number of columns
-    integer, intent(in) :: nlev                   ! number of vertical levels
     character(len=*), intent(in) :: species_type  ! species type
-    class(aerosol_properties), intent(in) :: aero_props ! aerosol properties object
     real(r8), intent(in) :: rho(:,:)              ! air density (kg m-3)
     real(r8), intent(out) :: wght(:,:)            ! type weights
     logical, optional, intent(in) :: cloud_borne  ! if TRUE cloud-borne aerosols are used
@@ -323,13 +313,13 @@ contains
     ! species type matches the bin's species, 0.0 otherwise. This avoids the
     ! base class computation (which reads MMR just to compute mass/totalmass = 1.0).
 
-    call aero_props%species_type(bin_ndx, 1, bin_spectype)
+    call self%props_%species_type(bin_ndx, 1, bin_spectype)
 
     if (trim(bin_spectype) == trim(species_type) .or. &
         (species_type == 'sulfate_strat' .and. bin_spectype == 'sulfate')) then
-       wght(:ncol,:nlev) = 1._r8
+       wght(:self%ncol_,:self%nlev_) = 1._r8
     else
-       wght(:ncol,:nlev) = 0._r8
+       wght(:self%ncol_,:self%nlev_) = 0._r8
     end if
 
   end subroutine icenuc_type_wght
@@ -356,12 +346,10 @@ contains
   ! returns the volume-weighted fractions of aerosol subset `bin_ndx` that can act
   ! as heterogeneous freezing nuclei
   !------------------------------------------------------------------------------
-  function hetfrz_size_wght(self, bin_ndx, ncol, nlev) result(wght)
+  function hetfrz_size_wght(self, bin_ndx) result(wght)
     class(bulk_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_ndx             ! bin number
-    integer, intent(in) :: ncol                ! number of columns
-    integer, intent(in) :: nlev                ! number of vertical levels
-    real(r8) :: wght(ncol,nlev)
+    real(r8) :: wght(self%ncol_,self%nlev_)
 
     call endrun('ERROR: bulk_aerosol_state_mod%hetfrz_size_wght not yet implemented')
 
@@ -384,15 +372,12 @@ contains
   ! returns aerosol wet diameter and aerosol water concentration for a given
   ! radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  subroutine water_uptake(self, aero_props, bin_idx, ncol, nlev, dgnumwet, qaerwat)
+  subroutine water_uptake(self, bin_idx, dgnumwet, qaerwat)
 
     class(bulk_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props
     integer, intent(in) :: bin_idx              ! bin number
-    integer, intent(in) :: ncol                 ! number of columns
-    integer, intent(in) :: nlev                 ! number of levels
-    real(r8),intent(out) :: dgnumwet(ncol,nlev) ! aerosol wet diameter (m)
-    real(r8),intent(out) :: qaerwat(ncol,nlev)  ! aerosol water concentration (g/g)
+    real(r8),intent(out) :: dgnumwet(self%ncol_,self%nlev_) ! aerosol wet diameter (m)
+    real(r8),intent(out) :: qaerwat(self%ncol_,self%nlev_)  ! aerosol water concentration (g/g)
 
     call endrun('ERROR: bulk_aerosol_state_mod%water_uptake not yet implemented')
 
@@ -401,58 +386,49 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol dry volume (m3/kg) for given radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  function dry_volume(self, aero_props, bin_idx, ncol, nlev) result(vol)
+  function dry_volume(self, bin_idx) result(vol)
 
     class(bulk_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props
 
     integer, intent(in) :: bin_idx   ! bin number
-    integer, intent(in) :: ncol      ! number of columns
-    integer, intent(in) :: nlev      ! number of levels
 
-    real(r8) :: vol(ncol,nlev)       ! m3/kg
+    real(r8) :: vol(self%ncol_,self%nlev_)  ! m3/kg
     real(r8), pointer :: mmr(:,:)    ! kg/kg
     real(r8) :: dens                 ! kg/m3
 
-    call aero_props%get(bin_idx, 1, density=dens)
-    call self%get_ambient_mmr(species_ndx=1, bin_ndx=bin_idx, mmr=mmr)
+    call self%props_%get(bin_idx, 1, density=dens)
+    call self%ambient_mmr_ptr(species_ndx=1, bin_ndx=bin_idx, mmr=mmr)
 
-    vol(:ncol,:nlev) = mmr(:ncol,:nlev)/dens
+    vol(:,:) = mmr(:self%ncol_,:self%nlev_)/dens
 
   end function dry_volume
 
   !------------------------------------------------------------------------------
   ! aerosol wet volume (m3/kg) for given radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  function wet_volume(self, aero_props, bin_idx, ncol, nlev) result(vol)
+  function wet_volume(self, bin_idx) result(vol)
 
     class(bulk_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props
 
     integer, intent(in) :: bin_idx   ! bin number
-    integer, intent(in) :: ncol      ! number of columns
-    integer, intent(in) :: nlev      ! number of levels
 
-    real(r8) :: vol(ncol,nlev)       ! m3/kg
+    real(r8) :: vol(self%ncol_,self%nlev_)  ! m3/kg
 
-    vol = self%dry_volume(aero_props, bin_idx, ncol, nlev) &
-        + self%water_volume(aero_props, bin_idx, ncol, nlev)
+    vol = self%dry_volume(bin_idx) &
+        + self%water_volume(bin_idx)
 
   end function wet_volume
 
   !------------------------------------------------------------------------------
   ! aerosol water volume (m3/kg) for given radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  function water_volume(self, aero_props, bin_idx, ncol, nlev) result(vol)
+  function water_volume(self, bin_idx) result(vol)
 
     class(bulk_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props
 
     integer, intent(in) :: bin_idx   ! bin number
-    integer, intent(in) :: ncol      ! number of columns
-    integer, intent(in) :: nlev      ! number of levels
 
-    real(r8) :: vol(ncol,nlev)       ! m3/kg
+    real(r8) :: vol(self%ncol_,self%nlev_)  ! m3/kg
 
     vol = 0._r8
 
@@ -461,13 +437,11 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol wet diameter
   !------------------------------------------------------------------------------
-  function wet_diameter(self, bin_idx, ncol, nlev) result(diam)
+  function wet_diameter(self, bin_idx) result(diam)
     class(bulk_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_idx   ! bin number
-    integer, intent(in) :: ncol      ! number of columns
-    integer, intent(in) :: nlev      ! number of levels
 
-    real(r8) :: diam(ncol,nlev)
+    real(r8) :: diam(self%ncol_,self%nlev_)
 
     call endrun('ERROR: bulk_aerosol_state_mod%wet_diameter not yet implemented')
 
@@ -476,16 +450,13 @@ contains
   !------------------------------------------------------------------------------
   ! prescribed aerosol activation fraction for convective cloud
   !------------------------------------------------------------------------------
-  function convcld_actfrac(self, aero_props, ibin, ispc, ncol, nlev) result(frac)
+  function convcld_actfrac(self, ibin, ispc) result(frac)
 
     class(bulk_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props ! aerosol properties object
     integer, intent(in) :: ibin   ! bin index
     integer, intent(in) :: ispc   ! species index
-    integer, intent(in) :: ncol   ! number of columns
-    integer, intent(in) :: nlev   ! number of vertical levels
 
-    real(r8) :: frac(ncol,nlev)
+    real(r8) :: frac(self%ncol_,self%nlev_)
 
     call endrun('ERROR: bulk_aerosol_state_mod%convcld_actfrac not yet implemented')
 
@@ -494,10 +465,9 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol weight percent of H2SO4/H2O solution
   !------------------------------------------------------------------------------
-  function wgtpct(self, ncol, nlev) result(wtp)
+  function wgtpct(self) result(wtp)
     class(bulk_aerosol_state), intent(in) :: self
-    integer, intent(in) ::  ncol, nlev
-    real(r8) :: wtp(ncol,nlev)  ! weight percent of H2SO4/H2O solution for given icol, ilev
+    real(r8) :: wtp(self%ncol_,self%nlev_)  ! weight percent of H2SO4/H2O solution for given icol, ilev
 
     wtp = -huge(1._r8)
 
@@ -506,10 +476,9 @@ contains
   !------------------------------------------------------------------------------
   ! aqueous chemistry partitioning -- used in sox_cldaero_update
   !------------------------------------------------------------------------------
-  subroutine aqu_gain_binfraction(self, aero_props, type, qcw, delso4_o3rxn, faqgain)
+  subroutine aqu_gain_binfraction(self, type, qcw, delso4_o3rxn, faqgain)
 
     class(bulk_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props
     character(len=*), intent(in) :: type
     real(r8), intent(in) :: qcw(:,:,:)
     real(r8), intent(in) :: delso4_o3rxn(:,:)
@@ -524,6 +493,9 @@ contains
   ! for a single bin. Applies bam_sulfate_scale only to SULFATE (not volcanic).
   ! b4b operation order: (mmr * rho) first, then * ntm [* 2.0 for sulfate].
   !------------------------------------------------------------------------------
+  ! NOTE: the ncol dummy is retained (not replaced by self%ncol()) because this
+  ! BAM-internal method is called by the ndrop_bam CCPP scheme in atmospheric_physics,
+  ! which is not modified in this phase.
   subroutine get_bulk_num_and_mass(self, bin_ndx, ncol, rho, naer2, maerosol)
     class(bulk_aerosol_state), intent(in) :: self
     integer, intent(in)   :: bin_ndx
@@ -536,7 +508,7 @@ contains
     real(r8)          :: ntm
     character(len=32) :: aname
 
-    call self%get_ambient_mmr(species_ndx=1, bin_ndx=bin_ndx, mmr=mmr)
+    call self%ambient_mmr_ptr(species_ndx=1, bin_ndx=bin_ndx, mmr=mmr)
     call rad_aer_get_props(self%list_idx_, bin_ndx, num_to_mass_aer=ntm, aername=aname)
 
     ! b4b operation order: (mmr * rho) first, then * ntm [* 2.0 for sulfate]
@@ -570,36 +542,33 @@ contains
   ! These differ only in floating-point operation order (associativity).
   ! It has been shown that this rearranging causes answer differences, so we
   ! use this subroutine to replicate the original behavior.
-  subroutine nuclice_get_numdens_bam(self, aero_props, use_preexisting_ice, &
-       ncol, nlev, rho, dust_num_col, sulf_num_col, soot_num_col, sulf_num_tot_col)
-    !REMOVECAM: host-model specific dimensions
-    use ppgrid, only: pcols, pver
-    !REMOVECAM_END
+  subroutine nuclice_get_numdens_bam(self, use_preexisting_ice, &
+       rho, dust_num_col, sulf_num_col, soot_num_col, sulf_num_tot_col)
 
     class(bulk_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props
     logical, intent(in) :: use_preexisting_ice
-    integer, intent(in) :: ncol
-    integer, intent(in) :: nlev
     real(r8), intent(in) :: rho(:,:)
     real(r8), intent(out) :: dust_num_col(:,:)
     real(r8), intent(out) :: sulf_num_col(:,:)
     real(r8), intent(out) :: soot_num_col(:,:)
     real(r8), intent(out) :: sulf_num_tot_col(:,:)
 
-    real(r8) :: naer2_1bin(ncol,nlev)
-    real(r8) :: maerosol_1bin(ncol,nlev)
+    real(r8) :: naer2_1bin(self%ncol_,self%nlev_)
+    real(r8) :: maerosol_1bin(self%ncol_,self%nlev_)
     character(len=32) :: spectype, aname
-    integer :: m, i, k
+    integer :: m, i, k, ncol, nlev
     real(r8), parameter :: per_cm3 = 1.e-6_r8
+
+    ncol = self%ncol()
+    nlev = self%nlev()
 
     dust_num_col(:,:) = 0._r8
     sulf_num_col(:,:) = 0._r8
     soot_num_col(:,:) = 0._r8
     sulf_num_tot_col(:,:) = 0._r8
 
-    do m = 1, aero_props%nbins()
-       call aero_props%species_type(m, 1, spectype)
+    do m = 1, self%props_%nbins()
+       call self%props_%species_type(m, 1, spectype)
        call self%get_bulk_num_and_mass(m, ncol, rho, naer2_1bin, maerosol_1bin)
 
        ! get_bulk_num_and_mass only applied bam_sulfate_scale to SULFATE (by name).

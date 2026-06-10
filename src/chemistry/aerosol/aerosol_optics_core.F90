@@ -226,8 +226,8 @@ contains
     ! extinction compared with spherical coarse-mode dust.
     ! ref: Fig. 1d of Jasper F. Kok et al. (2017)
     if (coarse_dust_mode .and. idx_sw_diag > 0) then
-      wetvol(:ncol, :nlev) = aerostate%wet_volume(aeroprops, ibin, ncol, nlev)
-      watervol(:ncol, :nlev) = aerostate%water_volume(aeroprops, ibin, ncol, nlev)
+      wetvol(:ncol, :nlev) = aerostate%wet_volume(ibin)
+      watervol(:ncol, :nlev) = aerostate%water_volume(ibin)
 
       do ilev = top_lev, nlev
         scatdust(:ncol) = 0._r8
@@ -253,7 +253,7 @@ contains
         do ispec = 1, aeroprops%nspecies(ibin)
           call aeroprops%get(ibin, ispec, density=specdens, &
                              spectype=spectype, refindex_sw=specrefindex, hygro=hygro_aer)
-          call aerostate%get_ambient_mmr(species_ndx=ispec, bin_ndx=ibin, mmr=specmmr)
+          call aerostate%ambient_mmr_ptr(species_ndx=ispec, bin_ndx=ibin, mmr=specmmr)
 
           do icol = 1, ncol
             vol(icol) = specmmr(icol, ilev)/specdens

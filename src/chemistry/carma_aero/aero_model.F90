@@ -583,7 +583,7 @@ contains
 
     ! Init pointers to mode number and specie mass mixing ratios in
     ! intersitial and cloud borne phases.
-    call aero_state%get_states( aero_props, raer, qqcw )
+    call aero_state%get_states( raer, qqcw )
 
     mw_carma(:) = 0.0_r8
     do m = 1, nbins      ! main loop over aerosol bins

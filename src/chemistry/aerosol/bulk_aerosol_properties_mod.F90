@@ -8,6 +8,8 @@ module bulk_aerosol_properties_mod
   use string_utils, only : to_lower
 
   use aerosol_properties_mod, only: aerosol_properties
+  use aerosol_properties_mod, only: field_kind_from_source
+  use aerosol_properties_mod, only: AERO_AMBIENT, AERO_CLDBRNE, AERO_FIELD_DERIVED, AERO_FIELD_ABSENT
 
   use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_props
   use shr_infnan_mod, only: nan => shr_infnan_nan, assignment(=)
@@ -60,10 +62,12 @@ contains
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
   function constructor(list_idx) result(newobj)
+    use radiative_aerosol_definitions, only: bulk_aerosol_list
 
     integer, optional, intent(in) :: list_idx ! radiation list index (0=climate)
     type(bulk_aerosol_properties), pointer :: newobj
 
+    integer,allocatable :: kinds(:,:,:)
     integer,allocatable :: nspecies(:)
     real(r8),allocatable :: alogsig(:)
     real(r8),allocatable :: f1(:)
@@ -113,6 +117,36 @@ contains
     ! the same (naero) -- one constituent (species and mass) per bin.
     call newobj%initialize(nbin=naero, ncnst=naero, nspec=nspecies, nmasses=nspecies, &
                            alogsig=alogsig, f1=f1, f2=f1, ierr=ierr, list_idx=list_idx_loc)
+    if( ierr /= 0 ) then
+       nullify(newobj)
+       return
+    end if
+
+    ! field kind table: ambient mass from the parsed per-entry source data
+    ! ('A' advected constituent, 'N' pbuf (CAM)/non-advected (SIMA),
+    !  e.g. prescribed aerosol), with the model overrides that the BAM ambient number is
+    ! derived from mass (via num_to_mass) and BAM has no cloud-borne phase
+    allocate(kinds(naero,0:1,AERO_AMBIENT:AERO_CLDBRNE),stat=ierr)
+    if( ierr /= 0 ) then
+       nullify(newobj)
+       return
+    end if
+    do i = 1, naero
+       ! species_ndx 0 refers to the bin's number field and 1..nspecies(bin) to its mass
+       ! species (same convention as the species indexer). Each bulk "bin" holds exactly
+       ! one species, so index 0 is its number concentration -- always derived from mass
+       ! via num_to_mass -- and index 1 is its mass mmr, classified from the rad list
+       ! source descriptor.
+       kinds(i,0,AERO_AMBIENT) = AERO_FIELD_DERIVED
+       kinds(i,1,AERO_AMBIENT) = field_kind_from_source(bulk_aerosol_list(list_idx_loc)%aer(i)%source)
+       kinds(i,:,AERO_CLDBRNE) = AERO_FIELD_ABSENT
+    end do
+    call newobj%field_kind_set(kinds, ierr)
+    if( ierr /= 0 ) then
+       nullify(newobj)
+       return
+    end if
+    deallocate(kinds)
 
     deallocate(nspecies)
     deallocate(alogsig)

@@ -659,7 +659,7 @@ contains
 
        nbins = aeroprops%nbins()
 
-       sulfwtpct(:ncol,:pver) = aerostate%wgtpct(ncol,pver)
+       sulfwtpct(:ncol,:pver) = aerostate%wgtpct()
        call outfld('SULFWTPCT', sulfwtpct(1:ncol,:), ncol, lchnk)
 
        binloop: do ibin = 1, nbins
@@ -730,8 +730,8 @@ contains
 
           ! CAM diagnostics:
           ! Get wet/water volumes for diagnostic species partitioning
-          wetvol(:ncol,:pver) = aerostate%wet_volume(aeroprops, ibin, ncol, pver)
-          watervol(:ncol,:pver) = aerostate%water_volume(aeroprops, ibin, ncol, pver)
+          wetvol(:ncol,:pver) = aerostate%wet_volume(ibin)
+          watervol(:ncol,:pver) = aerostate%water_volume(ibin)
 
           ! Diagnostic accumulation using tau_bin (asphericity already applied by core)
           do iwav = 1, nswbands
@@ -783,7 +783,7 @@ contains
                       do ispec = 1, aeroprops%nspecies(ibin)
                          call aeroprops%get(ibin, ispec, density=specdens, &
                               spectype=spectype, refindex_sw=specrefindex, hygro=hygro_aer)
-                         call aerostate%get_ambient_mmr(species_ndx=ispec, bin_ndx=ibin, mmr=specmmr)
+                         call aerostate%ambient_mmr_ptr(species_ndx=ispec, bin_ndx=ibin, mmr=specmmr)
 
                          burden(icol) = burden(icol) + specmmr(icol,ilev)*mass(icol,ilev)
 
@@ -1177,7 +1177,7 @@ contains
 
        nbins=aeroprops%nbins()
 
-       sulfwtpct(:ncol,:pver) = aerostate%wgtpct(ncol,pver)
+       sulfwtpct(:ncol,:pver) = aerostate%wgtpct()
 
        binloop: do ibin = 1, nbins
 

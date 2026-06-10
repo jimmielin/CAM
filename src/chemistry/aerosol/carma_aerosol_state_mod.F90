@@ -36,10 +36,12 @@ module carma_aerosol_state_mod
      procedure :: get_transported
      procedure :: set_transported
      procedure :: ambient_total_bin_mmr
-     procedure :: get_ambient_mmr
-     procedure :: get_cldbrne_mmr
-     procedure :: get_ambient_num
-     procedure :: get_cldbrne_num
+     procedure :: alias_ambient_mmr
+     procedure :: alias_cldbrne_mmr
+     procedure :: alias_ambient_num
+     procedure :: alias_cldbrne_num
+     procedure :: derive_ambient_num
+     procedure :: derive_cldbrne_num
      procedure :: get_states
      procedure :: icenuc_size_wght_arr
      procedure :: icenuc_size_wght_val
@@ -68,8 +70,10 @@ contains
 
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
-  function constructor(ncol,state,pbuf,list_idx) result(newobj)
+  function constructor(props,ncol,nlev,state,pbuf,list_idx) result(newobj)
+    class(aerosol_properties), pointer, intent(in) :: props
     integer, intent(in) :: ncol
+    integer, intent(in) :: nlev
     type(physics_state), target, optional :: state
     type(physics_buffer_desc), pointer, optional :: pbuf(:)
     integer, intent(in), optional :: list_idx
@@ -84,14 +88,16 @@ contains
        return
     end if
 
+    newobj%props_ => props
     newobj%state => state
     newobj%pbuf => pbuf
 
     ! set number of active columns internally to prevent loops from accessing beyond
     ! meaningful data in arrays
-    call newobj%set_ncol(ncol)
+    newobj%ncol_ = ncol
+    newobj%nlev_ = nlev
 
-    if (present(list_idx)) call newobj%set_list_idx(list_idx)
+    if (present(list_idx)) newobj%list_idx_ = list_idx
 
   end function constructor
 
@@ -100,6 +106,7 @@ contains
   subroutine destructor(self)
     type(carma_aerosol_state), intent(inout) :: self
 
+    nullify(self%props_)
     nullify(self%state)
     nullify(self%pbuf)
 
@@ -130,9 +137,8 @@ contains
   !------------------------------------------------------------------------
   ! Total aerosol mass mixing ratio for a bin in a given grid box location (column and layer)
   !------------------------------------------------------------------------
-  function ambient_total_bin_mmr(self, aero_props, bin_ndx, col_ndx, lyr_ndx) result(mmr_tot)
+  function ambient_total_bin_mmr(self, bin_ndx, col_ndx, lyr_ndx) result(mmr_tot)
     class(carma_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props ! aerosol properties object
     integer, intent(in) :: bin_ndx      ! bin index
     integer, intent(in) :: col_ndx      ! column index
     integer, intent(in) :: lyr_ndx      ! vertical layer index
@@ -161,7 +167,7 @@ contains
   !------------------------------------------------------------------------------
   ! returns ambient aerosol mass mixing ratio for a given species index and bin index
   !------------------------------------------------------------------------------
-  subroutine get_ambient_mmr(self, species_ndx, bin_ndx, mmr)
+  subroutine alias_ambient_mmr(self, species_ndx, bin_ndx, mmr)
     class(carma_aerosol_state), intent(in) :: self
     integer, intent(in) :: species_ndx  ! species index
     integer, intent(in) :: bin_ndx      ! bin index
@@ -169,12 +175,12 @@ contains
 
     call rad_cnst_get_bin_mmr_by_idx(self%list_idx_, bin_ndx, species_ndx, 'a', self%state, self%pbuf, mmr)
 
-  end subroutine get_ambient_mmr
+  end subroutine alias_ambient_mmr
 
   !------------------------------------------------------------------------------
   ! returns cloud-borne aerosol number mixing ratio for a given species index and bin index
   !------------------------------------------------------------------------------
-  subroutine get_cldbrne_mmr(self, species_ndx, bin_ndx, mmr)
+  subroutine alias_cldbrne_mmr(self, species_ndx, bin_ndx, mmr)
     class(carma_aerosol_state), intent(in) :: self
     integer, intent(in) :: species_ndx  ! species index
     integer, intent(in) :: bin_ndx      ! bin index
@@ -182,15 +188,20 @@ contains
 
     call rad_cnst_get_bin_mmr_by_idx(self%list_idx_, bin_ndx, species_ndx, 'c', self%state, self%pbuf, mmr)
 
-  end subroutine get_cldbrne_mmr
+  end subroutine alias_cldbrne_mmr
 
   !------------------------------------------------------------------------------
   ! returns ambient aerosol number mixing ratio for a given species index and bin index
   !------------------------------------------------------------------------------
-  subroutine get_ambient_num(self, bin_ndx, num)
+  subroutine alias_ambient_num(self, bin_ndx, num)
     class(carma_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_ndx     ! bin index
     real(r8), pointer :: num(:,:)      ! number mixing ratios
+
+    ! The CARMA number is derived (field_kind DERIVED) and materialized into a
+    ! pbuf-resident cache here, returning a pointer to the cache. Unreachable
+    ! through the guarded ambient_num_ptr accessor; retained only to feed the
+    ! concrete get_states working-state pointers from the cache.
 
     character(len=aero_name_len) :: bin_name, shortname
     integer :: igroup, ibin, rc, nchr, ncol
@@ -213,15 +224,20 @@ contains
 
     num(:ncol,:) = nmr(:ncol,:)
 
-  end subroutine get_ambient_num
+  end subroutine alias_ambient_num
 
   !------------------------------------------------------------------------------
   ! returns cloud-borne aerosol number mixing ratio for a given species index and bin index
   !------------------------------------------------------------------------------
-  subroutine get_cldbrne_num(self, bin_ndx, num)
+  subroutine alias_cldbrne_num(self, bin_ndx, num)
     class(carma_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_ndx     ! bin index
     real(r8), pointer :: num(:,:)      ! number mixing ratios
+
+    ! The CARMA number is derived (field_kind DERIVED) and materialized into a
+    ! pbuf-resident cache here, returning a pointer to the cache. Unreachable
+    ! through the guarded cldbrne_num_ptr accessor; retained only to feed the
+    ! concrete get_states working-state pointers from the cache.
 
     character(len=aero_name_len) :: bin_name, shortname
     integer :: igroup, ibin, rc, nchr, ncol
@@ -244,27 +260,88 @@ contains
 
     num(:ncol,:) = nmr(:ncol,:)
 
-  end subroutine get_cldbrne_num
+  end subroutine alias_cldbrne_num
+
+  !------------------------------------------------------------------------------
+  ! derives the ambient aerosol number mixing ratio for a given bin index into
+  ! the caller's array (same values as the cache-materializing alias hook, with
+  ! no pbuf write)
+  !------------------------------------------------------------------------------
+  subroutine derive_ambient_num(self, bin_ndx, num)
+    class(carma_aerosol_state), intent(in) :: self
+    integer, intent(in) :: bin_ndx     ! bin index
+    real(r8), intent(out) :: num(:,:)  ! number mixing ratios
+
+    character(len=aero_name_len) :: bin_name, shortname
+    integer :: igroup, ibin, rc, nchr, ncol
+    real(r8) :: nmr(pcols,pver)
+
+    ncol = self%ncol()
+
+    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=bin_name)
+
+    nchr = len_trim(bin_name)-2
+    shortname = bin_name(:nchr)
+
+    call carma_get_group_by_name(shortname, igroup, rc)
+
+    read(bin_name(nchr+1:),*) ibin
+
+    call carma_get_number(self%state, igroup, ibin, nmr, rc)
+
+    num(:ncol,:) = nmr(:ncol,:)
+
+  end subroutine derive_ambient_num
+
+  !------------------------------------------------------------------------------
+  ! derives the cloud-borne aerosol number mixing ratio for a given bin index
+  ! into the caller's array (same values as the cache-materializing alias hook,
+  ! with no pbuf write)
+  !------------------------------------------------------------------------------
+  subroutine derive_cldbrne_num(self, bin_ndx, num)
+    class(carma_aerosol_state), intent(in) :: self
+    integer, intent(in) :: bin_ndx     ! bin index
+    real(r8), intent(out) :: num(:,:)  ! number mixing ratios
+
+    character(len=aero_name_len) :: bin_name, shortname
+    integer :: igroup, ibin, rc, nchr, ncol
+    real(r8) :: nmr(pcols,pver)
+
+    ncol = self%ncol()
+
+    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=bin_name)
+
+    nchr = len_trim(bin_name)-2
+    shortname = bin_name(:nchr)
+
+    call  carma_get_group_by_name(shortname, igroup, rc)
+
+    read(bin_name(nchr+1:),*) ibin
+
+    call carma_get_number_cld(self%pbuf, igroup, ibin,  ncol, pver, nmr, rc)
+
+    num(:ncol,:) = nmr(:ncol,:)
+
+  end subroutine derive_cldbrne_num
 
   !------------------------------------------------------------------------------
   ! returns interstitial and cloud-borne aerosol states
   !------------------------------------------------------------------------------
-  subroutine get_states( self, aero_props, raer, qqcw )
+  subroutine get_states( self, raer, qqcw )
     class(carma_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props
     type(ptr2d_t), intent(out) :: raer(:)
     type(ptr2d_t), intent(out) :: qqcw(:)
 
     integer :: ibin,ispc, indx
 
-    do ibin = 1, aero_props%nbins()
-       indx = aero_props%indexer(ibin, 0)
-       call self%get_ambient_num(ibin, raer(indx)%fld)
-       call self%get_cldbrne_num(ibin, qqcw(indx)%fld)
-       do ispc = 1, aero_props%nspecies(ibin)
-          indx = aero_props%indexer(ibin, ispc)
-          call self%get_ambient_mmr(species_ndx=ispc, bin_ndx=ibin, mmr=raer(indx)%fld)
-          call self%get_cldbrne_mmr(species_ndx=ispc, bin_ndx=ibin, mmr=qqcw(indx)%fld)
+    do ibin = 1, self%props_%nbins()
+       indx = self%props_%indexer(ibin, 0)
+       call self%alias_ambient_num(ibin, raer(indx)%fld)
+       call self%alias_cldbrne_num(ibin, qqcw(indx)%fld)
+       do ispc = 1, self%props_%nspecies(ibin)
+          indx = self%props_%indexer(ibin, ispc)
+          call self%alias_ambient_mmr(species_ndx=ispc, bin_ndx=ibin, mmr=raer(indx)%fld)
+          call self%alias_cldbrne_mmr(species_ndx=ispc, bin_ndx=ibin, mmr=qqcw(indx)%fld)
        end do
     end do
 
@@ -273,24 +350,25 @@ contains
   !------------------------------------------------------------------------------
   ! return aerosol bin size weights for a given bin
   !------------------------------------------------------------------------------
-  subroutine icenuc_size_wght_arr(self, bin_ndx, ncol, nlev, species_type, use_preexisting_ice, wght)
+  subroutine icenuc_size_wght_arr(self, bin_ndx, species_type, use_preexisting_ice, wght)
     class(carma_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_ndx                ! bin number
-    integer, intent(in) :: ncol                   ! number of columns
-    integer, intent(in) :: nlev                ! number of vertical levels
     character(len=*), intent(in) :: species_type  ! species type
     logical, intent(in) :: use_preexisting_ice ! pre-existing ice flag
     real(r8), intent(out) :: wght(:,:)
 
     character(len=aero_name_len) :: bin_name, shortname
-    real(r8) :: rdry(ncol,nlev), rhopdry(ncol,nlev)
-    integer :: i,k
+    real(r8) :: rdry(self%ncol_,self%nlev_), rhopdry(self%ncol_,self%nlev_)
+    integer :: i,k,ncol,nlev
     real(r8) :: diamdry
     integer :: igroup, ibin, rc, nchr
 
     if (self%list_idx_ /= 0) then
        call endrun('carma_aerosol_state::icenuc_size_wght_arr: only valid for climate list (list_idx=0)')
     end if
+
+    ncol = self%ncol()
+    nlev = self%nlev()
 
     wght = 0._r8
 
@@ -329,7 +407,7 @@ contains
 
     real(r8) :: wght_arr(pcols,pver)
 
-    call self%icenuc_size_wght(bin_ndx, self%ncol(), pver, species_type, use_preexisting_ice, wght_arr)
+    call self%icenuc_size_wght(bin_ndx, species_type, use_preexisting_ice, wght_arr)
 
     wght = wght_arr(col_ndx,lyr_ndx)
 
@@ -360,23 +438,24 @@ contains
   ! returns the volume-weighted fractions of aerosol subset `bin_ndx` that can act
   ! as heterogeneous freezing nuclei
   !------------------------------------------------------------------------------
-  function hetfrz_size_wght(self, bin_ndx, ncol, nlev) result(wght)
+  function hetfrz_size_wght(self, bin_ndx) result(wght)
     class(carma_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_ndx             ! bin number
-    integer, intent(in) :: ncol                ! number of columns
-    integer, intent(in) :: nlev                ! number of vertical levels
 
-    real(r8) :: wght(ncol,nlev)
+    real(r8) :: wght(self%ncol_,self%nlev_)
 
     character(len=aero_name_len) :: bin_name, shortname
-    real(r8) :: rdry(ncol,nlev), rhopdry(ncol,nlev)
-    integer :: i,k
+    real(r8) :: rdry(self%ncol_,self%nlev_), rhopdry(self%ncol_,self%nlev_)
+    integer :: i,k,ncol,nlev
     real(r8) :: diamdry
     integer :: igroup, ibin, rc, nchr
 
     if (self%list_idx_ /= 0) then
        call endrun('carma_aerosol_state::hetfrz_size_wght: only valid for climate list (list_idx=0)')
     end if
+
+    ncol = self%ncol()
+    nlev = self%nlev()
 
     wght = 0._r8
 
@@ -430,15 +509,12 @@ contains
   ! returns aerosol wet diameter and aerosol water concentration for a given
   ! radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  subroutine water_uptake(self, aero_props, bin_idx, ncol, nlev, dgnumwet, qaerwat)
+  subroutine water_uptake(self, bin_idx, dgnumwet, qaerwat)
 
     class(carma_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props
     integer, intent(in) :: bin_idx              ! bin number
-    integer, intent(in) :: ncol                 ! number of columns
-    integer, intent(in) :: nlev                 ! number of levels
-    real(r8),intent(out) :: dgnumwet(ncol,nlev) ! aerosol wet diameter (m)
-    real(r8),intent(out) :: qaerwat(ncol,nlev)  ! aerosol water concentration (g/g)
+    real(r8),intent(out) :: dgnumwet(self%ncol_,self%nlev_) ! aerosol wet diameter (m)
+    real(r8),intent(out) :: qaerwat(self%ncol_,self%nlev_)  ! aerosol water concentration (g/g)
 
     dgnumwet = -huge(1._r8)
     qaerwat = -huge(1._r8)
@@ -448,35 +524,33 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol weight percent of H2SO4/H2O solution
   !------------------------------------------------------------------------------
-  function wgtpct(self, ncol, nlev) result(wtp)
+  function wgtpct(self) result(wtp)
     class(carma_aerosol_state), intent(in) :: self
-    integer, intent(in) ::  ncol, nlev
-    real(r8) :: wtp(ncol,nlev)  ! weight percent of H2SO4/H2O solution for given icol, ilev
+    real(r8) :: wtp(self%ncol_,self%nlev_)  ! weight percent of H2SO4/H2O solution for given icol, ilev
 
-    wtp(:,:) = carma_get_wght_pct(ncol,nlev,self%state)
+    wtp(:,:) = carma_get_wght_pct(self%ncol_,self%nlev_,self%state)
 
   end function wgtpct
 
   !------------------------------------------------------------------------------
   ! aerosol dry volume (m3/kg) for given radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  function dry_volume(self, aero_props, bin_idx, ncol, nlev) result(vol)
+  function dry_volume(self, bin_idx) result(vol)
 
     class(carma_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props
 
     integer, intent(in) :: bin_idx   ! bin number
-    integer, intent(in) :: ncol      ! number of columns
-    integer, intent(in) :: nlev      ! number of levels
 
-    real(r8) :: vol(ncol,nlev)       ! m3/kg
+    real(r8) :: vol(self%ncol_,self%nlev_)  ! m3/kg
 
     real(r8) :: raddry(pcols,pver)   ! dry radius (m)
     real(r8) :: rhodry(pcols,pver)   ! dry density (kg/m3)
     real(r8) :: nmr(pcols,pver)      ! number mixing ratio (#/kg)
 
     character(len=aero_name_len) :: bin_name, shortname
-    integer :: igroup, ibin, rc, nchr
+    integer :: igroup, ibin, rc, nchr, ncol
+
+    ncol = self%ncol()
 
     call rad_aer_get_info_by_bin(0, bin_idx, bin_name=bin_name)
 
@@ -499,23 +573,22 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol wet volume (m3/kg) for given radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  function wet_volume(self, aero_props, bin_idx, ncol, nlev) result(vol)
+  function wet_volume(self, bin_idx) result(vol)
 
     class(carma_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props
 
     integer, intent(in) :: bin_idx   ! bin number
-    integer, intent(in) :: ncol      ! number of columns
-    integer, intent(in) :: nlev      ! number of levels
 
-    real(r8) :: vol(ncol,nlev)       ! m3/kg
+    real(r8) :: vol(self%ncol_,self%nlev_)  ! m3/kg
 
     real(r8) :: radwet(pcols,pver)   ! wet radius (m)
     real(r8) :: rhowet(pcols,pver)   ! wet density (kg/m3)
     real(r8) :: nmr(pcols,pver)      ! number mixing ratio (#/kg)
 
     character(len=aero_name_len) :: bin_name, shortname
-    integer :: igroup, ibin, rc, nchr
+    integer :: igroup, ibin, rc, nchr, ncol
+
+    ncol = self%ncol()
 
     call rad_aer_get_info_by_bin(0, bin_idx, bin_name=bin_name)
 
@@ -538,24 +611,21 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol water volume (m3/kg) for given radiation diagnostic list number and bin number
   !------------------------------------------------------------------------------
-  function water_volume(self, aero_props, bin_idx, ncol, nlev) result(vol)
+  function water_volume(self, bin_idx) result(vol)
 
     class(carma_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props
 
     integer, intent(in) :: bin_idx   ! bin number
-    integer, intent(in) :: ncol      ! number of columns
-    integer, intent(in) :: nlev      ! number of levels
 
-    real(r8) :: vol(ncol,nlev)       ! m3/kg
+    real(r8) :: vol(self%ncol_,self%nlev_)  ! m3/kg
 
-    real(r8) :: wetvol(ncol,nlev)
-    real(r8) :: dryvol(ncol,nlev)
+    real(r8) :: wetvol(self%ncol_,self%nlev_)
+    real(r8) :: dryvol(self%ncol_,self%nlev_)
 
-    wetvol = self%wet_volume(aero_props, bin_idx, ncol, nlev)
-    dryvol = self%dry_volume(aero_props, bin_idx, ncol, nlev)
+    wetvol = self%wet_volume(bin_idx)
+    dryvol = self%dry_volume(bin_idx)
 
-    vol(:ncol,:) = wetvol(:ncol,:) - dryvol(:ncol,:)
+    vol(:,:) = wetvol(:,:) - dryvol(:,:)
 
     where (vol<0._r8)
        vol = 0._r8
@@ -566,19 +636,20 @@ contains
   !------------------------------------------------------------------------------
   ! aerosol wet diameter
   !------------------------------------------------------------------------------
-  function wet_diameter(self, bin_idx, ncol, nlev) result(diam)
+  function wet_diameter(self, bin_idx) result(diam)
     class(carma_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_idx   ! bin number
-    integer, intent(in) :: ncol      ! number of columns
-    integer, intent(in) :: nlev      ! number of levels
 
-    real(r8) :: diam(ncol,nlev)
+    real(r8) :: diam(self%ncol_,self%nlev_)
 
     real(r8) :: radwet(pcols,pver)   !! wet radius (m)
     real(r8) :: rhowet(pcols,pver)   !! wet density (kg/m3)
 
     character(len=aero_name_len) :: bin_name, shortname
-    integer :: igroup, ibin, rc, nchr
+    integer :: igroup, ibin, rc, nchr, ncol, nlev
+
+    ncol = self%ncol()
+    nlev = self%nlev()
 
     call rad_aer_get_info_by_bin(0, bin_idx, bin_name=bin_name)
 
@@ -598,10 +669,9 @@ contains
   !------------------------------------------------------------------------------
   ! aqueous chemistry partitioning -- used in sox_cldaero_update
   !------------------------------------------------------------------------------
-  subroutine aqu_gain_binfraction(self, aero_props, type, qcw, delso4_o3rxn, faqgain)
+  subroutine aqu_gain_binfraction(self, type, qcw, delso4_o3rxn, faqgain)
 
     class(carma_aerosol_state), intent(in) :: self
-    class(aerosol_properties), intent(in) :: aero_props ! aerosol properties object
     character(len=*), intent(in) :: type                ! aerosol species type
     real(r8), intent(in) :: qcw(:,:,:)                  ! cloud-borne aerosol volume mixing ratio
     real(r8), intent(in) :: delso4_o3rxn(:,:)           ! sulfate concentration change due to oxidation
@@ -624,7 +694,7 @@ contains
     ! M/D^2 as: fra = Mi/D^2/sum(Mi/D^2).
 
     ncol = self%state%ncol
-    nbins = aero_props%nbins()
+    nbins = self%props_%nbins()
     faqgain(:,:,:) = 0._r8
 
     allocate(wt_mass(nbins))

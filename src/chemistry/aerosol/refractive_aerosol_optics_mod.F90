@@ -150,7 +150,7 @@ contains
     end if
     newobj%crefwsw(:) = crefwsw(:)
 
-    call aero_state%water_uptake(aero_props, ibin,  ncol, nlev, dgnumwet, qaerwat)
+    call aero_state%water_uptake(ibin, dgnumwet, qaerwat)
 
     nspec = aero_props%nspecies(ibin)
 
@@ -163,7 +163,7 @@ contains
     do ilev = 1, nlev
        dryvol(:ncol) = 0._r8
        do ispec = 1, nspec
-          call aero_state%get_ambient_mmr(species_ndx=ispec,bin_ndx=ibin,mmr=specmmr)
+          call aero_state%ambient_mmr_ptr(species_ndx=ispec,bin_ndx=ibin,mmr=specmmr)
           call aero_props%get(ibin, ispec, density=specdens)
 
           do icol = 1, ncol
@@ -210,7 +210,7 @@ contains
     type(table_interp_wghts) :: wghtsr(ncol)
     type(table_interp_wghts) :: wghtsi(ncol)
 
-    crefin(:ncol) = self%aero_state%refractive_index_sw(ncol, ilev, self%ibin, iwav, self%aero_props)
+    crefin(:ncol) = self%aero_state%refractive_index_sw(ilev, self%ibin, iwav)
 
     do icol = 1, ncol
        crefin(icol) = crefin(icol) + self%watervol(icol,ilev)*self%crefwsw(iwav)
@@ -279,7 +279,7 @@ contains
     type(table_interp_wghts) :: wghtsr(ncol)
     type(table_interp_wghts) :: wghtsi(ncol)
 
-    crefin(:ncol) = self%aero_state%refractive_index_lw(ncol, ilev, self%ibin, iwav, self%aero_props)
+    crefin(:ncol) = self%aero_state%refractive_index_lw(ilev, self%ibin, iwav)
 
     do icol = 1, ncol
        crefin(icol) = crefin(icol) + self%watervol(icol,ilev)*self%crefwlw(iwav)

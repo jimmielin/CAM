@@ -158,7 +158,57 @@ contains
        end if
     end do
 
+    ! R2 residual check (see design doc): for working-state-table models the
+    ! field_kind table must agree with the constituent-index logic it subsumes
+    do ilist = 0, N_DIAG
+       do iaermod = 1, num_aero_models_
+          if (associated(aero_props_all(iaermod, ilist)%obj)) then
+             call check_field_kinds(aero_props_all(iaermod, ilist)%obj)
+          end if
+       end do
+    end do
+
   end subroutine aerosol_instances_init
+
+  ! Init-time consistency check of the field_kind table for models that
+  ! support the working-state table (MAM, CARMA): an ambient entry must be
+  ! ADVECTED exactly when its interstitial constituent name resolves to a
+  ! constituent index -- the same lookup the convproc-style `ndx > 0` write
+  ! branches rely on -- and no such model may have a STORED ambient entry
+  ! (per investigation R2 there are none today; a STORED ambient entry would
+  ! have taken a different branch in the pre-field_kind logic).
+  subroutine check_field_kinds(props)
+    use aerosol_properties_mod, only: aero_name_len, aerocap_working_state_table
+    use aerosol_properties_mod, only: AERO_FIELD_ADVECTED, AERO_FIELD_STORED, AERO_AMBIENT
+    use constituents,   only: cnst_get_ind
+    use cam_abortutils, only: endrun
+
+    class(aerosol_properties), intent(in) :: props
+
+    character(len=aero_name_len) :: name_a, name_c
+    integer :: m, l, ndx
+    character(len=*), parameter :: subname = 'aerosol_instances_init: '
+
+    if (.not. props%supports(aerocap_working_state_table)) return
+
+    do m = 1, props%nbins()
+       do l = 0, props%nspecies(m)
+          if (l == 0) then
+             call props%num_names(m, name_a, name_c)
+          else
+             call props%mmr_names(m, l, name_a, name_c)
+          end if
+          call cnst_get_ind(trim(name_a), ndx, abort=.false.)
+          if ((ndx > 0) .neqv. (props%field_kind(m, l, AERO_AMBIENT) == AERO_FIELD_ADVECTED)) then
+             call endrun(subname//'field_kind inconsistent with constituent lookup for '//trim(name_a))
+          end if
+          if (props%field_kind(m, l, AERO_AMBIENT) == AERO_FIELD_STORED) then
+             call endrun(subname//'unexpected STORED ambient entry: '//trim(name_a))
+          end if
+       end do
+    end do
+
+  end subroutine check_field_kinds
 
   ! Return a pointer to the aerosol_properties object for the given aerosol
   ! model index and radiation list.  Returns null when the model has no
@@ -244,7 +294,7 @@ contains
     use bulk_aerosol_state_mod,  only: bulk_aerosol_state
     use physics_types,  only: physics_state
     use physics_buffer, only: physics_buffer_desc, pbuf_get_chunk
-    use ppgrid,         only: begchunk, endchunk
+    use ppgrid,         only: begchunk, endchunk, pver
     use cam_abortutils, only: endrun
 
     type(physics_state),       intent(in), target :: phys_state(begchunk:endchunk)
@@ -272,21 +322,24 @@ contains
              iaermod = iaermod + 1
              if (associated(aero_props_all(iaermod, ilist)%obj)) then
                 aero_states_all(iaermod, ilist, lchnk)%obj => &
-                     modal_aerosol_state(phys_state(lchnk)%ncol, phys_state(lchnk), pbuf, ilist)
+                     modal_aerosol_state(aero_props_all(iaermod, ilist)%obj, &
+                     phys_state(lchnk)%ncol, pver, phys_state(lchnk), pbuf, ilist)
              end if
           end if
           if (carma_active_) then
              iaermod = iaermod + 1
              if (associated(aero_props_all(iaermod, ilist)%obj)) then
                 aero_states_all(iaermod, ilist, lchnk)%obj => &
-                     carma_aerosol_state(phys_state(lchnk)%ncol, phys_state(lchnk), pbuf, ilist)
+                     carma_aerosol_state(aero_props_all(iaermod, ilist)%obj, &
+                     phys_state(lchnk)%ncol, pver, phys_state(lchnk), pbuf, ilist)
              end if
           end if
           if (bulk_active_) then
              iaermod = iaermod + 1
              if (associated(aero_props_all(iaermod, ilist)%obj)) then
                 aero_states_all(iaermod, ilist, lchnk)%obj => &
-                     bulk_aerosol_state(phys_state(lchnk)%ncol, phys_state(lchnk), pbuf, ilist)
+                     bulk_aerosol_state(aero_props_all(iaermod, ilist)%obj, &
+                     phys_state(lchnk)%ncol, pver, phys_state(lchnk), pbuf, ilist)
              end if
           end if
        end do
@@ -320,6 +373,7 @@ contains
     use bulk_aerosol_state_mod,  only: bulk_aerosol_state
     use physics_types,  only: physics_state
     use physics_buffer, only: physics_buffer_desc
+    use ppgrid,         only: pver
     use cam_abortutils, only: endrun
 
     integer,                   intent(in)               :: list_idx
@@ -342,15 +396,18 @@ contains
     iaermod = 0
     if (modal_active_) then
        iaermod = iaermod + 1
-       aero_states(iaermod)%obj => modal_aerosol_state(state%ncol, state, pbuf, list_idx)
+       aero_states(iaermod)%obj => modal_aerosol_state(aero_props_all(iaermod, list_idx)%obj, &
+            state%ncol, pver, state, pbuf, list_idx)
     end if
     if (carma_active_) then
        iaermod = iaermod + 1
-       aero_states(iaermod)%obj => carma_aerosol_state(state%ncol, state, pbuf, list_idx)
+       aero_states(iaermod)%obj => carma_aerosol_state(aero_props_all(iaermod, list_idx)%obj, &
+            state%ncol, pver, state, pbuf, list_idx)
     end if
     if (bulk_active_) then
        iaermod = iaermod + 1
-       aero_states(iaermod)%obj => bulk_aerosol_state(state%ncol, state, pbuf, list_idx)
+       aero_states(iaermod)%obj => bulk_aerosol_state(aero_props_all(iaermod, list_idx)%obj, &
+            state%ncol, pver, state, pbuf, list_idx)
     end if
 
   end subroutine aerosol_instances_create_states

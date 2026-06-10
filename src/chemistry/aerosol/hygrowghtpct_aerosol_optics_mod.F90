@@ -91,7 +91,7 @@ contains
 
     do ispec = 1,nspec
 
-       call aero_state%get_ambient_mmr(species_ndx=ispec,bin_ndx=ibin,mmr=specmmr)
+       call aero_state%ambient_mmr_ptr(species_ndx=ispec,bin_ndx=ibin,mmr=specmmr)
        newobj%totalmmr(:ncol,:nlev) = newobj%totalmmr(:ncol,:nlev) + specmmr(:ncol,:nlev)
 
     end do

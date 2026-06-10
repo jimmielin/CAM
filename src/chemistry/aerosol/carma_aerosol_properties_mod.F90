@@ -2,6 +2,8 @@ module carma_aerosol_properties_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
   use physconst, only: pi
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
+  use aerosol_properties_mod, only: field_kind_from_source, aerocap_working_state_table
+  use aerosol_properties_mod, only: AERO_AMBIENT, AERO_CLDBRNE, AERO_FIELD_DERIVED
   use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_bin_props_by_idx, &
                                rad_aer_get_info_by_bin, rad_aer_get_info_by_bin_spec, &
                                rad_aer_bin_physprop_id
@@ -39,6 +41,7 @@ module carma_aerosol_properties_mod
      procedure :: rebin_bulk_fluxes
      procedure :: hydrophilic
      procedure :: model_is
+     procedure :: supports
 
      final :: destructor
   end type carma_aerosol_properties
@@ -54,11 +57,13 @@ contains
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
   function constructor(list_idx) result(newobj)
+    use radiative_aerosol_definitions, only: bins, sectional_aerosol_list
 
     integer, optional, intent(in) :: list_idx ! radiation list index (0=climate)
     type(carma_aerosol_properties), pointer :: newobj
 
-    integer :: l, m, nbins, ncnst_tot
+    integer :: l, m, nbins, ncnst_tot, mm
+    integer, allocatable :: kinds(:,:,:)
     integer :: list_idx_loc
     integer,allocatable :: nspecies(:)
     integer,allocatable :: nmasses(:)
@@ -131,6 +136,33 @@ contains
        nullify(newobj)
        return
     end if
+
+    ! field kind table built from the parsed per-entry source data
+    ! ('A' advected constituent, 'N' pbuf-resident), with the model override
+    ! that CARMA bin numbers (both phases) are derived from bin mass via the
+    ! fixed bin radius (design doc R1) rather than read from host storage
+    allocate(kinds(nbins,0:maxval(nspecies),AERO_AMBIENT:AERO_CLDBRNE),stat=ierr)
+    if( ierr /= 0 ) then
+       nullify(newobj)
+       return
+    end if
+    kinds(:,:,:) = -1
+    do m = 1, nbins
+       mm = sectional_aerosol_list(list_idx_loc)%idx(m)
+       kinds(m,0,AERO_AMBIENT) = AERO_FIELD_DERIVED
+       kinds(m,0,AERO_CLDBRNE) = AERO_FIELD_DERIVED
+       do l = 1, nspecies(m)
+          kinds(m,l,AERO_AMBIENT) = field_kind_from_source(bins%comps(mm)%source_mmr_a(l))
+          kinds(m,l,AERO_CLDBRNE) = field_kind_from_source(bins%comps(mm)%source_mmr_c(l))
+       end do
+    end do
+    call newobj%field_kind_set(kinds, ierr)
+    if( ierr /= 0 ) then
+       nullify(newobj)
+       return
+    end if
+    deallocate(kinds)
+
     deallocate(nspecies)
     deallocate(nmasses)
     deallocate(alogsig)
@@ -782,5 +814,20 @@ contains
     end if
 
   end function model_is
+
+  !------------------------------------------------------------------------------
+  ! returns TRUE if the CARMA aerosol model provides the given capability
+  !------------------------------------------------------------------------------
+  logical function supports(self, capability)
+    class(carma_aerosol_properties), intent(in) :: self
+    integer, intent(in) :: capability ! aerocap_* constant
+
+    select case (capability)
+    case (aerocap_working_state_table)
+       supports = .true.
+    case default
+       supports = .false.
+    end select
+  end function supports
 
 end module carma_aerosol_properties_mod

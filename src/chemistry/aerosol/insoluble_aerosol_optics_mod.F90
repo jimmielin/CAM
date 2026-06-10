@@ -63,7 +63,7 @@ contains
          sw_insoluble_asm=newobj%sw_asm, &
          lw_insoluble_ext=newobj%lw_abs )
 
-    call aero_state%get_ambient_mmr(species_ndx=1, bin_ndx=ibin, mmr=newobj%mmr)
+    call aero_state%ambient_mmr_ptr(species_ndx=1, bin_ndx=ibin, mmr=newobj%mmr)
 
   end function constructor
 

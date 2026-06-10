@@ -510,10 +510,10 @@ subroutine microp_aero_run ( &
    real(r8), pointer :: rndst(:,:,:)    ! radius of 4 dust bins for contact freezing
    real(r8), pointer :: nacon(:,:,:)    ! number in 4 dust bins for contact freezing
 
-   real(r8), pointer :: num_coarse(:,:) ! number m.r. of coarse mode
-   real(r8), pointer :: coarse_dust(:,:) ! mass m.r. of coarse dust
-   real(r8), pointer :: coarse_nacl(:,:) ! mass m.r. of coarse nacl
-   real(r8), pointer :: coarse_so4(:,:)  ! mass m.r. of coarse sulfate
+   real(r8) :: num_coarse(pcols,pver)  ! number m.r. of coarse mode
+   real(r8) :: coarse_dust(pcols,pver) ! mass m.r. of coarse dust
+   real(r8) :: coarse_nacl(pcols,pver) ! mass m.r. of coarse nacl
+   real(r8) :: coarse_so4(pcols,pver)  ! mass m.r. of coarse sulfate
 
    real(r8), pointer :: kvh(:,:)        ! vertical eddy diff coef (m2 s-1)
    real(r8), pointer :: tke(:,:)        ! TKE from the UW PBL scheme (m2 s-2)
@@ -816,6 +816,18 @@ subroutine microp_aero_run ( &
    ! (nacon is output from ndrop_bam_calc)
    ! Below for modal aerosol only:
    if(clim_modal_aero) then
+      ! coarse mode number and specie mass mixing ratios for contact freezing.
+      ! the getters copy values out of the aerosol state, so they must be called
+      ! after the ice nucleation and droplet activation updates of state1 above
+      ! in order to see the updated mixing ratios.
+      call aero_state1_obj%get_ambient_num(mode_coarse_dst_idx, num_coarse)
+
+      call aero_state1_obj%get_ambient_mmr(species_ndx=coarse_dust_idx, bin_ndx=mode_coarse_dst_idx, mmr=coarse_dust)
+      call aero_state1_obj%get_ambient_mmr(species_ndx=coarse_nacl_idx, bin_ndx=mode_coarse_slt_idx, mmr=coarse_nacl)
+      if (mode_coarse_idx>0) then
+         call aero_state1_obj%get_ambient_mmr(species_ndx=coarse_so4_idx, bin_ndx=mode_coarse_idx, mmr=coarse_so4)
+      endif
+
       ! For modal aerosols:
       ! mode number mixing ratios
       call aero_state1_obj%get_ambient_num(mode_coarse_dst_idx, num_coarse)

@@ -227,8 +227,8 @@ contains
     ! bin, which is the MR of cloud drops "associated with" the mode
     ! thus we are assuming the cloud drop size is independent of the
     ! associated aerosol mode properties
-    call aero_state%aqu_gain_binfraction(aero_props, 'sulfate', qcw, delso4_ox, faqgain_so4)
-    if (has_msa) call aero_state%aqu_gain_binfraction(aero_props, 'msa', qcw, delso4_ox, faqgain_msa)
+    call aero_state%aqu_gain_binfraction('sulfate', qcw, delso4_ox, faqgain_so4)
+    if (has_msa) call aero_state%aqu_gain_binfraction('msa', qcw, delso4_ox, faqgain_msa)
 
     lev_loop: do k = 1,pver
        col_loop: do i = 1,ncol

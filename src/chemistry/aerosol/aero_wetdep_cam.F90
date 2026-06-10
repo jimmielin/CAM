@@ -444,7 +444,7 @@ contains
 
     call pbuf_get_field(pbuf, fracis_idx, fracis)
 
-    call aero_state%get_states( aero_props, raer, qqcw )
+    call aero_state%get_states( raer, qqcw )
 
     qsrflx_mzaer2cnvpr(:,:,:) = 0.0_r8
     aerdepwetis(:,:) = 0.0_r8
@@ -546,7 +546,7 @@ contains
              sol_factic = 0.0_r8
           endif
 
-          diam_wet = aero_state%wet_diameter(m,ncol,pver)
+          diam_wet = aero_state%wet_diameter(m)
 
           scavcoefnv = 0.0_r8
 
@@ -556,7 +556,7 @@ contains
              if ( sol_factb_interstitial /= NOTSET ) then
                 sol_factb(:ncol,:) = sol_factb_interstitial ! all below-cloud scav
              else
-                sol_factb(:ncol,:) = aero_state%sol_factb_interstitial( m, ncol, pver, aero_props )
+                sol_factb(:ncol,:) = aero_state%sol_factb_interstitial( m )
              end if
 
              write(binstr,'(i2.2)') m
@@ -606,7 +606,7 @@ contains
                    qqcw_in(:ncol,:) = qqcw(mm)%fld(:ncol,:)
                 end if
 
-                f_act_conv(:ncol,:) = aero_state%convcld_actfrac( aero_props, m, l, ncol, pver)
+                f_act_conv(:ncol,:) = aero_state%convcld_actfrac( m, l )
                 name = aname
              end if
 

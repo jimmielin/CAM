@@ -417,7 +417,6 @@ subroutine nucleate_ice_cam_calc( &
    real(r8) :: sulf_num_tot_col(pcols,pver)
 
    integer :: idxtmp
-   real(r8), pointer :: amb_num(:,:)
    real(r8), pointer :: amb_mmr(:,:)
    real(r8), pointer :: cld_num(:,:)
    real(r8), pointer :: cld_mmr(:,:)
@@ -561,15 +560,14 @@ subroutine nucleate_ice_cam_calc( &
    !          icenuc_size_wght returns 1/25, icenuc_type_wght returns 1.0 ("sulfate_strat" or "sulfate") or 0.0.
    ! When no aerosols are active, all *_num_col are zero and nucleati runs Meyers depnuc which only depend on T and qc.
    if (present(aero_props) .and. present(aero_state)) then
-      call aero_state%nuclice_get_numdens( aero_props, use_preexisting_ice, ncol, pver, rho, &
+      call aero_state%nuclice_get_numdens( use_preexisting_ice, rho, &
                                            dust_num_col, sulf_num_col, soot_num_col, sulf_num_tot_col )
 
       do m = 1, aero_props%nbins()
-         call aero_state%get_ambient_num(m, amb_num)
-         amb_num_bins(:ncol,:,m) = amb_num(:ncol,:)
+         call aero_state%get_ambient_num(m, amb_num_bins(:,:,m))
          do l = 1, aero_props%nspecies(m)
             call aero_props%species_type(m, l, spectype)
-            call aero_state%icenuc_size_wght( m, ncol, pver, spectype, use_preexisting_ice, size_wght(:,:,m,l))
+            call aero_state%icenuc_size_wght( m, spectype, use_preexisting_ice, size_wght(:,:,m,l))
          end do
       end do
    end if
@@ -646,8 +644,8 @@ subroutine nucleate_ice_cam_calc( &
 
                                  idxtmp = aer_cnst_idx(m,l)
 
-                                 call aero_state%get_ambient_mmr(species_ndx=l, bin_ndx=m, mmr=amb_mmr)
-                                 call aero_state%get_cldbrne_mmr(species_ndx=l, bin_ndx=m, mmr=cld_mmr)
+                                 call aero_state%ambient_mmr_ptr(species_ndx=l, bin_ndx=m, mmr=amb_mmr)
+                                 call aero_state%cldbrne_mmr_ptr(species_ndx=l, bin_ndx=m, mmr=cld_mmr)
 
                                  ! determine change in aerosol mass
                                  delmmr = 0._r8

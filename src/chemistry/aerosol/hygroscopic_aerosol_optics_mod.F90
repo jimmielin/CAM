@@ -89,7 +89,7 @@ contains
          sw_hygroscopic_asm=newobj%asm_sw, &
          lw_hygroscopic_ext=newobj%abs_lw )
 
-    call aero_state%get_ambient_mmr(species_ndx=1, bin_ndx=ibin, mmr=newobj%mmr)
+    call aero_state%ambient_mmr_ptr(species_ndx=1, bin_ndx=ibin, mmr=newobj%mmr)
 
   end function constructor
 

@@ -87,7 +87,7 @@ contains
          r_lw_abs=newobj%r_lw_abs, &
          r_mu=newobj%r_mu )
 
-    call aero_state%get_ambient_mmr(species_ndx=1, bin_ndx=ibin, mmr=newobj%mmr)
+    call aero_state%ambient_mmr_ptr(species_ndx=1, bin_ndx=ibin, mmr=newobj%mmr)
 
 
 ! NOTE should try to use table_interp_mod utility !!!

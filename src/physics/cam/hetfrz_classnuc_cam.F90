@@ -433,8 +433,8 @@ subroutine hetfrz_classnuc_cam_calc(aero_props, aero_state, state, deltatin, fac
 
    do i = 1,tot_num_bins
 
-      call aero_state%get_amb_species_numdens( indices(i)%bin_ndx, ncol, pver, types(i), aero_props, rho, amb_aer_num(:,:,i))
-      call aero_state%get_cld_species_numdens( indices(i)%bin_ndx, ncol, pver, types(i), aero_props, rho, cld_aer_num(:,:,i))
+      call aero_state%get_amb_species_numdens( indices(i)%bin_ndx, types(i), rho, amb_aer_num(:,:,i))
+      call aero_state%get_cld_species_numdens( indices(i)%bin_ndx, types(i), rho, cld_aer_num(:,:,i))
 
       tot_aer_num(:ncol,:,i) = cld_aer_num(:ncol,:,i) + amb_aer_num(:ncol,:,i)
 
@@ -442,9 +442,9 @@ subroutine hetfrz_classnuc_cam_calc(aero_props, aero_state, state, deltatin, fac
       call outfld(amb_dens_hnames(i), amb_aer_num(:,:,i), pcols, lchnk)
       call outfld(cld_dens_hnames(i), cld_aer_num(:,:,i), pcols, lchnk)
 
-      aer_radius(:ncol,:,i) = aero_state%mass_mean_radius( indices(i)%bin_ndx, indices(i)%spc_ndx,  ncol, pver, aero_props, rho )
+      aer_radius(:ncol,:,i) = aero_state%mass_mean_radius( indices(i)%bin_ndx, indices(i)%spc_ndx, rho )
 
-      coated(:ncol,:,i) = aero_state%coated_frac( indices(i)%bin_ndx, types(i), ncol, pver, aero_props, aer_radius(:,:,i) )
+      coated(:ncol,:,i) = aero_state%coated_frac( indices(i)%bin_ndx, types(i), aer_radius(:,:,i) )
 
       call outfld(coated_frac_hnames(i), coated(:,:,i), pcols, lchnk)
 
@@ -455,7 +455,7 @@ subroutine hetfrz_classnuc_cam_calc(aero_props, aero_state, state, deltatin, fac
       call outfld(uncoated_dens_hnames(i), uncoated_amb_aer_num(:,:,i), pcols, lchnk)
       call outfld(radius_hnames(i), aer_radius(:ncol,:,i), ncol, lchnk)
 
-      call aero_state%watact_mfactor(indices(i)%bin_ndx, types(i), ncol, pver, aero_props, rho, aer_wactfac(:ncol,:,i))
+      call aero_state%watact_mfactor(indices(i)%bin_ndx, types(i), rho, aer_wactfac(:ncol,:,i))
       call outfld(wactfac_hnames(i), aer_wactfac(:,:,i), pcols, lchnk)
 
       fn_cld_aer_num(:ncol,:) = tot_aer_num(:ncol,:,i)*factnum(:ncol,:,indices(i)%bin_ndx)

@@ -2,6 +2,8 @@ module modal_aerosol_properties_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
   use physconst, only: pi
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
+  use aerosol_properties_mod, only: field_kind_from_source, aerocap_working_state_table
+  use aerosol_properties_mod, only: AERO_AMBIENT, AERO_CLDBRNE
   use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_mode_props, rad_aer_get_props
   use modal_aero_data, only: specmw_amode
   implicit none
@@ -51,6 +53,7 @@ module modal_aerosol_properties_mod
      procedure :: rebin_bulk_fluxes
      procedure :: hydrophilic
      procedure :: model_is
+     procedure :: supports
 
      final :: destructor
   end type modal_aerosol_properties
@@ -66,11 +69,13 @@ contains
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
   function constructor(list_idx) result(newobj)
+    use radiative_aerosol_definitions, only: modes, modal_aerosol_list
 
     integer, optional, intent(in) :: list_idx ! radiation list index (0=climate)
     type(modal_aerosol_properties), pointer :: newobj
 
     integer :: l, m, nmodes, ncnst_tot, mm, itmp
+    integer, allocatable :: kinds(:,:,:)
     integer :: list_idx_loc
     real(r8) :: dgnumlo_val
     real(r8) :: dgnumhi_val
@@ -204,6 +209,30 @@ contains
     call newobj%initialize(nmodes,ncnst_tot,nspecies,nspecies,alogsig,f1,f2,ierr,list_idx_loc, &
                            dgnum=dgnum_arr,dgnumhi=dgnumhi_arr,dgnumlo=dgnumlo_arr, &
                            rhcrystal=rhcrystal_arr,rhdeliques=rhdeliques_arr)
+
+    ! field kind table built from the parsed per-entry source data
+    ! ('A' advected constituent, 'N' pbuf-resident); no modal overrides
+    allocate(kinds(nmodes,0:maxval(nspecies),AERO_AMBIENT:AERO_CLDBRNE),stat=ierr)
+    if( ierr /= 0 ) then
+       nullify(newobj)
+       return
+    end if
+    kinds(:,:,:) = -1
+    do m = 1, nmodes
+       mm = modal_aerosol_list(list_idx_loc)%idx(m)
+       kinds(m,0,AERO_AMBIENT) = field_kind_from_source(modes%comps(mm)%source_num_a)
+       kinds(m,0,AERO_CLDBRNE) = field_kind_from_source(modes%comps(mm)%source_num_c)
+       do l = 1, nspecies(m)
+          kinds(m,l,AERO_AMBIENT) = field_kind_from_source(modes%comps(mm)%source_mmr_a(l))
+          kinds(m,l,AERO_CLDBRNE) = field_kind_from_source(modes%comps(mm)%source_mmr_c(l))
+       end do
+    end do
+    call newobj%field_kind_set(kinds, ierr)
+    if( ierr /= 0 ) then
+       nullify(newobj)
+       return
+    end if
+    deallocate(kinds)
 
     npoa = 0
     nsoa = 0
@@ -960,5 +989,20 @@ contains
     end if
 
   end function model_is
+
+  !------------------------------------------------------------------------------
+  ! returns TRUE if the modal aerosol model provides the given capability
+  !------------------------------------------------------------------------------
+  logical function supports(self, capability)
+    class(modal_aerosol_properties), intent(in) :: self
+    integer, intent(in) :: capability ! aerocap_* constant
+
+    select case (capability)
+    case (aerocap_working_state_table)
+       supports = .true.
+    case default
+       supports = .false.
+    end select
+  end function supports
 
 end module modal_aerosol_properties_mod

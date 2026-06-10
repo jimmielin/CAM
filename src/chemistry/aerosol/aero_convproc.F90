@@ -376,7 +376,7 @@ subroutine aero_convproc_intr( aero_props, aero_state, state, ptend, pbuf, ztodt
    sflxec(:,:) = 0.0_r8
    sflxed(:,:) = 0.0_r8
 
-   call aero_state%get_states( aero_props, raer, qqcw )
+   call aero_state%get_states( raer, qqcw )
 
    ! prepare for deep conv processing
    do m = 1, aero_props%nbins()
