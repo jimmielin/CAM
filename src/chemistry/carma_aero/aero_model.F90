@@ -138,8 +138,6 @@ contains
 
     integer :: m, l, i
     integer :: nsoa_vbs
-    character(len=32) :: num_name
-    character(len=32) :: num_name_cw
     character(len=32) :: spec_name_cw
 
     integer :: idx, ierr
@@ -148,11 +146,14 @@ contains
     allocate( nspec(nbins), stat=ierr )
     if (ierr/=0) call endrun('aero_model_register: allocate error')
 
-    ! add pbuf fields for interstitial (cloud borne) aerosols in CARMA
+    ! add pbuf fields for cloud-borne aerosols in CARMA.
+    ! The ambient and cloud-borne bin numbers are NOT pbuf-resident: they are
+    ! DERIVED on demand from the CARMA bin masses (field_kind classification);
+    ! the former number/number_cw pbuf cache fields had no readers and were
+    ! removed (this shrinks the restart-file inventory; old restarts remain
+    ! readable).
     do m = 1, nbins
-       call rad_aer_get_info_by_bin(0, m, num_name=num_name, num_name_cw=num_name_cw, nspec=nspec(m))
-       call pbuf_add_field(num_name,'global',dtype_r8,(/pcols,pver/), idx)
-       call pbuf_add_field(num_name_cw,'global',dtype_r8,(/pcols,pver/), idx)
+       call rad_aer_get_info_by_bin(0, m, nspec=nspec(m))
        do l = 1, nspec(m)
           call rad_aer_get_info_by_bin_spec(0, m, l, spec_name_cw=spec_name_cw)
           call pbuf_add_field(spec_name_cw,'global',dtype_r8,(/pcols,pver/),idx)
@@ -206,8 +207,6 @@ contains
     integer :: l
 
     character(len=2)  :: unit_basename  ! Units 'kg' or '1'
-    character(len=32) :: num_name
-    character(len=32) :: num_name_cw
     character(len=32) :: spec_name_cw
 
     integer :: idx, ierr
@@ -221,11 +220,6 @@ contains
 
     if (is_first_step()) then
        do m = 1, nbins
-          call rad_aer_get_info_by_bin(0, m, num_name=num_name, num_name_cw=num_name_cw)
-          idx = pbuf_get_index(num_name)
-          call pbuf_set_field(pbuf2d, idx, 0.0_r8)
-          idx = pbuf_get_index(num_name_cw)
-          call pbuf_set_field(pbuf2d, idx, 0.0_r8)
           do l = 1, nspec(m)
              call rad_aer_get_info_by_bin_spec(0, m, l, spec_name_cw=spec_name_cw)
              idx = pbuf_get_index(spec_name_cw)
@@ -513,6 +507,8 @@ contains
 
     type(ptr2d_t), allocatable :: raer(:)     ! aerosol mass, number mixing ratios
     type(ptr2d_t), allocatable :: qqcw(:)
+    real(r8), allocatable, target :: wrk_scratch(:,:,:) ! scratch backing for DERIVED
+                                                        ! working-state entries
 
     real(r8) :: del_h2so4_aeruptk(ncol,pver)
 
@@ -578,12 +574,13 @@ contains
     allocate( &
       rmass(nbins), &
       raer(ncnst_tot), &
-      qqcw(ncnst_tot), stat=ierr )
+      qqcw(ncnst_tot), &
+      wrk_scratch(pcols, pver, max(1, aero_props%num_derived_working_entries())), stat=ierr )
     if (ierr /= 0) call endrun(subname//': allocate error')
 
     ! Init pointers to mode number and specie mass mixing ratios in
     ! intersitial and cloud borne phases.
-    call aero_state%get_states( raer, qqcw )
+    call aero_state%get_working_state( raer, qqcw, wrk_scratch )
 
     mw_carma(:) = 0.0_r8
     do m = 1, nbins      ! main loop over aerosol bins

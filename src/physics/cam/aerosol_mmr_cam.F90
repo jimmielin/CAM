@@ -31,7 +31,6 @@ public :: rad_cnst_get_mam_mmr_idx
 public :: rad_cnst_get_mode_num
 public :: rad_cnst_get_mode_num_idx
 public :: rad_cnst_get_bin_mmr_by_idx
-public :: rad_cnst_get_bin_num
 public :: rad_cnst_get_bin_num_idx
 public :: rad_cnst_get_carma_mmr_idx
 public :: rad_cnst_get_bin_mmr
@@ -173,9 +172,11 @@ subroutine resolve_bin_idx(bins)
 
    do m = 1, bins%nbins
 
-      ! indices for number mixing ratio components
-      bins%comps(m)%idx_num_a = get_cam_idx(bins%comps(m)%source_num_a, bins%comps(m)%camname_num_a, routine)
-      bins%comps(m)%idx_num_c = get_cam_idx(bins%comps(m)%source_num_c, bins%comps(m)%camname_num_c, routine)
+      ! The (CARMA) bin number mixing ratios are DERIVED on demand from the bin
+      ! masses (field_kind classification) -- there is no host-resident field to
+      ! resolve (the former pbuf cache fields are no longer registered, R1).
+      bins%comps(m)%idx_num_a = -1
+      bins%comps(m)%idx_num_c = -1
       if ( bins%comps(m)%source_mass_a /= 'NOTSET' .and. bins%comps(m)%camname_mass_a /= 'NOTSET' ) then
          bins%comps(m)%idx_mass_a = get_cam_idx(bins%comps(m)%source_mass_a, bins%comps(m)%camname_mass_a, routine)
       endif
@@ -671,78 +672,13 @@ subroutine rad_cnst_get_mode_num(list_idx, mode_idx, phase, state, pbuf, num)
       call pbuf_get_field(pbuf, idx, num)
    case ('Z')
       num => zero_cols
+   case default
+      call endrun(subname//': no source for the mode number field')
    end select
 
 end subroutine rad_cnst_get_mode_num
 
 !================================================================================================
-
-subroutine rad_cnst_get_bin_num(list_idx, bin_idx, phase, state, pbuf, num)
-
-   ! Return pointer to number mixing ratio for the aerosol bin from the specified
-   ! climate or diagnostic list.
-
-   use cam_logfile,    only: iulog
-   use cam_abortutils, only: endrun
-   use physics_types,  only: physics_state
-   use physics_buffer, only: physics_buffer_desc, pbuf_get_field
-   use radiative_aerosol_definitions, only: N_DIAG, binlist_t, sectional_aerosol_list, bins
-
-   ! Arguments
-   integer,                     intent(in) :: list_idx    ! index of the climate or a diagnostic list
-   integer,                     intent(in) :: bin_idx     ! bin index
-   character(len=1),            intent(in) :: phase       ! 'a' for interstitial, 'c' for cloud borne
-   type(physics_state), target, intent(in) :: state
-   type(physics_buffer_desc),   pointer    :: pbuf(:)
-   real(r8),                    pointer    :: num(:,:)
-
-   ! Local variables
-   integer :: m_idx
-   integer :: idx
-   character(len=1) :: source
-   type(binlist_t), pointer :: slist
-   character(len=*), parameter :: subname = 'rad_cnst_get_bin_num'
-   !-----------------------------------------------------------------------------
-
-   if (list_idx >= 0 .and. list_idx <= N_DIAG) then
-      slist => sectional_aerosol_list(list_idx)
-   else
-      write(iulog,*) subname//': list_idx =', list_idx
-      call endrun(subname//': list_idx out of bounds')
-   endif
-
-   ! Check for valid bin index
-   if (bin_idx < 1  .or.  bin_idx > slist%nbins) then
-      write(iulog,*) subname//': bin_idx= ', bin_idx, '  nbins= ', slist%nbins
-      call endrun(subname//': bin list index out of range')
-   end if
-
-   ! Get the index for the corresponding bin in the bin definition object
-   m_idx = slist%idx(bin_idx)
-
-   ! Get data source
-   if (phase == 'a') then
-      source = bins%comps(m_idx)%source_num_a
-      idx    = bins%comps(m_idx)%idx_num_a
-   else if (phase == 'c') then
-      source = bins%comps(m_idx)%source_num_c
-      idx    = bins%comps(m_idx)%idx_num_c
-   else
-      write(iulog,*) subname//': phase= ', phase
-      call endrun(subname//': unrecognized phase; must be "a" or "c"')
-   end if
-
-   select case( source )
-   case ('A')
-      num => state%q(:,:,idx)
-   case ('N')
-      call pbuf_get_field(pbuf, idx, num)
-   case ('Z')
-      num => zero_cols
-   end select
-
-end subroutine rad_cnst_get_bin_num
-
 !================================================================================================
 
 subroutine rad_cnst_get_mode_num_idx(mode_idx, cnst_idx)

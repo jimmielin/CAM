@@ -179,7 +179,8 @@ contains
   ! have taken a different branch in the pre-field_kind logic).
   subroutine check_field_kinds(props)
     use aerosol_properties_mod, only: aero_name_len, aerocap_working_state_table
-    use aerosol_properties_mod, only: AERO_FIELD_ADVECTED, AERO_FIELD_STORED, AERO_AMBIENT
+    use aerosol_properties_mod, only: AERO_FIELD_ADVECTED, AERO_FIELD_STORED
+    use aerosol_properties_mod, only: AERO_AMBIENT, AERO_CLDBRNE
     use constituents,   only: cnst_get_ind
     use cam_abortutils, only: endrun
 
@@ -204,6 +205,12 @@ contains
           end if
           if (props%field_kind(m, l, AERO_AMBIENT) == AERO_FIELD_STORED) then
              call endrun(subname//'unexpected STORED ambient entry: '//trim(name_a))
+          end if
+          ! cloud-borne entries must never be ADVECTED: working-state consumers
+          ! (e.g. dropmixnuc) update them in place unconditionally, which is
+          ! legal only for non-constituent fields
+          if (props%field_kind(m, l, AERO_CLDBRNE) == AERO_FIELD_ADVECTED) then
+             call endrun(subname//'unexpected ADVECTED cloud-borne entry: '//trim(name_c))
           end if
        end do
     end do

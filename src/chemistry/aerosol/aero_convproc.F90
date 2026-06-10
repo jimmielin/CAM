@@ -32,6 +32,8 @@ use cam_logfile,     only: iulog
 use cam_abortutils,  only: endrun
 
 use aerosol_properties_mod, only: aerosol_properties
+use aerosol_properties_mod, only: AERO_FIELD_ADVECTED, AERO_FIELD_STORED, AERO_FIELD_DERIVED
+use aerosol_properties_mod, only: AERO_AMBIENT
 use aerosol_state_mod, only: aerosol_state, ptr2d_t
 
 implicit none
@@ -358,6 +360,8 @@ subroutine aero_convproc_intr( aero_props, aero_state, state, ptend, pbuf, ztodt
 
    type(ptr2d_t) :: raer(ncnstaer)     ! aerosol mass, number mixing ratios
    type(ptr2d_t) :: qqcw(ncnstaer)
+   real(r8), allocatable, target :: wrk_scratch(:,:,:) ! scratch backing for DERIVED
+                                                       ! working-state entries
 
    logical  :: dotend(pcnst)
    logical  :: applytend
@@ -376,7 +380,8 @@ subroutine aero_convproc_intr( aero_props, aero_state, state, ptend, pbuf, ztodt
    sflxec(:,:) = 0.0_r8
    sflxed(:,:) = 0.0_r8
 
-   call aero_state%get_states( raer, qqcw )
+   allocate(wrk_scratch(pcols, pver, max(1, aero_props%num_derived_working_entries())))
+   call aero_state%get_working_state( raer, qqcw, wrk_scratch )
 
    ! prepare for deep conv processing
    do m = 1, aero_props%nbins()
@@ -426,12 +431,20 @@ subroutine aero_convproc_intr( aero_props, aero_state, state, ptend, pbuf, ztodt
                ndx = aer_cnst_ndx(mm)
 
                if ( apply_convproc_tend_to_ptend ) then
-                  ! add dqdt onto ptend%q and set ptend%lq
-                  if (ndx>0) then ! advected species
+                  ! add dqdt onto ptend%q and set ptend%lq -- dispatch on the field
+                  ! kind (same branches as the former ndx>0 test -- ADVECTED <=>
+                  ! constituent index, asserted at init)
+                  select case (aero_props%field_kind(m, l, AERO_AMBIENT))
+                  case (AERO_FIELD_ADVECTED)
                      ptend%q(1:ncol,:,ndx) = ptend%q(1:ncol,:,ndx) + dqdt(1:ncol,:,mm)
-                  else
+                  case (AERO_FIELD_STORED, AERO_FIELD_DERIVED)
+                     ! in-place update: host storage for STORED (pbuf, sole owner);
+                     ! caller-scoped scratch for DERIVED (CARMA numbers) -- visible
+                     ! for the remainder of this call, then discarded
                      raer(mm)%fld(1:ncol,:) = max( 0.0_r8, raer(mm)%fld(1:ncol,:) + dqdt(1:ncol,:,mm) * dt )
-                  end if
+                  case default
+                     call endrun('aero_convproc_intr: unsupported ambient field kind in working-state update')
+                  end select
                end if
 
                ! these used for history file wetdep diagnostics

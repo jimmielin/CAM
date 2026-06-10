@@ -1,7 +1,7 @@
 module modal_aerosol_state_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
   use shr_spfn_mod, only: erf => shr_spfn_erf
-  use aerosol_state_mod, only: aerosol_state, ptr2d_t
+  use aerosol_state_mod, only: aerosol_state
   use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_mode_props
   !REMOVECAM
   use aerosol_mmr_cam, only: rad_cnst_get_aer_mmr, rad_cnst_get_mode_num
@@ -36,7 +36,6 @@ module modal_aerosol_state_mod
      procedure :: alias_cldbrne_mmr
      procedure :: alias_ambient_num
      procedure :: alias_cldbrne_num
-     procedure :: get_states
      procedure :: icenuc_size_wght_arr
      procedure :: icenuc_size_wght_val
      procedure :: icenuc_type_wght
@@ -194,29 +193,6 @@ contains
 
     call rad_cnst_get_mode_num(self%list_idx_, bin_ndx, 'c', self%state, self%pbuf, num)
   end subroutine alias_cldbrne_num
-
-  !------------------------------------------------------------------------------
-  ! returns interstitial and cloud-borne aerosol states
-  !------------------------------------------------------------------------------
-  subroutine get_states( self, raer, qqcw )
-    class(modal_aerosol_state), intent(in) :: self
-    type(ptr2d_t), intent(out) :: raer(:)
-    type(ptr2d_t), intent(out) :: qqcw(:)
-
-    integer :: ibin,ispc, indx
-
-    do ibin = 1, self%props_%nbins()
-       indx = self%props_%indexer(ibin, 0)
-       call self%alias_ambient_num(ibin, raer(indx)%fld)
-       call self%alias_cldbrne_num(ibin, qqcw(indx)%fld)
-       do ispc = 1, self%props_%nspecies(ibin)
-          indx = self%props_%indexer(ibin, ispc)
-          call self%alias_ambient_mmr(species_ndx=ispc, bin_ndx=ibin, mmr=raer(indx)%fld)
-          call self%alias_cldbrne_mmr(species_ndx=ispc, bin_ndx=ibin, mmr=qqcw(indx)%fld)
-       end do
-    end do
-
-  end subroutine get_states
 
   !------------------------------------------------------------------------------
   ! return aerosol bin size weights for a given bin

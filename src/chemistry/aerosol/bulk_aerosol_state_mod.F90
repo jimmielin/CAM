@@ -11,7 +11,7 @@ module bulk_aerosol_state_mod
   use radiative_aerosol, only: rad_aer_get_props
   use string_utils, only: to_lower
 
-  use aerosol_state_mod,      only: aerosol_state, ptr2d_t
+  use aerosol_state_mod,      only: aerosol_state
   use aerosol_properties_mod, only: aerosol_properties
 
   implicit none
@@ -41,7 +41,6 @@ module bulk_aerosol_state_mod
      procedure :: alias_cldbrne_mmr
      procedure :: alias_ambient_num
      procedure :: alias_cldbrne_num
-     procedure :: get_states
      procedure :: icenuc_size_wght_arr
      procedure :: icenuc_size_wght_val
      procedure :: icenuc_type_wght
@@ -248,18 +247,6 @@ contains
     call endrun('bulk_aerosol_state alias_cldbrne_num: no host-resident cloud-borne field for bulk aerosols')
 
   end subroutine alias_cldbrne_num
-
-  !------------------------------------------------------------------------------
-  ! returns interstitial and cloud-borne aerosol states
-  !------------------------------------------------------------------------------
-  subroutine get_states( self, raer, qqcw )
-    class(bulk_aerosol_state), intent(in) :: self
-    type(ptr2d_t), intent(out) :: raer(:)
-    type(ptr2d_t), intent(out) :: qqcw(:)
-
-    call endrun('ERROR: bulk_aerosol_state_mod%get_states not yet implemented')
-
-  end subroutine get_states
 
   !------------------------------------------------------------------------------
   ! return aerosol bin size weights for a given bin

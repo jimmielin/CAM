@@ -378,6 +378,8 @@ contains
 
     type(ptr2d_t) :: raer(nele_tot)
     type(ptr2d_t) :: qqcw(nele_tot)
+    real(r8), allocatable, target :: wrk_scratch(:,:,:) ! scratch backing for DERIVED
+                                                        ! working-state entries
 
     real(r8) :: sflx(pcols)
     character(len=aero_name_len) :: aname, cname, name
@@ -444,7 +446,8 @@ contains
 
     call pbuf_get_field(pbuf, fracis_idx, fracis)
 
-    call aero_state%get_states( raer, qqcw )
+    allocate(wrk_scratch(pcols, pver, max(1, aero_props%num_derived_working_entries())))
+    call aero_state%get_working_state( raer, qqcw, wrk_scratch )
 
     qsrflx_mzaer2cnvpr(:,:,:) = 0.0_r8
     aerdepwetis(:,:) = 0.0_r8

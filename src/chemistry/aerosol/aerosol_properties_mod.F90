@@ -76,6 +76,7 @@ module aerosol_properties_mod
      procedure :: initialize => aero_props_init
      procedure :: field_kind
      procedure :: field_kind_set
+     procedure :: num_derived_working_entries
      procedure :: supports
      procedure :: nbins => get_nbins
      procedure :: ncnst_tot
@@ -566,6 +567,28 @@ contains
 
     field_kind = self%field_kind_(bin_ndx, species_ndx, phase)
   end function field_kind
+
+  !------------------------------------------------------------------------------
+  ! returns the number of DERIVED entries in the working-state table (ambient
+  ! and cloud-borne) -- the number of scratch slabs a get_working_state caller
+  ! must provide; counted off the field kind table
+  !------------------------------------------------------------------------------
+  pure integer function num_derived_working_entries(self)
+    class(aerosol_properties), intent(in) :: self
+
+    integer :: m, l, phase
+
+    num_derived_working_entries = 0
+    do phase = AERO_AMBIENT, AERO_CLDBRNE
+       do m = 1, self%nbins_
+          do l = 0, self%nspecies_(m)
+             if (self%field_kind_(m, l, phase) == AERO_FIELD_DERIVED) then
+                num_derived_working_entries = num_derived_working_entries + 1
+             end if
+          end do
+       end do
+    end do
+  end function num_derived_working_entries
 
   !------------------------------------------------------------------------------
   ! returns TRUE if the aerosol model provides the given capability

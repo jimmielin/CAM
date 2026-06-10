@@ -26,6 +26,8 @@ use cam_abortutils,   only: endrun
 use cam_logfile,      only: iulog
 
 use aerosol_properties_mod, only: aerosol_properties
+use aerosol_properties_mod, only: AERO_FIELD_ADVECTED, AERO_FIELD_STORED, AERO_FIELD_DERIVED
+use aerosol_properties_mod, only: AERO_AMBIENT
 use aerosol_state_mod, only: aerosol_state, ptr2d_t
 
 implicit none
@@ -222,6 +224,8 @@ subroutine dropmixnuc( aero_props, aero_state, &
 
    type(ptr2d_t), allocatable :: raer(:)     ! aerosol mass, number mixing ratios
    type(ptr2d_t), allocatable :: qqcw(:)
+   real(r8), allocatable, target :: wrk_scratch(:,:,:) ! scratch backing for DERIVED
+                                                       ! working-state entries
    real(r8) :: raertend(pver)  ! tendency of aerosol mass, number mixing ratios
    real(r8) :: qqcwtend(pver)  ! tendency of cloudborne aerosol mass, number mixing ratios
 
@@ -371,9 +375,11 @@ subroutine dropmixnuc( aero_props, aero_state, &
       fluxn(nbin),                 &
       fluxm(nbin)               )
 
+   allocate(wrk_scratch(pcols, pver, max(1, aero_props%num_derived_working_entries())))
+
    ! Init pointers to mode number and specie mass mixing ratios in
    ! intersitial and cloud borne phases.
-   call aero_state%get_states( raer, qqcw )
+   call aero_state%get_working_state( raer, qqcw, wrk_scratch )
 
    factnum = 0._r8
    wtke = 0._r8
@@ -932,14 +938,21 @@ subroutine dropmixnuc( aero_props, aero_state, &
             coltend(i,mm)    = sum( pdel(i,:)*raertend )/gravit
             coltend_cw(i,mm) = sum( pdel(i,:)*qqcwtend )/gravit
 
-            ! check for advected aerosol constituents
-            if (lptr>0) then ! advected aerosol parts
+            ! dispatch the interstitial update on the field kind (same branches as
+            ! the former lptr>0 test -- ADVECTED <=> constituent index, asserted at init)
+            select case (aero_props%field_kind(m, l, AERO_AMBIENT))
+            case (AERO_FIELD_ADVECTED)
                ptend%q(i,:,lptr) = 0.0_r8
                ptend%q(i,top_lev:pver,lptr) = raertend(top_lev:pver)         ! set tendencies for interstitial aerosol
-            else
+            case (AERO_FIELD_STORED, AERO_FIELD_DERIVED)
+               ! in-place update: host storage for STORED (pbuf, sole owner);
+               ! caller-scoped scratch for DERIVED (CARMA numbers) -- visible for
+               ! the remainder of this call, then discarded
                raer(mm)%fld(i,:) = 0.0_r8
-               raer(mm)%fld(i,top_lev:pver)  = raercol(top_lev:pver,mm,nnew) ! update non-advected interstitial aerosol (pbuf)
-            end if
+               raer(mm)%fld(i,top_lev:pver)  = raercol(top_lev:pver,mm,nnew) ! update non-advected interstitial aerosol
+            case default
+               call endrun('dropmixnuc: unsupported ambient field kind in working-state update')
+            end select
 
             qqcw(mm)%fld(i,:) = 0.0_r8
             qqcw(mm)%fld(i,top_lev:pver) = raercol_cw(top_lev:pver,mm,nnew)  ! update cloud-borne aerosol
@@ -974,6 +987,7 @@ subroutine dropmixnuc( aero_props, aero_state, &
       mact,       &
       raer,       &
       qqcw,       &
+      wrk_scratch, &
       raercol,    &
       raercol_cw, &
       coltend,    &

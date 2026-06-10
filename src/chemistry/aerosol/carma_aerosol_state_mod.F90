@@ -1,13 +1,13 @@
 module carma_aerosol_state_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
-  use aerosol_state_mod, only: aerosol_state, ptr2d_t
+  use aerosol_state_mod, only: aerosol_state
 
   use radiative_aerosol, only: rad_aer_get_info_by_bin
   !REMOVECAM
-  use aerosol_mmr_cam, only: rad_cnst_get_bin_mmr_by_idx, rad_cnst_get_bin_num
+  use aerosol_mmr_cam, only: rad_cnst_get_bin_mmr_by_idx
   !REMOVECAM_END
   !REMOVECAM: no longer need pbuf and state after CAM is retired
-  use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
+  use physics_buffer, only: physics_buffer_desc
   use physics_types, only: physics_state
   !REMOVECAM_END
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
@@ -42,7 +42,6 @@ module carma_aerosol_state_mod
      procedure :: alias_cldbrne_num
      procedure :: derive_ambient_num
      procedure :: derive_cldbrne_num
-     procedure :: get_states
      procedure :: icenuc_size_wght_arr
      procedure :: icenuc_size_wght_val
      procedure :: update_bin
@@ -191,74 +190,34 @@ contains
   end subroutine alias_cldbrne_mmr
 
   !------------------------------------------------------------------------------
-  ! returns ambient aerosol number mixing ratio for a given species index and bin index
+  ! returns ambient aerosol number mixing ratio for a given bin index
   !------------------------------------------------------------------------------
   subroutine alias_ambient_num(self, bin_ndx, num)
     class(carma_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_ndx     ! bin index
     real(r8), pointer :: num(:,:)      ! number mixing ratios
 
-    ! The CARMA number is derived (field_kind DERIVED) and materialized into a
-    ! pbuf-resident cache here, returning a pointer to the cache. Unreachable
-    ! through the guarded ambient_num_ptr accessor; retained only to feed the
-    ! concrete get_states working-state pointers from the cache.
-
-    character(len=aero_name_len) :: bin_name, shortname
-    integer :: igroup, ibin, rc, nchr, ncol
-    real(r8) :: nmr(pcols,pver)
-
-    ncol = self%ncol()
-
-    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=bin_name)
-
-    nchr = len_trim(bin_name)-2
-    shortname = bin_name(:nchr)
-
-    call carma_get_group_by_name(shortname, igroup, rc)
-
-    read(bin_name(nchr+1:),*) ibin
-
-    call rad_cnst_get_bin_num(self%list_idx_, bin_ndx, 'a', self%state, self%pbuf, num)
-
-    call carma_get_number(self%state, igroup, ibin, nmr, rc)
-
-    num(:ncol,:) = nmr(:ncol,:)
+    ! The CARMA number is derived (field_kind DERIVED) -- there is no
+    ! host-resident field to alias (the former pbuf cache was deleted, R1).
+    ! Unreachable through the guarded ambient_num_ptr accessor; use the
+    ! get_ambient_num fill getter, which dispatches to derive_ambient_num.
+    call endrun('carma_aerosol_state alias_ambient_num: no host-resident number field for CARMA aerosols')
 
   end subroutine alias_ambient_num
 
   !------------------------------------------------------------------------------
-  ! returns cloud-borne aerosol number mixing ratio for a given species index and bin index
+  ! returns cloud-borne aerosol number mixing ratio for a given bin index
   !------------------------------------------------------------------------------
   subroutine alias_cldbrne_num(self, bin_ndx, num)
     class(carma_aerosol_state), intent(in) :: self
     integer, intent(in) :: bin_ndx     ! bin index
     real(r8), pointer :: num(:,:)      ! number mixing ratios
 
-    ! The CARMA number is derived (field_kind DERIVED) and materialized into a
-    ! pbuf-resident cache here, returning a pointer to the cache. Unreachable
-    ! through the guarded cldbrne_num_ptr accessor; retained only to feed the
-    ! concrete get_states working-state pointers from the cache.
-
-    character(len=aero_name_len) :: bin_name, shortname
-    integer :: igroup, ibin, rc, nchr, ncol
-    real(r8) :: nmr(pcols,pver)
-
-    ncol = self%ncol()
-
-    call rad_aer_get_info_by_bin(self%list_idx_, bin_ndx, bin_name=bin_name)
-
-    nchr = len_trim(bin_name)-2
-    shortname = bin_name(:nchr)
-
-    call  carma_get_group_by_name(shortname, igroup, rc)
-
-    read(bin_name(nchr+1:),*) ibin
-
-    call rad_cnst_get_bin_num(self%list_idx_, bin_ndx, 'c', self%state, self%pbuf, num)
-
-    call carma_get_number_cld(self%pbuf, igroup, ibin,  ncol, pver, nmr, rc)
-
-    num(:ncol,:) = nmr(:ncol,:)
+    ! The CARMA number is derived (field_kind DERIVED) -- there is no
+    ! host-resident field to alias (the former pbuf cache was deleted, R1).
+    ! Unreachable through the guarded cldbrne_num_ptr accessor; use the
+    ! get_cldbrne_num fill getter, which dispatches to derive_cldbrne_num.
+    call endrun('carma_aerosol_state alias_cldbrne_num: no host-resident number field for CARMA aerosols')
 
   end subroutine alias_cldbrne_num
 
@@ -323,29 +282,6 @@ contains
     num(:ncol,:) = nmr(:ncol,:)
 
   end subroutine derive_cldbrne_num
-
-  !------------------------------------------------------------------------------
-  ! returns interstitial and cloud-borne aerosol states
-  !------------------------------------------------------------------------------
-  subroutine get_states( self, raer, qqcw )
-    class(carma_aerosol_state), intent(in) :: self
-    type(ptr2d_t), intent(out) :: raer(:)
-    type(ptr2d_t), intent(out) :: qqcw(:)
-
-    integer :: ibin,ispc, indx
-
-    do ibin = 1, self%props_%nbins()
-       indx = self%props_%indexer(ibin, 0)
-       call self%alias_ambient_num(ibin, raer(indx)%fld)
-       call self%alias_cldbrne_num(ibin, qqcw(indx)%fld)
-       do ispc = 1, self%props_%nspecies(ibin)
-          indx = self%props_%indexer(ibin, ispc)
-          call self%alias_ambient_mmr(species_ndx=ispc, bin_ndx=ibin, mmr=raer(indx)%fld)
-          call self%alias_cldbrne_mmr(species_ndx=ispc, bin_ndx=ibin, mmr=qqcw(indx)%fld)
-       end do
-    end do
-
-  end subroutine get_states
 
   !------------------------------------------------------------------------------
   ! return aerosol bin size weights for a given bin

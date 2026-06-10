@@ -4,6 +4,7 @@ module aerosol_state_mod
   use aerosol_properties_mod, only: AERO_FIELD_ADVECTED, AERO_FIELD_STORED
   use aerosol_properties_mod, only: AERO_FIELD_DERIVED, AERO_FIELD_ABSENT
   use aerosol_properties_mod, only: AERO_AMBIENT, AERO_CLDBRNE
+  use aerosol_properties_mod, only: aerocap_working_state_table
   use physconst, only: pi
   use cam_abortutils, only: endrun
 
@@ -63,7 +64,9 @@ module aerosol_state_mod
      ! per-model derivation hooks for DERIVED number fields
      procedure :: derive_ambient_num
      procedure :: derive_cldbrne_num
-     procedure(aero_get_states), deferred :: get_states
+     ! working-state table over all bins/species -- capability-guarded
+     ! (aerocap_working_state_table); replaces the deferred get_states
+     procedure :: get_working_state
      procedure(aero_update_bin), deferred :: update_bin
      procedure :: loadaer
      procedure(aero_icenuc_size_wght_arr), deferred :: icenuc_size_wght_arr
@@ -138,18 +141,6 @@ module aerosol_state_mod
        integer, intent(in) :: bin_ndx     ! bin index
        real(r8), pointer   :: num(:,:)    ! number densities (ncol,nlev)
      end subroutine aero_get_state_num
-
-     !------------------------------------------------------------------------
-     ! returns interstitial and cloud-borne aerosol states
-     !------------------------------------------------------------------------
-     subroutine aero_get_states( self, raer, qqcw )
-       import :: aerosol_state, ptr2d_t
-
-       class(aerosol_state), intent(in) :: self
-       type(ptr2d_t), intent(out) :: raer(:) ! state of interstitial aerosols
-       type(ptr2d_t), intent(out) :: qqcw(:) ! state of cloud-borne aerosols
-
-     end subroutine aero_get_states
 
      !------------------------------------------------------------------------------
      ! sets transported components
@@ -551,6 +542,72 @@ contains
 
     call endrun('aerosol_state derive_cldbrne_num: no derivation defined for this model')
   end subroutine derive_cldbrne_num
+
+  !------------------------------------------------------------------------------
+  ! returns the working-state table of interstitial and cloud-borne aerosol
+  ! fields over all bins and species, indexed by the species indexer.
+  ! Entries alias host storage for ADVECTED/STORED fields (writes persist per
+  ! the write contract: ADVECTED mutate via ptend only; STORED in-place by the
+  ! sole owner). DERIVED entries point into the caller-scoped scratch slabs
+  ! filled from the derivation hooks (writes are visible for the remainder of
+  ! the caller's use, then discarded).
+  !------------------------------------------------------------------------------
+  subroutine get_working_state(self, raer, qqcw, scratch)
+    class(aerosol_state), intent(in) :: self
+    type(ptr2d_t), intent(out) :: raer(:) ! working state of interstitial aerosols
+    type(ptr2d_t), intent(out) :: qqcw(:) ! working state of cloud-borne aerosols
+    real(r8), target, intent(inout) :: scratch(:,:,:) ! caller-owned backing for DERIVED
+                                                      ! entries; third extent >=
+                                                      ! props%num_derived_working_entries()
+
+    integer :: ibin, ispc, indx, islab
+
+    if (.not. self%props_%supports(aerocap_working_state_table)) then
+       call endrun('aerosol_state get_working_state: working-state table not supported'// &
+                   ' for this aerosol model -- use the fill getters per field_kind')
+    end if
+
+    islab = 0
+    do ibin = 1, self%props_%nbins()
+       indx = self%props_%indexer(ibin, 0)
+       select case (self%props_%field_kind(ibin, 0, AERO_AMBIENT))
+       case (AERO_FIELD_ADVECTED, AERO_FIELD_STORED)
+          call self%alias_ambient_num(ibin, raer(indx)%fld)
+       case (AERO_FIELD_DERIVED)
+          islab = islab + 1
+          call self%derive_ambient_num(ibin, scratch(:,:,islab))
+          raer(indx)%fld => scratch(:,:,islab)
+       case default
+          call endrun('aerosol_state get_working_state: unsupported ambient number entry')
+       end select
+       select case (self%props_%field_kind(ibin, 0, AERO_CLDBRNE))
+       case (AERO_FIELD_ADVECTED, AERO_FIELD_STORED)
+          call self%alias_cldbrne_num(ibin, qqcw(indx)%fld)
+       case (AERO_FIELD_DERIVED)
+          islab = islab + 1
+          call self%derive_cldbrne_num(ibin, scratch(:,:,islab))
+          qqcw(indx)%fld => scratch(:,:,islab)
+       case default
+          call endrun('aerosol_state get_working_state: unsupported cloud-borne number entry')
+       end select
+       do ispc = 1, self%props_%nspecies(ibin)
+          indx = self%props_%indexer(ibin, ispc)
+          select case (self%props_%field_kind(ibin, ispc, AERO_AMBIENT))
+          case (AERO_FIELD_ADVECTED, AERO_FIELD_STORED)
+             call self%alias_ambient_mmr(species_ndx=ispc, bin_ndx=ibin, mmr=raer(indx)%fld)
+          case default
+             call endrun('aerosol_state get_working_state: unsupported ambient mass entry')
+          end select
+          select case (self%props_%field_kind(ibin, ispc, AERO_CLDBRNE))
+          case (AERO_FIELD_ADVECTED, AERO_FIELD_STORED)
+             call self%alias_cldbrne_mmr(species_ndx=ispc, bin_ndx=ibin, mmr=qqcw(indx)%fld)
+          case default
+             call endrun('aerosol_state get_working_state: unsupported cloud-borne mass entry')
+          end select
+       end do
+    end do
+
+  end subroutine get_working_state
 
   !------------------------------------------------------------------------------
   ! returns aerosol number, volume concentrations, and bulk hygroscopicity
