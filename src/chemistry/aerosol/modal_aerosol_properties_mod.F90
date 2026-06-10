@@ -2,7 +2,7 @@ module modal_aerosol_properties_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
   use physconst, only: pi
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
-  use aerosol_properties_mod, only: field_kind_from_source, aerocap_working_state_table
+  use aerosol_properties_mod, only: field_kind_from_source, aero_has_working_state_table
   use aerosol_properties_mod, only: AERO_AMBIENT, AERO_CLDBRNE
   use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_mode_props, rad_aer_get_props
   use modal_aero_data, only: specmw_amode
@@ -995,10 +995,10 @@ contains
   !------------------------------------------------------------------------------
   logical function supports(self, capability)
     class(modal_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: capability ! aerocap_* constant
+    integer, intent(in) :: capability ! aero_has_* constant
 
     select case (capability)
-    case (aerocap_working_state_table)
+    case (aero_has_working_state_table)
        supports = .true.
     case default
        supports = .false.

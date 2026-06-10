@@ -2,7 +2,7 @@ module carma_aerosol_properties_mod
   use shr_kind_mod, only: r8 => shr_kind_r8
   use physconst, only: pi
   use aerosol_properties_mod, only: aerosol_properties, aero_name_len
-  use aerosol_properties_mod, only: field_kind_from_source, aerocap_working_state_table
+  use aerosol_properties_mod, only: field_kind_from_source, aero_has_working_state_table
   use aerosol_properties_mod, only: AERO_AMBIENT, AERO_CLDBRNE, AERO_FIELD_DERIVED
   use radiative_aerosol, only: rad_aer_get_info, rad_aer_get_bin_props_by_idx, &
                                rad_aer_get_info_by_bin, rad_aer_get_info_by_bin_spec, &
@@ -137,10 +137,13 @@ contains
        return
     end if
 
-    ! field kind table built from the parsed per-entry source data
-    ! ('A' advected constituent, 'N' pbuf-resident), with the model override
-    ! that CARMA bin numbers (both phases) are derived from bin mass via the
-    ! fixed bin radius (design doc R1) rather than read from host storage
+    ! field kind table built from the parsed per-entry source data:
+    !  A - advected constituent
+    !  N - pbuf (CAM), non-advected constituent (SIMA)
+    !
+    ! Special note for CARMA: Bin numbers for CARMA in both ambient and cloud-borne phases
+    ! are derived from bin mass via the fixed bin radius and not stored in the host model,
+    ! so it is a "derived" quantity.
     allocate(kinds(nbins,0:maxval(nspecies),AERO_AMBIENT:AERO_CLDBRNE),stat=ierr)
     if( ierr /= 0 ) then
        nullify(newobj)
@@ -820,10 +823,10 @@ contains
   !------------------------------------------------------------------------------
   logical function supports(self, capability)
     class(carma_aerosol_properties), intent(in) :: self
-    integer, intent(in) :: capability ! aerocap_* constant
+    integer, intent(in) :: capability ! aero_has_* constant
 
     select case (capability)
-    case (aerocap_working_state_table)
+    case (aero_has_working_state_table)
        supports = .true.
     case default
        supports = .false.

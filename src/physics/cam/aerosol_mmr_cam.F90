@@ -31,7 +31,6 @@ public :: rad_cnst_get_mam_mmr_idx
 public :: rad_cnst_get_mode_num
 public :: rad_cnst_get_mode_num_idx
 public :: rad_cnst_get_bin_mmr_by_idx
-public :: rad_cnst_get_bin_num_idx
 public :: rad_cnst_get_carma_mmr_idx
 public :: rad_cnst_get_bin_mmr
 public :: rad_aer_diag_init
@@ -173,8 +172,7 @@ subroutine resolve_bin_idx(bins)
    do m = 1, bins%nbins
 
       ! The (CARMA) bin number mixing ratios are DERIVED on demand from the bin
-      ! masses (field_kind classification) -- there is no host-resident field to
-      ! resolve (the former pbuf cache fields are no longer registered, R1).
+      ! masses (field_kind classification) and should not be resolved.
       bins%comps(m)%idx_num_a = -1
       bins%comps(m)%idx_num_c = -1
       if ( bins%comps(m)%source_mass_a /= 'NOTSET' .and. bins%comps(m)%camname_mass_a /= 'NOTSET' ) then
@@ -729,57 +727,6 @@ subroutine rad_cnst_get_mode_num_idx(mode_idx, cnst_idx)
    cnst_idx = modes%comps(m_idx)%idx_num_a
 
 end subroutine rad_cnst_get_mode_num_idx
-
-!================================================================================================
-
-subroutine rad_cnst_get_bin_num_idx(bin_idx, cnst_idx)
-
-   ! Return constituent index of bin number mixing ratio for the aerosol bin in
-   ! the climate list.
-
-   ! This is a special routine to allow direct access to information in the
-   ! constituent array inside physics parameterizations that have been passed,
-   ! and are operating over the entire constituent array.  The interstitial phase
-   ! is assumed since that's what is contained in the constituent array.
-
-   use cam_logfile,    only: iulog
-   use cam_abortutils, only: endrun
-   use radiative_aerosol_definitions, only: binlist_t, bins, sectional_aerosol_list
-
-   ! Arguments
-   integer,  intent(in)  :: bin_idx    ! bin index
-   integer,  intent(out) :: cnst_idx    ! constituent index
-
-   ! Local variables
-   integer :: b_idx
-   character(len=1) :: source
-   type(binlist_t), pointer :: slist
-   character(len=*), parameter :: subname = 'rad_cnst_get_bin_num_idx'
-   !-----------------------------------------------------------------------------
-
-   ! assume climate list
-   slist => sectional_aerosol_list(0)
-
-   ! Check for valid bin index
-   if (bin_idx < 1  .or.  bin_idx > slist%nbins) then
-      write(iulog,*) subname//': bin_idx= ', bin_idx, '  nbins= ', slist%nbins
-      call endrun(subname//': bin list index out of range')
-   end if
-
-   ! Get the index for the corresponding bin in the bin definition object
-   b_idx = slist%idx(bin_idx)
-
-   ! Check that source is 'A' which means the index is for the constituent array
-   source = bins%comps(b_idx)%source_num_a
-   if (source /= 'A') then
-      write(iulog,*) subname//': source= ', source
-      call endrun(subname//': requested bin number index not in constituent array')
-   end if
-
-   ! Return index in constituent array
-   cnst_idx = bins%comps(b_idx)%idx_num_a
-
-end subroutine rad_cnst_get_bin_num_idx
 
 !================================================================================================
 

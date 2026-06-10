@@ -4,7 +4,7 @@ module aerosol_state_mod
   use aerosol_properties_mod, only: AERO_FIELD_ADVECTED, AERO_FIELD_STORED
   use aerosol_properties_mod, only: AERO_FIELD_DERIVED, AERO_FIELD_ABSENT
   use aerosol_properties_mod, only: AERO_AMBIENT, AERO_CLDBRNE
-  use aerosol_properties_mod, only: aerocap_working_state_table
+  use aerosol_properties_mod, only: aero_has_working_state_table
   use physconst, only: pi
   use cam_abortutils, only: endrun
 
@@ -65,7 +65,7 @@ module aerosol_state_mod
      procedure :: derive_ambient_num
      procedure :: derive_cldbrne_num
      ! working-state table over all bins/species -- capability-guarded
-     ! (aerocap_working_state_table); replaces the deferred get_states
+     ! (aero_has_working_state_table); replaces the deferred get_states
      procedure :: get_working_state
      procedure(aero_update_bin), deferred :: update_bin
      procedure :: loadaer
@@ -546,11 +546,17 @@ contains
   !------------------------------------------------------------------------------
   ! returns the working-state table of interstitial and cloud-borne aerosol
   ! fields over all bins and species, indexed by the species indexer.
-  ! Entries alias host storage for ADVECTED/STORED fields (writes persist per
-  ! the write contract: ADVECTED mutate via ptend only; STORED in-place by the
-  ! sole owner). DERIVED entries point into the caller-scoped scratch slabs
-  ! filled from the derivation hooks (writes are visible for the remainder of
-  ! the caller's use, then discarded).
+  !
+  ! For ADVECTED or STORED (pbuf/non-advected) fields:
+  !   - returns pointer to host storage
+  !   - for writes: ADVECTED constituents are updated via ptend and never via pointer.
+  !                 STORED (pbuf/non-advected) are updated in-place via pointer.
+  ! For DERIVED fields:
+  !   - caller must allocate a slab target passed in here,
+  !     so derived fields are calculated and written into this caller-managed memory.
+  !   - the purpose of the caller-supplied scratch space is because the aerosol state
+  !     itself should not manage the lifecycle of memory for data that is derived
+  !     and discarded after the caller parameterization uses it.
   !------------------------------------------------------------------------------
   subroutine get_working_state(self, raer, qqcw, scratch)
     class(aerosol_state), intent(in) :: self
@@ -562,7 +568,7 @@ contains
 
     integer :: ibin, ispc, indx, islab
 
-    if (.not. self%props_%supports(aerocap_working_state_table)) then
+    if (.not. self%props_%supports(aero_has_working_state_table)) then
        call endrun('aerosol_state get_working_state: working-state table not supported'// &
                    ' for this aerosol model -- use the fill getters per field_kind')
     end if

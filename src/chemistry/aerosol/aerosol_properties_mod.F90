@@ -8,32 +8,41 @@ module aerosol_properties_mod
   public :: aerosol_properties
   public :: field_kind_from_source
 
-  ! Field kind classification (see design doc section 4.2). One per
-  ! (bin, species, phase) entry; species index 0 selects the bin number field.
+  ! Field kind classifications for each (bin, species, phase), where:
+  !   bin = aerosol bin or mode (MAM mode, CARMA bin, individual bulk aerosol for BAM)
+  !   species = index 0 is the "bin number" field, others are individual species
+  !             (e.g., 'sulfate', 'p-organic', 'dust')
+  !   phase = ambient, cloud-borne
+
+  ! ADVECTED: (e.g., MAM interstitial mmr and numbers, CARMA interstitial mmr)
+  !   Sourced from host constituent.
+  !   Read  via pointer or fill.
+  !   Write via physics tendencies for constituents.
   integer, public, parameter :: AERO_FIELD_ADVECTED = 1
-    ! Host constituent updated via the host tendency mechanism (ptend / CCPP
-    ! tendencies). Read: pointer getter legal. Mutate: tendencies ONLY.
+  ! STORED: (e.g., MAM qqcw)
+  !   Sourced from pbuf (CAM) or host non-advected constituent (SIMA).
+  !   Read  via pointer or fill.
+  !   Write via pointer only.
   integer, public, parameter :: AERO_FIELD_STORED   = 2
-    ! Host-resident but NOT updated via the tendency mechanism. CAM: pbuf fields
-    ! (MAM qqcw, ...). Read: pointer getter legal. Mutate: in place through the
-    ! pointer, sole-owner contract.
+  ! DERIVED: (e.g., BAM number concentrations; CARMA number concentrations)
+  !   Sourced by deriving on demand from other fields.
+  !   Read  via fill only, there is no pointer access.
+  !   Write to a derived quantity is meaningless.
   integer, public, parameter :: AERO_FIELD_DERIVED  = 3
-    ! Computed on demand from other fields (BAM number; CARMA number).
-    ! Read: fill getter ONLY. Mutation is meaningless and impossible by
-    ! construction (no pointer is ever returned).
+  ! ABSENT: (e.g., BAM cloud-borne phase)
+  !   This quantity is meaningless for this aerosol model.
   integer, public, parameter :: AERO_FIELD_ABSENT   = 4
-    ! Does not exist for this model (BAM cloud-borne). Consumers skip;
-    ! fill getters return zeros as a read convenience.
 
   ! phase selectors for field_kind
   integer, public, parameter :: AERO_AMBIENT = 1
   integer, public, parameter :: AERO_CLDBRNE = 2
 
-  ! Aerosol model capabilities -- arguments to supports() (design doc section
-  ! 4.7). A capability is declared by overriding supports(); the base class
+  ! Aerosol model capability query keys -- used as arguments to supports()
+  !
+  ! A capability is declared by overriding supports(); the base class
   ! returns .false. for everything. Further capabilities are added by the
   ! development phase that first guards on them.
-  integer, public, parameter :: aerocap_working_state_table = 1
+  integer, public, parameter :: aero_has_working_state_table = 1
     ! get_states-style working-state table over all bins/species is supported
 
   !> aerosol_properties defines the configuration of any aerosol package (using
@@ -592,12 +601,12 @@ contains
 
   !------------------------------------------------------------------------------
   ! returns TRUE if the aerosol model provides the given capability
-  ! (aerocap_* constant); models declare capabilities by overriding this --
+  ! (aero_has_* constant); models declare capabilities by overriding this --
   ! everything defaults to unsupported
   !------------------------------------------------------------------------------
   logical function supports(self, capability)
     class(aerosol_properties), intent(in) :: self
-    integer, intent(in) :: capability ! aerocap_* constant
+    integer, intent(in) :: capability ! aero_has_* constant
 
     supports = .false.
   end function supports

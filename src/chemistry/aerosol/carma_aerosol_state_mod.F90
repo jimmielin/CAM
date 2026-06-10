@@ -197,10 +197,8 @@ contains
     integer, intent(in) :: bin_ndx     ! bin index
     real(r8), pointer :: num(:,:)      ! number mixing ratios
 
-    ! The CARMA number is derived (field_kind DERIVED) -- there is no
-    ! host-resident field to alias (the former pbuf cache was deleted, R1).
-    ! Unreachable through the guarded ambient_num_ptr accessor; use the
-    ! get_ambient_num fill getter, which dispatches to derive_ambient_num.
+    ! Aerosol numbers for CARMA are derived and should be accessed using the
+    ! fill (non-pointer) get_ambient_num variant for derivation.
     call endrun('carma_aerosol_state alias_ambient_num: no host-resident number field for CARMA aerosols')
 
   end subroutine alias_ambient_num
@@ -213,10 +211,8 @@ contains
     integer, intent(in) :: bin_ndx     ! bin index
     real(r8), pointer :: num(:,:)      ! number mixing ratios
 
-    ! The CARMA number is derived (field_kind DERIVED) -- there is no
-    ! host-resident field to alias (the former pbuf cache was deleted, R1).
-    ! Unreachable through the guarded cldbrne_num_ptr accessor; use the
-    ! get_cldbrne_num fill getter, which dispatches to derive_cldbrne_num.
+    ! Aerosol numbers for CARMA are derived and should be accessed using the
+    ! fill (non-pointer) get_cldbrne_num variant for derivation.
     call endrun('carma_aerosol_state alias_cldbrne_num: no host-resident number field for CARMA aerosols')
 
   end subroutine alias_cldbrne_num

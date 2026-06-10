@@ -158,8 +158,8 @@ contains
        end if
     end do
 
-    ! R2 residual check (see design doc): for working-state-table models the
-    ! field_kind table must agree with the constituent-index logic it subsumes
+    ! Consistency check: the field_kind (advected/stored/derived) flags must
+    ! agree with the constituent index resolution.
     do ilist = 0, N_DIAG
        do iaermod = 1, num_aero_models_
           if (associated(aero_props_all(iaermod, ilist)%obj)) then
@@ -171,14 +171,12 @@ contains
   end subroutine aerosol_instances_init
 
   ! Init-time consistency check of the field_kind table for models that
-  ! support the working-state table (MAM, CARMA): an ambient entry must be
-  ! ADVECTED exactly when its interstitial constituent name resolves to a
-  ! constituent index -- the same lookup the convproc-style `ndx > 0` write
-  ! branches rely on -- and no such model may have a STORED ambient entry
-  ! (per investigation R2 there are none today; a STORED ambient entry would
-  ! have taken a different branch in the pre-field_kind logic).
+  ! support the working-state table (MAM, CARMA):
+  ! (1) an ambient entry must be ADVECTED exactly when its interstitial constituent
+  ! name resolves to a constituent index (updated via ptend)
+  ! (2) cloud-borne entries must never be ADVECTED (updated in-place via pointer)
   subroutine check_field_kinds(props)
-    use aerosol_properties_mod, only: aero_name_len, aerocap_working_state_table
+    use aerosol_properties_mod, only: aero_name_len, aero_has_working_state_table
     use aerosol_properties_mod, only: AERO_FIELD_ADVECTED, AERO_FIELD_STORED
     use aerosol_properties_mod, only: AERO_AMBIENT, AERO_CLDBRNE
     use constituents,   only: cnst_get_ind
@@ -190,7 +188,7 @@ contains
     integer :: m, l, ndx
     character(len=*), parameter :: subname = 'aerosol_instances_init: '
 
-    if (.not. props%supports(aerocap_working_state_table)) return
+    if (.not. props%supports(aero_has_working_state_table)) return
 
     do m = 1, props%nbins()
        do l = 0, props%nspecies(m)
