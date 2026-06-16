@@ -15,9 +15,8 @@
 
    use ccpp_kinds,              only: kind_phys
    use wv_saturation,           only: qsat_water, findsp_vc
-   use cldfrc2m,                only: astG_PDF_single, astG_PDF, astG_RHU_single, &
-                                      astG_RHU, aist_single, aist_vector,         &
-                                      rhmini_const, rhmaxi_const
+   use compute_cloud_fraction_two_moment, only: astG_PDF_single, astG_PDF, astG_RHU_single, &
+                                                astG_RHU, aist_single, aist_vector
    use ccpp_constituent_prop_mod, only: ccpp_constituent_prop_ptr_t
    use ccpp_const_utils,          only: ccpp_const_get_idx
 
@@ -75,6 +74,8 @@
    real(kind_phys), private    :: rhminl_const              ! Critical RH for low-level  liquid stratus clouds
    real(kind_phys), private    :: rhminl_adj_land_const     ! rhminl adjustment for snowfree land
    real(kind_phys), private    :: rhminh_const              ! Critical RH for high-level liquid stratus clouds
+   real(kind_phys), private    :: rhmini_const              ! Minimum RH for ice cloud fraction > 0
+   real(kind_phys), private    :: rhmaxi_const              ! Maximum RH for ice cloud fraction
    real(kind_phys), private    :: premit                    ! Top    height for mid-level liquid stratus fraction
    real(kind_phys), private    :: premib                    ! Bottom height for mid-level liquid stratus fraction
 
@@ -104,7 +105,8 @@
    ! -------------- !
 
    subroutine park_macrophysics_init(rhminl_opt_in, rhmini_opt_in, &
-        rhminl_in, rhminl_adj_land_in, rhminh_in, premit_in, premib_in, &
+        rhminl_in, rhminl_adj_land_in, rhminh_in, rhmini_in, rhmaxi_in, &
+        premit_in, premib_in, &
         iulog_in, masterproc_in, errmsg, errflg)
 
    !--------------------------------------------------------------------- !
@@ -120,6 +122,8 @@
    real(kind_phys), intent(in) :: rhminl_in
    real(kind_phys), intent(in) :: rhminl_adj_land_in
    real(kind_phys), intent(in) :: rhminh_in
+   real(kind_phys), intent(in) :: rhmini_in
+   real(kind_phys), intent(in) :: rhmaxi_in
    real(kind_phys), intent(in) :: premit_in
    real(kind_phys), intent(in) :: premib_in
    integer,  intent(in) :: iulog_in
@@ -136,6 +140,8 @@
    rhminl_const          = rhminl_in
    rhminl_adj_land_const = rhminl_adj_land_in
    rhminh_const          = rhminh_in
+   rhmini_const          = rhmini_in
+   rhmaxi_const          = rhmaxi_in
    premit                = premit_in
    premib                = premib_in
 
@@ -146,6 +152,8 @@
        write(iulog,*) '  rhminl          = ', rhminl_const
        write(iulog,*) '  rhminl_adj_land = ', rhminl_adj_land_const
        write(iulog,*) '  rhminh          = ', rhminh_const
+       write(iulog,*) '  rhmini          = ', rhmini_const
+       write(iulog,*) '  rhmaxi          = ', rhmaxi_const
        write(iulog,*) '  premit          = ', premit
        write(iulog,*) '  premib          = ', premib
        write(iulog,*) '  i_rhminl        = ', i_rhminl
@@ -1148,15 +1156,29 @@
          U(i,k)    =  qv(i,k)/qsat_b(i)
          U_nc(i,k) =  U(i,k)
       enddo
+      !REMOVECAM: this is no longer needed when CAM is retired and pcols no longer exists
+      al_st_nc(:,k) = 0._kind_phys
+      G_nc(:,k)     = 0._kind_phys
+      !REMOVECAM_END
       if( CAMstfrac ) then
-          call astG_RHU(U_nc(:,k),pmid(:,k),qv(:,k),landfrac(:),snowh(:),al_st_nc(:,k),G_nc(:,k),ncol,&
-                        rhminl_arr(:,k), rhminl_adj_land_arr(:,k), rhminh_arr(:,k))
+          call astG_RHU(U_nc(:ncol,k),pmid(:ncol,k),qv(:ncol,k),landfrac(:ncol),snowh(:ncol), &
+                        al_st_nc(:ncol,k),G_nc(:ncol,k),ncol, &
+                        rhminl_in=rhminl_arr(:ncol,k), rhminl_adj_land_in=rhminl_adj_land_arr(:ncol,k), &
+                        rhminh_in=rhminh_arr(:ncol,k))
       else
-          call astG_PDF(U_nc(:,k),pmid(:,k),qv(:,k),landfrac(:),snowh(:),al_st_nc(:,k),G_nc(:,k),ncol,&
-                        rhminl_arr(:,k), rhminl_adj_land_arr(:,k), rhminh_arr(:,k))
+          call astG_PDF(U_nc(:ncol,k),pmid(:ncol,k),qv(:ncol,k),landfrac(:ncol),snowh(:ncol), &
+                        al_st_nc(:ncol,k),G_nc(:ncol,k),ncol, &
+                        rhminl_in=rhminl_arr(:ncol,k), rhminl_adj_land_in=rhminl_adj_land_arr(:ncol,k), &
+                        rhminh_in=rhminh_arr(:ncol,k))
       endif
-      call aist_vector(qv(:,k),T_loc(:,k),pmid(:,k),qi_mm(:,k),ni(:,k),landfrac(:),snowh(:),ai_st_nc(:,k),ncol,&
-                       rhmaxi_arr(:,k), rhmini_arr(:,k), rhminl_arr(:,k), rhminl_adj_land_arr(:,k), rhminh_arr(:,k))
+      !REMOVECAM: this is no longer needed when CAM is retired and pcols no longer exists
+      ai_st_nc(:,k) = 0._kind_phys
+      !REMOVECAM_END
+      call aist_vector(qv(:ncol,k),T_loc(:ncol,k),pmid(:ncol,k),qi_mm(:ncol,k),ni(:ncol,k), &
+                       landfrac(:ncol),snowh(:ncol),ai_st_nc(:ncol,k),ncol, &
+                       rhmaxi_in=rhmaxi_arr(:ncol,k), rhmini_in=rhmini_arr(:ncol,k), &
+                       rhminl_in=rhminl_arr(:ncol,k), rhminl_adj_land_in=rhminl_adj_land_arr(:ncol,k), &
+                       rhminh_in=rhminh_arr(:ncol,k))
 
       ai_st(:ncol,k)  =  (1._kind_phys-a_cu(:ncol,k))*ai_st_nc(:ncol,k)
       al_st(:ncol,k)  =  (1._kind_phys-a_cu(:ncol,k))*al_st_nc(:ncol,k)
@@ -1662,15 +1684,25 @@
 
    call qsat_water(T0_in(1:ncol), p_in(1:ncol), esat_in(1:ncol), qsat_in(1:ncol), ncol)
    U0_in(:ncol) = qv0_in(:ncol)/qsat_in(:ncol)
+   al0_st_nc_in(:) = 0._kind_phys
+   G0_nc_in(:)     = 0._kind_phys
    if( CAMstfrac ) then
-       call astG_RHU(U0_in(:),p_in(:),qv0_in(:),landfrac(:),snowh(:),al0_st_nc_in(:),G0_nc_in(:),ncol,&
-                     rhminl_in(:), rhminl_adj_land_in(:), rhminh_in(:))
+       call astG_RHU(U0_in(:ncol),p_in(:ncol),qv0_in(:ncol),landfrac(:ncol),snowh(:ncol), &
+                     al0_st_nc_in(:ncol),G0_nc_in(:ncol),ncol, &
+                     rhminl_in=rhminl_in(:ncol), rhminl_adj_land_in=rhminl_adj_land_in(:ncol), &
+                     rhminh_in=rhminh_in(:ncol))
    else
-       call astG_PDF(U0_in(:),p_in(:),qv0_in(:),landfrac(:),snowh(:),al0_st_nc_in(:),G0_nc_in(:),ncol,&
-                     rhminl_in(:), rhminl_adj_land_in(:), rhminh_in(:))
+       call astG_PDF(U0_in(:ncol),p_in(:ncol),qv0_in(:ncol),landfrac(:ncol),snowh(:ncol), &
+                     al0_st_nc_in(:ncol),G0_nc_in(:ncol),ncol, &
+                     rhminl_in=rhminl_in(:ncol), rhminl_adj_land_in=rhminl_adj_land_in(:ncol), &
+                     rhminh_in=rhminh_in(:ncol))
    endif
-   call aist_vector(qv0_in(:),T0_in(:),p_in(:),qi0_in(:),ni0_in(:),landfrac(:),snowh(:),ai0_st_nc_in(:),ncol,&
-                    rhmaxi_in(:), rhmini_in(:), rhminl_in(:), rhminl_adj_land_in(:), rhminh_in(:))
+   ai0_st_nc_in(:) = 0._kind_phys
+   call aist_vector(qv0_in(:ncol),T0_in(:ncol),p_in(:ncol),qi0_in(:ncol),ni0_in(:ncol), &
+                    landfrac(:ncol),snowh(:ncol),ai0_st_nc_in(:ncol),ncol, &
+                    rhmaxi_in=rhmaxi_in(:ncol), rhmini_in=rhmini_in(:ncol), &
+                    rhminl_in=rhminl_in(:ncol), rhminl_adj_land_in=rhminl_adj_land_in(:ncol), &
+                    rhminh_in=rhminh_in(:ncol))
 
    do i = 1, ncol
 
@@ -1725,13 +1757,14 @@
           U0_nc   =  U0
           if( CAMstfrac ) then
               call astG_RHU_single(U0_nc, p, qv0, landfrac(i), snowh(i), al0_st_nc, G0_nc, &
-                 rhminl_in=rhminl, rhminl_adj_land_in=rhminl_adj_land, rhminh_in=rhminh)
+                 rhminl=rhminl, rhminl_adj_land=rhminl_adj_land, rhminh=rhminh)
           else
               call astG_PDF_single(U0_nc, p, qv0, landfrac(i), snowh(i), al0_st_nc, G0_nc, &
-                 rhminl_in=rhminl, rhminl_adj_land_in=rhminl_adj_land, rhminh_in=rhminh)
+                 rhminl=rhminl, rhminl_adj_land=rhminl_adj_land, rhminh=rhminh)
           endif
           call aist_single(qv0,T0,p,qi0,landfrac(i),snowh(i),ai0_st_nc,&
-                           rhmaxi, rhmini, rhminl, rhminl_adj_land, rhminh)
+                           rhmaxi=rhmaxi, rhmini=rhmini, rhminl=rhminl, &
+                           rhminl_adj_land=rhminl_adj_land, rhminh=rhminh)
           ai0_st  = (1._kind_phys-a_dc-a_sc)*ai0_st_nc
           al0_st  = (1._kind_phys-a_dc-a_sc)*al0_st_nc
           idxmod  = 1
@@ -1781,10 +1814,10 @@
              U_nc = U
              if( CAMstfrac ) then
                  call astG_RHU_single(U_nc, p, qv, landfrac(i), snowh(i), al_st_nc, G_nc, &
-                    rhminl_in=rhminl, rhminl_adj_land_in=rhminl_adj_land, rhminh_in=rhminh)
+                    rhminl=rhminl, rhminl_adj_land=rhminl_adj_land, rhminh=rhminh)
              else
                  call astG_PDF_single(U_nc, p, qv, landfrac(i), snowh(i), al_st_nc, G_nc, &
-                    rhminl_in=rhminl, rhminl_adj_land_in=rhminl_adj_land, rhminh_in=rhminh)
+                    rhminl=rhminl, rhminl_adj_land=rhminl_adj_land, rhminh=rhminh)
              endif
              al_st = (1._kind_phys-a_dc-a_sc)*al_st_nc
              caseid = 0
@@ -1896,17 +1929,18 @@
 
      if( idxmod .eq. 1 ) then
          call aist_single(qv,T,p,qi,landfrac(i),snowh(i),ai_st_nc,&
-                          rhmaxi, rhmini, rhminl, rhminl_adj_land, rhminh)
+                          rhmaxi=rhmaxi, rhmini=rhmini, rhminl=rhminl, &
+                          rhminl_adj_land=rhminl_adj_land, rhminh=rhminh)
          ai_st = (1._kind_phys-a_dc-a_sc)*ai_st_nc
          call qsat_water(T, p, es, qs)
          U     = (qv/qs)
          U_nc  =  U
          if( CAMstfrac ) then
              call astG_RHU_single(U_nc, p, qv, landfrac(i), snowh(i), al_st_nc, G_nc, &
-                rhminl_in=rhminl, rhminl_adj_land_in=rhminl_adj_land, rhminh_in=rhminh)
+                rhminl=rhminl, rhminl_adj_land=rhminl_adj_land, rhminh=rhminh)
          else
              call astG_PDF_single(U_nc, p, qv, landfrac(i), snowh(i), al_st_nc, G_nc, &
-                rhminl_in=rhminl, rhminl_adj_land_in=rhminl_adj_land, rhminh_in=rhminh)
+                rhminl=rhminl, rhminl_adj_land=rhminl_adj_land, rhminh=rhminh)
          endif
          al_st = (1._kind_phys-a_dc-a_sc)*al_st_nc
      else
@@ -2214,10 +2248,10 @@
    U_nc   =   U
    if( CAMstfrac ) then
        call astG_RHU_single(U_nc, p, qv, landfrac, snowh, al_st_nc, G_nc, &
-          rhminl_in=rhminl, rhminl_adj_land_in=rhminl_adj_land, rhminh_in=rhminh)
+          rhminl=rhminl, rhminl_adj_land=rhminl_adj_land, rhminh=rhminh)
    else
        call astG_PDF_single(U_nc, p, qv, landfrac, snowh, al_st_nc, G_nc, &
-          rhminl_in=rhminl, rhminl_adj_land_in=rhminl_adj_land, rhminh_in=rhminh)
+          rhminl=rhminl, rhminl_adj_land=rhminl_adj_land, rhminh=rhminh)
    endif
    al_st   =  (1._kind_phys-a_dc-a_sc)*al_st_nc
    dUdt    = -(alpha*dqcncdt+beta)

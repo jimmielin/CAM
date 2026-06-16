@@ -198,6 +198,7 @@ end subroutine macrop_driver_readnl
     use cam_history,     only: addfld, add_default
     use convect_shallow, only: convect_shallow_use_shfrc
     use cloud_fraction,  only: cldfrc_getparams
+    use cldfrc2m,        only: rhmini_const, rhmaxi_const
 
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
@@ -227,6 +228,8 @@ end subroutine macrop_driver_readnl
          rhminl_in          = rhminl_val, &
          rhminl_adj_land_in = rhminl_adj_land_val, &
          rhminh_in          = rhminh_val, &
+         rhmini_in          = rhmini_const, &
+         rhmaxi_in          = rhmaxi_const, &
          premit_in          = premit_val, &
          premib_in          = premib_val, &
          iulog_in           = iulog, &
