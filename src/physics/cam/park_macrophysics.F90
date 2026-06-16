@@ -435,107 +435,98 @@ contains
 
     ! Thermodynamic state variables
 
-    real(kind_phys) T_loc(ncol, pver)                        ! Temperature of equilibrium reference state
-    ! from which 'Micro & Macro' are computed [K]
-    real(kind_phys) T1(ncol, pver)                           ! Temperature after 'fice_force' on T01
-    real(kind_phys) T_0(ncol, pver)                          ! Temperature after 'instratus_condensate' on T1
-    real(kind_phys) T_05(ncol, pver)                         ! Temperature after 'advection' on T_0
-    real(kind_phys) T_prime0(ncol, pver)                     ! Temperature after 'Macrophysics (QQ)' on T_05star
-    real(kind_phys) T_dprime(ncol, pver)                     ! Temperature after 'fice_force' on T_prime
-    real(kind_phys) T_star(ncol, pver)                       ! Temperature after 'instratus_condensate' on T_dprime
+    real(kind_phys) :: T_loc(ncol, pver)                        ! Temperature of equilibrium reference state from which 'Micro & Macro' are computed [K]
+    real(kind_phys) :: T1(ncol, pver)                           ! Temperature after 'fice_force' on T01
+    real(kind_phys) :: T_0(ncol, pver)                          ! Temperature after 'instratus_condensate' on T1
+    real(kind_phys) :: T_05(ncol, pver)                         ! Temperature after 'advection' on T_0
+    real(kind_phys) :: T_prime0(ncol, pver)                     ! Temperature after 'Macrophysics (QQ)' on T_05star
+    real(kind_phys) :: T_dprime(ncol, pver)                     ! Temperature after 'fice_force' on T_prime
+    real(kind_phys) :: T_star(ncol, pver)                       ! Temperature after 'instratus_condensate' on T_dprime
 
-    real(kind_phys) qv(ncol, pver)                           ! Grid-mean qv of equilibrium reference state from which
-    ! 'Micro & Macro' are computed [kg kg-1]
-    real(kind_phys) qv1(ncol, pver)                          ! Grid-mean qv after 'fice_force' on qv01
-    real(kind_phys) qv_0(ncol, pver)                         ! Grid-mean qv after 'instratus_condensate' on qv1
-    real(kind_phys) qv_05(ncol, pver)                        ! Grid-mean qv after 'advection' on qv_0
-    real(kind_phys) qv_prime0(ncol, pver)                    ! Grid-mean qv after 'Macrophysics (QQ)' on qv_05star
-    real(kind_phys) qv_dprime(ncol, pver)                    ! Grid-mean qv after 'fice_force' on qv_prime
-    real(kind_phys) qv_star(ncol, pver)                      ! Grid-mean qv after 'instratus_condensate' on qv_dprime
+    real(kind_phys) :: qv(ncol, pver)                           ! Grid-mean qv of equilibrium reference state from which 'Micro & Macro' are computed [kg kg-1]
+    real(kind_phys) :: qv1(ncol, pver)                          ! Grid-mean qv after 'fice_force' on qv01
+    real(kind_phys) :: qv_0(ncol, pver)                         ! Grid-mean qv after 'instratus_condensate' on qv1
+    real(kind_phys) :: qv_05(ncol, pver)                        ! Grid-mean qv after 'advection' on qv_0
+    real(kind_phys) :: qv_prime0(ncol, pver)                    ! Grid-mean qv after 'Macrophysics (QQ)' on qv_05star
+    real(kind_phys) :: qv_dprime(ncol, pver)                    ! Grid-mean qv after 'fice_force' on qv_prime
+    real(kind_phys) :: qv_star(ncol, pver)                      ! Grid-mean qv after 'instratus_condensate' on qv_dprime
 
-    real(kind_phys) ql(ncol, pver)                           ! Grid-mean ql of equilibrium reference state from which
-    ! 'Micro & Macro' are computed [kg kg-1]
-    real(kind_phys) ql1(ncol, pver)                          ! Grid-mean ql after 'fice_force' on ql01
-    real(kind_phys) ql_0(ncol, pver)                         ! Grid-mean ql after 'instratus_condensate' on ql1
-    real(kind_phys) ql_05(ncol, pver)                        ! Grid-mean ql after 'advection' on ql_0
-    real(kind_phys) ql_prime0(ncol, pver)                    ! Grid-mean ql after 'Macrophysics (QQ)' on ql_05star
-    real(kind_phys) ql_dprime(ncol, pver)                    ! Grid-mean ql after 'fice_force' on ql_prime
-    real(kind_phys) ql_star(ncol, pver)                      ! Grid-mean ql after 'instratus_condensate' on ql_dprime
+    real(kind_phys) :: ql(ncol, pver)                           ! Grid-mean ql of equilibrium reference state from which 'Micro & Macro' are computed [kg kg-1]
+    real(kind_phys) :: ql1(ncol, pver)                          ! Grid-mean ql after 'fice_force' on ql01
+    real(kind_phys) :: ql_0(ncol, pver)                         ! Grid-mean ql after 'instratus_condensate' on ql1
+    real(kind_phys) :: ql_05(ncol, pver)                        ! Grid-mean ql after 'advection' on ql_0
+    real(kind_phys) :: ql_prime0(ncol, pver)                    ! Grid-mean ql after 'Macrophysics (QQ)' on ql_05star
+    real(kind_phys) :: ql_dprime(ncol, pver)                    ! Grid-mean ql after 'fice_force' on ql_prime
+    real(kind_phys) :: ql_star(ncol, pver)                      ! Grid-mean ql after 'instratus_condensate' on ql_dprime
 
-    real(kind_phys) qi_mm(ncol, pver)                        ! Grid-mean qi of equilibrium reference state from which
-    ! 'Micro & Macro' are computed [kg kg-1]
-    real(kind_phys) qi1(ncol, pver)                          ! Grid-mean qi after 'fice_force' on qi01
-    real(kind_phys) qi_0(ncol, pver)                         ! Grid-mean qi after 'instratus_condensate' on qi1
-    real(kind_phys) qi_05(ncol, pver)                        ! Grid-mean qi after 'advection' on qi_0
-    real(kind_phys) qi_prime0(ncol, pver)                    ! Grid-mean qi after 'Macrophysics (QQ)' on qi_05star
-    real(kind_phys) qi_dprime(ncol, pver)                    ! Grid-mean qi after 'fice_force' on qi_prime
-    real(kind_phys) qi_star(ncol, pver)                      ! Grid-mean qi after 'instratus_condensate' on qi_dprime
+    real(kind_phys) :: qi_mm(ncol, pver)                        ! Grid-mean qi of equilibrium reference state from which 'Micro & Macro' are computed [kg kg-1]
+    real(kind_phys) :: qi1(ncol, pver)                          ! Grid-mean qi after 'fice_force' on qi01
+    real(kind_phys) :: qi_0(ncol, pver)                         ! Grid-mean qi after 'instratus_condensate' on qi1
+    real(kind_phys) :: qi_05(ncol, pver)                        ! Grid-mean qi after 'advection' on qi_0
+    real(kind_phys) :: qi_prime0(ncol, pver)                    ! Grid-mean qi after 'Macrophysics (QQ)' on qi_05star
+    real(kind_phys) :: qi_dprime(ncol, pver)                    ! Grid-mean qi after 'fice_force' on qi_prime
+    real(kind_phys) :: qi_star(ncol, pver)                      ! Grid-mean qi after 'instratus_condensate' on qi_dprime
 
-    real(kind_phys) nl(ncol, pver)                           ! Grid-mean nl of equilibrium reference state from which
-    ! 'Micro & Macro' are computed [kg kg-1]
-    real(kind_phys) nl1(ncol, pver)                          ! Grid-mean nl after 'fice_force' on nl01
-    real(kind_phys) nl_0(ncol, pver)                         ! Grid-mean nl after 'instratus_condensate' on nl1
-    real(kind_phys) nl_05(ncol, pver)                        ! Grid-mean nl after 'advection' on nl_0
-    real(kind_phys) nl_prime0(ncol, pver)                    ! Grid-mean nl after 'Macrophysics (QQ)' on nl_05star
-    real(kind_phys) nl_dprime(ncol, pver)                    ! Grid-mean nl after 'fice_force' on nl_prime
-    real(kind_phys) nl_star(ncol, pver)                      ! Grid-mean nl after 'instratus_condensate' on nl_dprime
+    real(kind_phys) :: nl(ncol, pver)                           ! Grid-mean nl of equilibrium reference state from which 'Micro & Macro' are computed [kg kg-1]
+    real(kind_phys) :: nl1(ncol, pver)                          ! Grid-mean nl after 'fice_force' on nl01
+    real(kind_phys) :: nl_0(ncol, pver)                         ! Grid-mean nl after 'instratus_condensate' on nl1
+    real(kind_phys) :: nl_05(ncol, pver)                        ! Grid-mean nl after 'advection' on nl_0
+    real(kind_phys) :: nl_prime0(ncol, pver)                    ! Grid-mean nl after 'Macrophysics (QQ)' on nl_05star
+    real(kind_phys) :: nl_dprime(ncol, pver)                    ! Grid-mean nl after 'fice_force' on nl_prime
+    real(kind_phys) :: nl_star(ncol, pver)                      ! Grid-mean nl after 'instratus_condensate' on nl_dprime
 
-    real(kind_phys) ni(ncol, pver)                           ! Grid-mean ni of equilibrium reference state from which
-    ! 'Micro & Macro' are computed [kg kg-1]
-    real(kind_phys) ni1(ncol, pver)                          ! Grid-mean ni after 'fice_force' on ni01
-    real(kind_phys) ni_0(ncol, pver)                         ! Grid-mean ni after 'instratus_condensate' on ni1
-    real(kind_phys) ni_05(ncol, pver)                        ! Grid-mean ni after 'advection' on ni_0
-    real(kind_phys) ni_prime0(ncol, pver)                    ! Grid-mean ni after 'Macrophysics (QQ)' on ni_05star
-    real(kind_phys) ni_dprime(ncol, pver)                    ! Grid-mean ni after 'fice_force' on ni_prime
-    real(kind_phys) ni_star(ncol, pver)                      ! Grid-mean ni after 'instratus_condensate' on ni_dprime
+    real(kind_phys) :: ni(ncol, pver)                           ! Grid-mean ni of equilibrium reference state from which 'Micro & Macro' are computed [kg kg-1]
+    real(kind_phys) :: ni1(ncol, pver)                          ! Grid-mean ni after 'fice_force' on ni01
+    real(kind_phys) :: ni_0(ncol, pver)                         ! Grid-mean ni after 'instratus_condensate' on ni1
+    real(kind_phys) :: ni_05(ncol, pver)                        ! Grid-mean ni after 'advection' on ni_0
+    real(kind_phys) :: ni_prime0(ncol, pver)                    ! Grid-mean ni after 'Macrophysics (QQ)' on ni_05star
+    real(kind_phys) :: ni_dprime(ncol, pver)                    ! Grid-mean ni after 'fice_force' on ni_prime
+    real(kind_phys) :: ni_star(ncol, pver)                      ! Grid-mean ni after 'instratus_condensate' on ni_dprime
 
-    real(kind_phys) a_st_0(ncol, pver)                       ! Stratus fraction at '_0' state
-    real(kind_phys) a_st_star(ncol, pver)                    ! Stratus fraction at '_star' state
+    real(kind_phys) :: a_st_0(ncol, pver)                       ! Stratus fraction at '_0' state
+    real(kind_phys) :: a_st_star(ncol, pver)                    ! Stratus fraction at '_star' state
 
-    real(kind_phys) al_st(ncol, pver)                        ! Liquid stratus fraction of equilibrium reference state
-    real(kind_phys) al_st_0(ncol, pver)                      ! Liquid stratus fraction at '_0' state
-    real(kind_phys) al_st_nc(ncol, pver)                     ! Non-physical liquid stratus fraction in the non-cumulus pixels
+    real(kind_phys) :: al_st(ncol, pver)                        ! Liquid stratus fraction of equilibrium reference state
+    real(kind_phys) :: al_st_0(ncol, pver)                      ! Liquid stratus fraction at '_0' state
+    real(kind_phys) :: al_st_nc(ncol, pver)                     ! Non-physical liquid stratus fraction in the non-cumulus pixels
 
-    real(kind_phys) ai_st(ncol, pver)                        ! Ice stratus fraction of equilibrium reference state
-    real(kind_phys) ai_st_0(ncol, pver)                      ! Ice stratus fraction at '_0' state
-    real(kind_phys) ai_st_nc(ncol, pver)                     ! Non-physical ice stratus fraction in the non-cumulus pixels
+    real(kind_phys) :: ai_st(ncol, pver)                        ! Ice stratus fraction of equilibrium reference state
+    real(kind_phys) :: ai_st_0(ncol, pver)                      ! Ice stratus fraction at '_0' state
+    real(kind_phys) :: ai_st_nc(ncol, pver)                     ! Non-physical ice stratus fraction in the non-cumulus pixels
 
-    real(kind_phys) ql_st(ncol, pver)                        ! In-stratus LWC of equilibrium reference state [kg kg-1]
-    real(kind_phys) ql_st_0(ncol, pver)                      ! In-stratus LWC at '_0' state
+    real(kind_phys) :: ql_st(ncol, pver)                        ! In-stratus LWC of equilibrium reference state [kg kg-1]
+    real(kind_phys) :: ql_st_0(ncol, pver)                      ! In-stratus LWC at '_0' state
 
-    real(kind_phys) qi_st(ncol, pver)                        ! In-stratus IWC of equilibrium reference state [kg kg-1]
-    real(kind_phys) qi_st_0(ncol, pver)                      ! In-stratus IWC at '_0' state
+    real(kind_phys) :: qi_st(ncol, pver)                        ! In-stratus IWC of equilibrium reference state [kg kg-1]
+    real(kind_phys) :: qi_st_0(ncol, pver)                      ! In-stratus IWC at '_0' state
 
     ! Cumulus properties
-
-    real(kind_phys) dacudt(ncol, pver)
-    real(kind_phys) a_cu(ncol, pver)
+    real(kind_phys) :: dacudt(ncol, pver)
+    real(kind_phys) :: a_cu(ncol, pver)
 
     ! Adjustment tendency in association with 'positive_moisture'
+    real(kind_phys) :: Tten_pwi1(ncol, pver)                    ! Pre-process T  tendency of input equilibrium state [K/s]
+    real(kind_phys) :: qvten_pwi1(ncol, pver)                   ! Pre-process qv tendency of input equilibrium state [kg kg-1/s]
+    real(kind_phys) :: qlten_pwi1(ncol, pver)                   ! Pre-process ql tendency of input equilibrium state [kg kg-1/s]
+    real(kind_phys) :: qiten_pwi1(ncol, pver)                   ! Pre-process qi tendency of input equilibrium state [kg kg-1/s]
+    real(kind_phys) :: nlten_pwi1(ncol, pver)                   ! Pre-process nl tendency of input equilibrium state [#/kg/s]
+    real(kind_phys) :: niten_pwi1(ncol, pver)                   ! Pre-process ni tendency of input equilibrium state [#/kg/s]
 
-    real(kind_phys) Tten_pwi1(ncol, pver)                    ! Pre-process T  tendency of input equilibrium state [K/s]
-    real(kind_phys) qvten_pwi1(ncol, pver)                   ! Pre-process qv tendency of input equilibrium state [kg kg-1/s]
-    real(kind_phys) qlten_pwi1(ncol, pver)                   ! Pre-process ql tendency of input equilibrium state [kg kg-1/s]
-    real(kind_phys) qiten_pwi1(ncol, pver)                   ! Pre-process qi tendency of input equilibrium state [kg kg-1/s]
-    real(kind_phys) nlten_pwi1(ncol, pver)                   ! Pre-process nl tendency of input equilibrium state [#/kg/s]
-    real(kind_phys) niten_pwi1(ncol, pver)                   ! Pre-process ni tendency of input equilibrium state [#/kg/s]
+    real(kind_phys) :: Tten_pwi2(ncol, pver)                    ! Post-process T  tendency of provisional equilibrium state [K/s]
+    real(kind_phys) :: qvten_pwi2(ncol, pver)                   ! Post-process qv tendency of provisional equilibrium state [kg kg-1/s]
+    real(kind_phys) :: qlten_pwi2(ncol, pver)                   ! Post-process ql tendency of provisional equilibrium state [kg kg-1/s]
+    real(kind_phys) :: qiten_pwi2(ncol, pver)                   ! Post-process qi tendency of provisional equilibrium state [kg kg-1/s]
+    real(kind_phys) :: nlten_pwi2(ncol, pver)                   ! Post-process nl tendency of provisoonal equilibrium state [#/kg/s]
+    real(kind_phys) :: niten_pwi2(ncol, pver)                   ! Post-process ni tendency of provisional equilibrium state [#/kg/s]
 
-    real(kind_phys) Tten_pwi2(ncol, pver)                    ! Post-process T  tendency of provisional equilibrium state [K/s]
-    real(kind_phys) qvten_pwi2(ncol, pver)                   ! Post-process qv tendency of provisional equilibrium state [kg kg-1/s]
-    real(kind_phys) qlten_pwi2(ncol, pver)                   ! Post-process ql tendency of provisional equilibrium state [kg kg-1/s]
-    real(kind_phys) qiten_pwi2(ncol, pver)                   ! Post-process qi tendency of provisional equilibrium state [kg kg-1/s]
-    real(kind_phys) nlten_pwi2(ncol, pver)                   ! Post-process nl tendency of provisoonal equilibrium state [#/kg/s]
-    real(kind_phys) niten_pwi2(ncol, pver)                   ! Post-process ni tendency of provisional equilibrium state [#/kg/s]
-
-    real(kind_phys) A_T_adj(ncol, pver)                      ! After applying external advective forcing [K/s]
-    real(kind_phys) A_qv_adj(ncol, pver)                     ! After applying external advective forcing [kg kg-1/s]
-    real(kind_phys) A_ql_adj(ncol, pver)                     ! After applying external advective forcing [kg kg-1/s]
-    real(kind_phys) A_qi_adj(ncol, pver)                     ! After applying external advective forcing [kg kg-1/s]
-    real(kind_phys) A_nl_adj(ncol, pver)                     ! After applying external advective forcing [#/kg/s]
-    real(kind_phys) A_ni_adj(ncol, pver)                     ! After applying external advective forcing [#/kg/s]
+    real(kind_phys) :: A_T_adj(ncol, pver)                      ! After applying external advective forcing [K/s]
+    real(kind_phys) :: A_qv_adj(ncol, pver)                     ! After applying external advective forcing [kg kg-1/s]
+    real(kind_phys) :: A_ql_adj(ncol, pver)                     ! After applying external advective forcing [kg kg-1/s]
+    real(kind_phys) :: A_qi_adj(ncol, pver)                     ! After applying external advective forcing [kg kg-1/s]
+    real(kind_phys) :: A_nl_adj(ncol, pver)                     ! After applying external advective forcing [#/kg/s]
+    real(kind_phys) :: A_ni_adj(ncol, pver)                     ! After applying external advective forcing [#/kg/s]
 
     ! Adjustment tendency in association with 'instratus_condensate'
-
     real(kind_phys) QQw1(ncol, pver)           ! Effective adjustive condensation into water due to 'instratus_condensate' [kg kg-1/s]
     real(kind_phys) QQi1(ncol, pver)           ! Effective adjustive condensation into ice   due to 'instratus_condensate' [kg kg-1/s]
     real(kind_phys) QQw2(ncol, pver)           ! Effective adjustive condensation into water due to 'instratus_condensate' [kg kg-1/s]
@@ -629,7 +620,7 @@ contains
     real(kind_phys) rhminh_arr(ncol, pver)
 
     real(kind_phys) QQmax, QQmin, QQwmin, QQimin                ! For limiting QQ
-    real(kind_phys) cone                                     ! Number close to but smaller than 1
+    real(kind_phys), parameter :: cone = 0.999_kind_phys        ! Number close to but smaller than 1
 
     ! Renamed output variables (al_st_star -> alst, ai_st_star -> aist, etc.)
     ! These are used directly from the output arguments
@@ -637,10 +628,6 @@ contains
     ! Renamed input variables for mmacro_pcond interface
     ! A_T -> ttend, A_qv -> qtend, A_ql -> lmitend, A_qi -> itend, etc.
     ! The renaming is handled by using the computed tendencies directly
-
-    ! ================================================================ !
-    ! Begin computation                                                 !
-    ! ================================================================ !
 
     errmsg = ''
     errflg = 0
@@ -662,11 +649,15 @@ contains
     call ccpp_const_get_idx(const_props, 'water_vapor_mixing_ratio_wrt_moist_air_and_condensed_water', ixq, errmsg, errflg)
     if (errflg /= 0) return
 
+    if(ixcldliq < 0 .or. ixcldice < 0 .or. ixq < 0) then
+      errflg = 1
+      errmsg = 'Park macrophysics reuqires cloud liquid, cloud ice, and water vapor.'
+    end if
+
     ! ------------------------------------------ !
     ! Section 1: Compute advective tendencies    !
     ! (from macrop_driver lines 931-982)         !
     ! ------------------------------------------ !
-
     rdtime = 1._kind_phys/dtime
 
     zeros(:ncol, top_lev:pver) = 0._kind_phys
@@ -749,8 +740,6 @@ contains
     !   nl_tendout -> ncten, ni_tendout -> niten                !
     !   qme -> cmeliq                                           !
     ! --------------------------------------------------------- !
-
-    cone = 0.999_kind_phys
     zeros(:ncol, :) = 0._kind_phys
 
     ! ------------------------------------ !
@@ -1765,7 +1754,6 @@ contains
         ql = ql0
         qi = qi0
         caseid = 0
-        goto 10
       else
         ! ----------------------------- !
         ! This is case II : Dense Cloud !
@@ -1794,7 +1782,6 @@ contains
             qi = qi0
             idxmod = 1
             caseid = 1
-            goto 10
           else
             ! ------------------------------------------- !
             ! Evaporate until qc_st decreases to qlst_max !
@@ -1810,7 +1797,6 @@ contains
                                 T, qv, ql, qi)
             idxmod = 1
             caseid = 2
-            goto 10
           end if
           ! ------------------------------ !
           ! This is case III : Empty Cloud !
@@ -1830,7 +1816,6 @@ contains
                               T, qv, ql, qi)
           idxmod = 1
           caseid = 3
-          goto 10
           ! --------------- !
           ! This is case IV !
           ! --------------- !
@@ -1851,7 +1836,6 @@ contains
                                 T, qv, ql, qi)
             idxmod = 1
             caseid = 4
-            goto 10
           elseif (ql0_nc .lt. qlst_min*al0_st) then
             ! -------------------------------------------- !
             ! Condensate until qc_st increases to qlst_min !
@@ -1867,7 +1851,6 @@ contains
                                 T, qv, ql, qi)
             idxmod = 1
             caseid = 5
-            goto 10
           else
             ! ------------------------------------------------ !
             ! This case should not happen. Issue error message !
@@ -1885,8 +1868,6 @@ contains
           return
         end if
       end if
-
-10    continue
 
       ! -------------------------------------------------- !
       ! Force final energy-moisture conserving consistency !
@@ -1947,13 +1928,7 @@ contains
       qi_st_out(i) = qi_st
 
     end do
-
-    return
   end subroutine instratus_condensate
-
-  ! ----------------- !
-  ! End of subroutine !
-  ! ----------------- !
 
   subroutine instratus_core(icol, k, p, &
                             T0, qv0, ql0, qi0, &
@@ -2023,6 +1998,7 @@ contains
     real(kind_phys) rtsafe
     real(kind_phys) df, dx, dxold, f, fh, fl, temp, xh, xl
     real(kind_phys), parameter   :: xacc = 1.e-3_kind_phys
+    logical :: converged
 
     ! ---------------- !
     ! Main computation !
@@ -2050,6 +2026,7 @@ contains
                          qcst_crit, landfrac, snowh, &
                          rhminl, rhminl_adj_land, rhminh, &
                          fh, df, qc_nc, fice, al_st)
+    converged = .false.
     if ((fl > 0._kind_phys .and. fh > 0._kind_phys) .or. (fl < 0._kind_phys .and. fh < 0._kind_phys)) then
       call funcd_instratus(T0, p, T0, qv0, ql0, qi0, fice0, muQ0, qc_nc0, &
                            a_dc, ql_dc, qi_dc, a_sc, ql_sc, qi_sc, ai_st, &
@@ -2057,65 +2034,67 @@ contains
                            rhminl, rhminl_adj_land, rhminh, &
                            fl, df, qc_nc, fice, al_st)
       rtsafe = T0
-      goto 10
+      converged = .true.
     end if
-    if (fl == 0._kind_phys) then
-      rtsafe = x1
-      goto 10
-    elseif (fh == 0._kind_phys) then
-      rtsafe = x2
-      goto 10
-    elseif (fl < 0._kind_phys) then
-      xl = x1
-      xh = x2
-    else
-      xh = x1
-      xl = x2
-    end if
-    rtsafe = 0.5_kind_phys*(x1 + x2)
-    dxold = abs(x2 - x1)
-    dx = dxold
-    call funcd_instratus(rtsafe, p, T0, qv0, ql0, qi0, fice0, muQ0, qc_nc0, &
-                         a_dc, ql_dc, qi_dc, a_sc, ql_sc, qi_sc, ai_st, &
-                         qcst_crit, landfrac, snowh, &
-                         rhminl, rhminl_adj_land, rhminh, &
-                         f, df, qc_nc, fice, al_st)
-    do j = 1, 20
-      if (((rtsafe - xh)*df - f)*((rtsafe - xl)*df - f) > 0._kind_phys .or. abs(2.0_kind_phys*f) > abs(dxold*df)) then
-        dxold = dx
-        dx = 0.5_kind_phys*(xh - xl)
-        rtsafe = xl + dx
-        if (xl == rtsafe) goto 10
+    if (.not. converged) then
+      if (fl == 0._kind_phys) then
+        rtsafe = x1
+        converged = .true.
+      elseif (fh == 0._kind_phys) then
+        rtsafe = x2
+        converged = .true.
+      elseif (fl < 0._kind_phys) then
+        xl = x1
+        xh = x2
       else
-        dxold = dx
-        dx = f/df
-        temp = rtsafe
-        rtsafe = rtsafe - dx
-        if (temp == rtsafe) goto 10
+        xh = x1
+        xl = x2
       end if
-      ! if(abs(dx) < xacc) goto 10
+    end if
+    if (.not. converged) then
+      rtsafe = 0.5_kind_phys*(x1 + x2)
+      dxold = abs(x2 - x1)
+      dx = dxold
       call funcd_instratus(rtsafe, p, T0, qv0, ql0, qi0, fice0, muQ0, qc_nc0, &
                            a_dc, ql_dc, qi_dc, a_sc, ql_sc, qi_sc, ai_st, &
                            qcst_crit, landfrac, snowh, &
                            rhminl, rhminl_adj_land, rhminh, &
                            f, df, qc_nc, fice, al_st)
-      ! Sep.21.2010. Sungsu modified to enhance convergence and guarantee 'qlst_min <  qlst < qlst_max'.
-      if (qcst_crit < 0.5_kind_phys*(qlst_min + qlst_max)) then
-        if ((qc_nc*(1._kind_phys - fice) .gt. qlst_min*al_st .and. &
-             qc_nc*(1._kind_phys - fice) .lt. 1.1_kind_phys*qlst_min*al_st)) goto 10
-      else
-        if ((qc_nc*(1._kind_phys - fice) .gt. 0.9_kind_phys*qlst_max*al_st .and. &
-             qc_nc*(1._kind_phys - fice) .lt. qlst_max*al_st)) goto 10
-      end if
-      if (f < 0._kind_phys) then
-        xl = rtsafe
-      else
-        xh = rtsafe
-      end if
+      newton_iter: do j = 1, 20
+        if (((rtsafe - xh)*df - f)*((rtsafe - xl)*df - f) > 0._kind_phys .or. abs(2.0_kind_phys*f) > abs(dxold*df)) then
+          dxold = dx
+          dx = 0.5_kind_phys*(xh - xl)
+          rtsafe = xl + dx
+          if (xl == rtsafe) exit newton_iter
+        else
+          dxold = dx
+          dx = f/df
+          temp = rtsafe
+          rtsafe = rtsafe - dx
+          if (temp == rtsafe) exit newton_iter
+        end if
+        ! if(abs(dx) < xacc) exit newton_iter
+        call funcd_instratus(rtsafe, p, T0, qv0, ql0, qi0, fice0, muQ0, qc_nc0, &
+                             a_dc, ql_dc, qi_dc, a_sc, ql_sc, qi_sc, ai_st, &
+                             qcst_crit, landfrac, snowh, &
+                             rhminl, rhminl_adj_land, rhminh, &
+                             f, df, qc_nc, fice, al_st)
+        ! Sep.21.2010. Sungsu modified to enhance convergence and guarantee 'qlst_min <  qlst < qlst_max'.
+        if (qcst_crit < 0.5_kind_phys*(qlst_min + qlst_max)) then
+          if ((qc_nc*(1._kind_phys - fice) .gt. qlst_min*al_st .and. &
+               qc_nc*(1._kind_phys - fice) .lt. 1.1_kind_phys*qlst_min*al_st)) exit newton_iter
+        else
+          if ((qc_nc*(1._kind_phys - fice) .gt. 0.9_kind_phys*qlst_max*al_st .and. &
+               qc_nc*(1._kind_phys - fice) .lt. qlst_max*al_st)) exit newton_iter
+        end if
+        if (f < 0._kind_phys) then
+          xl = rtsafe
+        else
+          xh = rtsafe
+        end if
 
-    end do
-
-10  continue
+      end do newton_iter
+    end if
 
     ! ------------------------------------------- !
     ! Final safety check before sending to output !
@@ -2217,8 +2196,6 @@ contains
 
     f = qc_nc - qcst_crit*al_st
     fg = dqcncdt - qcst_crit*dalstdt
-
-    return
   end subroutine funcd_instratus
 
   ! Subroutine to force grid-mean RH = 1 when RH > 1
@@ -2269,7 +2246,7 @@ contains
     Tc = T - (latvap/cpair)*ql
     qt = qv + ql
 
-    do m = 1, 20
+    convergence_iter: do m = 1, 20
       call qsat_water(T, p, es, qs, dqsdt=dqsdT)
       Tscale = latvap/cpair
       qc = (T - Tc)/Tscale
@@ -2279,12 +2256,11 @@ contains
       fg = sign(1._kind_phys, fg)*max(1.e-10_kind_phys, abs(fg))
       ! Sungsu modified convergence criteria to speed up convergence and guarantee RH <= 1.
       if (qc >= 0._kind_phys .and. (qt - qc) >= 0.999_kind_phys*qs .and. (qt - qc) <= 1._kind_phys*qs) then
-        goto 10
+        exit convergence_iter
       end if
       T = T - f/fg
-    end do
+    end do convergence_iter
     ! write(iulog,*) 'Convergence in gridmean_RH is not reached. RH = ', ( qt - qc ) / qs
-10  continue
 
     call qsat_water(T, p, es, qs)
     ! Sungsu modified 'qv = qs' in consistent with the modified convergence criteria above.
@@ -2314,6 +2290,7 @@ contains
     integer i, k
     real(kind_phys) dql, dqi, dqv, sum, aa, dum
     integer :: pver_loc
+    logical :: needs_fix
 
     pver_loc = size(dp, 2)
 
@@ -2322,14 +2299,15 @@ contains
     qlten(:ncol, :pver_loc) = 0._kind_phys
     qiten(:ncol, :pver_loc) = 0._kind_phys
 
-    do i = 1, ncol
-      do k = top_lev_mod, pver_loc
+    column_loop: do i = 1, ncol
+      needs_fix = .false.
+      scan_loop: do k = top_lev_mod, pver_loc
         if (qv(i, k) .lt. qvmin(i, k) .or. ql(i, k) .lt. qlmin(i, k) .or. qi(i, k) .lt. qimin(i, k)) then
-          goto 10
+          needs_fix = .true.
+          exit scan_loop
         end if
-      end do
-      goto 11
-10    continue
+      end do scan_loop
+      if (.not. needs_fix) cycle column_loop
       do k = top_lev_mod, pver_loc    ! From the top to the 1st (lowest) layer from the surface
         dql = max(0._kind_phys, 1._kind_phys*qlmin(i, k) - ql(i, k))
 
@@ -2379,8 +2357,7 @@ contains
           write (iulog, *) 'Full positive_moisture is impossible in Park Macro'
         end if
       end if
-11    continue
-    end do
+    end do column_loop
 
   end subroutine positive_moisture
 
@@ -2395,92 +2372,86 @@ contains
     aa(:, :) = a(:, :)
     bb(:, :) = b(:, :)
 
-    do 11 j = 1, n
+    do j = 1, n
       ipiv(j) = 0
-11    continue
-      do 22 i = 1, n
-        big = 0._kind_phys
-        do 13 j = 1, n
-          if (ipiv(j) .ne. 1) then
-            do 12 k = 1, n
-              if (ipiv(k) == 0) then
-                if (abs(a(j, k)) >= big) then
-                  big = abs(a(j, k))
-                  irow = j
-                  icol = k
-                end if
-              else if (ipiv(k) .gt. 1) then
-                write (iulog, *) 'singular matrix in gaussj 1'
-                do ii = 1, np
+    end do
+    elimination_loop: do i = 1, n
+      big = 0._kind_phys
+      do j = 1, n
+        if (ipiv(j) .ne. 1) then
+          do k = 1, n
+            if (ipiv(k) == 0) then
+              if (abs(a(j, k)) >= big) then
+                big = abs(a(j, k))
+                irow = j
+                icol = k
+              end if
+            else if (ipiv(k) .gt. 1) then
+              write (iulog, *) 'singular matrix in gaussj 1'
+              do ii = 1, np
                 do jj = 1, np
                   write (iulog, *) ii, jj, aa(ii, jj), bb(ii, 1)
                 end do
-                end do
-                return
-              end if
-12            continue
-              end if
-13            continue
-              ipiv(icol) = ipiv(icol) + 1
-              if (irow .ne. icol) then
-                do 14 l = 1, n
-                  dum = a(irow, l)
-                  a(irow, l) = a(icol, l)
-                  a(icol, l) = dum
-14                continue
-                  do 15 l = 1, m
-                    dum = b(irow, l)
-                    b(irow, l) = b(icol, l)
-                    b(icol, l) = dum
-15                  continue
-                    end if
-                    indxr(i) = irow
-                    indxc(i) = icol
-                    if (a(icol, icol) == 0._kind_phys) then
-                      write (iulog, *) 'singular matrix in gaussj 2'
-                      do ii = 1, np
-                      do jj = 1, np
-                        write (iulog, *) ii, jj, aa(ii, jj), bb(ii, 1)
-                      end do
-                      end do
-                      return
-                    end if
-                    pivinv = 1._kind_phys/a(icol, icol)
-                    a(icol, icol) = 1._kind_phys
-                    do 16 l = 1, n
-                      a(icol, l) = a(icol, l)*pivinv
-16                    continue
-                      do 17 l = 1, m
-                        b(icol, l) = b(icol, l)*pivinv
-17                      continue
-                        do 21 ll = 1, n
-                          if (ll .ne. icol) then
-                            dum = a(ll, icol)
-                            a(ll, icol) = 0._kind_phys
-                            do 18 l = 1, n
-                              a(ll, l) = a(ll, l) - a(icol, l)*dum
-18                            continue
-                              do 19 l = 1, m
-                                b(ll, l) = b(ll, l) - b(icol, l)*dum
-19                              continue
-                                end if
-21                              continue
-22                              continue
-                                do 24 l = n, 1, -1
-                                  if (indxr(l) .ne. indxc(l)) then
-                                    do 23 k = 1, n
-                                      dum = a(k, indxr(l))
-                                      a(k, indxr(l)) = a(k, indxc(l))
-                                      a(k, indxc(l)) = dum
-23                                    continue
-                                      end if
-24                                    continue
-
-                                      return
+              end do
+              return
+            end if
+          end do
+        end if
+      end do
+      ipiv(icol) = ipiv(icol) + 1
+      if (irow .ne. icol) then
+        do l = 1, n
+          dum = a(irow, l)
+          a(irow, l) = a(icol, l)
+          a(icol, l) = dum
+        end do
+        do l = 1, m
+          dum = b(irow, l)
+          b(irow, l) = b(icol, l)
+          b(icol, l) = dum
+        end do
+      end if
+      indxr(i) = irow
+      indxc(i) = icol
+      if (a(icol, icol) == 0._kind_phys) then
+        write (iulog, *) 'singular matrix in gaussj 2'
+        do ii = 1, np
+          do jj = 1, np
+            write (iulog, *) ii, jj, aa(ii, jj), bb(ii, 1)
+          end do
+        end do
+        return
+      end if
+      pivinv = 1._kind_phys/a(icol, icol)
+      a(icol, icol) = 1._kind_phys
+      do l = 1, n
+        a(icol, l) = a(icol, l)*pivinv
+      end do
+      do l = 1, m
+        b(icol, l) = b(icol, l)*pivinv
+      end do
+      do ll = 1, n
+        if (ll .ne. icol) then
+          dum = a(ll, icol)
+          a(ll, icol) = 0._kind_phys
+          do l = 1, n
+            a(ll, l) = a(ll, l) - a(icol, l)*dum
+          end do
+          do l = 1, m
+            b(ll, l) = b(ll, l) - b(icol, l)*dum
+          end do
+        end if
+      end do
+    end do elimination_loop
+    do l = n, 1, -1
+      if (indxr(l) .ne. indxc(l)) then
+        do k = 1, n
+          dum = a(k, indxr(l))
+          a(k, indxr(l)) = a(k, indxc(l))
+          a(k, indxc(l)) = dum
+        end do
+      end if
+    end do
   end subroutine gaussj
-
-    ! ----------------- !
-    ! End of subroutine !
-    ! ----------------- !
 
 end module park_macrophysics
