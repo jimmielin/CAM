@@ -398,7 +398,8 @@ end subroutine macrop_driver_readnl
   use physics_types,    only: physics_state_dealloc
   use cam_history,      only: outfld
   use constituents,     only: cnst_get_ind, pcnst, qmin
-  use park_macrophysics, only: park_macrophysics_detrain_run, park_macrophysics_run
+  use park_macrophysics, only: park_macrophysics_run
+  use park_macrophysics_detrain, only: park_macrophysics_detrain_run
   use physconst,        only: cpair, tmelt, gravit, cappa, rair, pref, lapse_rate, rh2o
   use time_manager,     only: get_nstep
   use ccpp_constituent_prop_mod, only: ccpp_constituent_prop_ptr_t, ccpp_const_props
@@ -604,6 +605,7 @@ end subroutine macrop_driver_readnl
   ! For CCPPized schemes
   character(len=512)   :: errmsg
   integer              :: errflg
+  character(len=64)    :: scheme_name
 
   ! ======================================================================
 
@@ -738,6 +740,7 @@ end subroutine macrop_driver_readnl
         dlf_qi      = dlf_qi(:ncol,:), &
         dlf_nl      = dlf_nl(:ncol,:), &
         dlf_ni      = dlf_ni(:ncol,:), &
+        scheme_name = scheme_name, &
         errmsg      = errmsg, &
         errflg      = errflg)
    if (errflg /= 0) call endrun('macrop_driver_tend: park_macrophysics_detrain_run error: ' // trim(errmsg))
@@ -1010,6 +1013,7 @@ end subroutine macrop_driver_readnl
         ast         = ast(:ncol,:), &
         rhmin_liq   = rhmin_liq_diag(:ncol,:), &
         rhmin_ice   = rhmin_ice_diag(:ncol,:), &
+        scheme_name = scheme_name, &
         errmsg      = errmsg, &
         errflg      = errflg)
    if (errflg /= 0) call endrun('macrop_driver_tend: park_macrophysics_run error: ' // trim(errmsg))
