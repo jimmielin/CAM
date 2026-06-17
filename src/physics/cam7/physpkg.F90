@@ -1838,16 +1838,20 @@ contains
              call check_energy_timestep_init(state_sc, tend_sc, pbuf, col_type_subcol)
           end if
 
-          if (trim(cam_take_snapshot_before) == "microp_section") then
-             call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf, &
-                  fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
-          end if
-
           call t_startf('microp_aero_run')
           call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf)
           call t_stopf('microp_aero_run')
 
           call t_startf('microp_tend')
+
+          ! The microp_section snapshot brackets PUMAS only.  Taken after
+          ! microp_aero_run so that the pbuf fields written by microp_aero that
+          ! PUMAS consumes (npccn, naai, ...) are captured as PUMAS inputs.
+          ! microp_aero_run leaves state untouched (intent(in)).
+          if (trim(cam_take_snapshot_before) == "microp_section") then
+             call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf, &
+                  fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
+          end if
 
           if (use_subcol_microp) then
 
@@ -1919,10 +1923,6 @@ contains
           else
              call microp_driver_tend(state, ptend, cld_macmic_ztodt, pbuf)
           end if
-          ! combine aero and micro tendencies for the grid
-          call physics_ptend_sum(ptend_aero, ptend, ncol)
-          call physics_ptend_dealloc(ptend_aero)
-
           ! Have to scale and apply for full timestep to get tend right
           ! (see above note for macrophysics).
           call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
@@ -1939,6 +1939,14 @@ contains
              call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf, &
                   fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
           end if
+
+          ! Apply the microp_aero tendencies after the PUMAS snapshot bracket so the
+          ! microp_section snapshot encapsulates PUMAS only.  PUMAS ran on the pre-aero
+          ! state above (microp_aero_run is intent(in) on state), so its input is
+          ! preserved; the aero and PUMAS tendencies act on disjoint constituents.
+          call physics_ptend_scale(ptend_aero, 1._r8/cld_macmic_num_steps, ncol)
+          call physics_update (state, ptend_aero, ztodt, tend)
+          call physics_ptend_dealloc(ptend_aero)
 
           call check_energy_cam_chng(state, tend, "microp_tend", nstep, ztodt, &
                zero, prec_str(:ncol)/cld_macmic_num_steps, &
