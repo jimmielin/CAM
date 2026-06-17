@@ -523,6 +523,7 @@ end subroutine macrop_driver_readnl
   real(r8)  shdlfice(pcols,pver)
   real(r8)  dpdlft  (pcols,pver)
   real(r8)  shdlft  (pcols,pver)
+  real(r8)  numliq_detrain_tend(pcols,pver)  ! detrainment droplet-number tendency, routed to park_macrophysics_run (not applied to state_loc)
 
   real(r8)  dum1
   real(r8)  qc(pcols,pver)
@@ -540,6 +541,7 @@ end subroutine macrop_driver_readnl
   real(r8)  qiten(pcols,pver)
   real(r8)  ncten(pcols,pver)
   real(r8)  niten(pcols,pver)
+  real(r8)  nlwat_bfb(pcols,pver)        ! sequential (collapsed) liquid number for the reproducible NLWAT save
 
   ! Output from mmacro_pcond
 
@@ -755,6 +757,17 @@ end subroutine macrop_driver_readnl
    call outfld( 'ZMDLF',     dlf     , pcols, state_loc%lchnk )
 
    ! det_ice division by density of water is now inside park_macrophysics_detrain_run
+
+   ! Operator-split handling of the cloud-liquid droplet number (NUMLIQ): the detrainment
+   ! number tendency is large and very nearly cancels the macrophysics tendency at cloud
+   ! edges. Applying detrain then macro sequentially loses the small net to round-off
+   ! through the inflated intermediate. Instead route the detrainment tendency into
+   ! park_macrophysics_run, which sums it with the macro tendency into a single update.
+   ! Stash it here and remove it from ptend_loc so it is neither accumulated into the
+   ! combined ptend (below) nor applied to state_loc: state_loc%q(ixnumliq) then stays at
+   ! its pre-detrainment value, which is what park_macrophysics_run now reconstructs from.
+   numliq_detrain_tend(:ncol,:)  = ptend_loc%q(:ncol,:,ixnumliq)
+   ptend_loc%q(:ncol,:,ixnumliq) = 0._r8
 
    ! Add the detrainment tendency to the output tendency
    call physics_ptend_init(ptend, state%psetcols, 'macrop')
@@ -988,6 +1001,7 @@ end subroutine macrop_driver_readnl
         dlf_qi      = dlf_qi(:ncol,:), &
         dlf_nl      = dlf_nl(:ncol,:), &
         dlf_ni      = dlf_ni(:ncol,:), &
+        numliq_tend_detrain = numliq_detrain_tend(:ncol,:), &
         concld_old  = concld_old(:ncol,:), &
         concld      = concld(:ncol,:), &
         landfrac    = landfrac(:ncol), &
@@ -999,6 +1013,7 @@ end subroutine macrop_driver_readnl
         qiten       = qiten(:ncol,:), &
         ncten       = ncten(:ncol,:), &
         niten       = niten(:ncol,:), &
+        nlwat_bfb   = nlwat_bfb(:ncol,:), &
         cmeliq      = cmeliq(:ncol,:), &
         qvadj       = qvadj(:ncol,:), &
         qladj       = qladj(:ncol,:), &
@@ -1126,7 +1141,11 @@ end subroutine macrop_driver_readnl
       qcwat(:ncol,k)  = state_loc%q(:ncol,k,1)
       lcwat(:ncol,k)  = state_loc%q(:ncol,k,ixcldliq) + state_loc%q(:ncol,k,ixcldice)
       iccwat(:ncol,k) = state_loc%q(:ncol,k,ixcldice)
-      nlwat(:ncol,k)  = state_loc%q(:ncol,k,ixnumliq)
+      ! NLWAT is saved from the sequential (cancellation-collapsed) droplet number returned
+      ! by park_macrophysics_run, not from state_loc%q(ixnumliq). With the operator-split
+      ! NUMLIQ handling above, state_loc now carries the accurate combined-tendency value,
+      ! whereas the saved equilibrium must remain the collapsed value for bit-for-bit answers.
+      nlwat(:ncol,k)  = nlwat_bfb(:ncol,k)
       niwat(:ncol,k)  = state_loc%q(:ncol,k,ixnumice)
       cldsice(:ncol,k) = lcwat(:ncol,k) * min(1.0_r8, max(0.0_r8, (tmelt - tcwat(:ncol,k)) / 20._r8))
    end do
