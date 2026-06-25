@@ -1279,9 +1279,14 @@ contains
     ! original where qsrflx/qcon were accumulated before the rename call.
     dqdt_gaex_conden(:,:,:) = dqdt_gaex(:,:,:)
 
-    ! Compute del_h2so4_aeruptk from the returned tendencies
     if (ndx_h2so4 > 0) then
-       del_h2so4_aeruptk(1:ncol,:) = dqdt_gaex(1:ncol,:,ndx_h2so4) * delt
+       ! Snapshot h2so4 vmr before applying tendencies. del_h2so4_aeruptk is
+       ! recovered below as (vmr_after - vmr_before) after the apply loop, matching
+       ! the original which bracketed the in-place gasaerexch_sub update.
+       ! A clearer formulation is
+       ! del_h2so4_aeruptk(1:ncol,:) = dqdt_gaex(1:ncol,:,ndx_h2so4) * delt
+       ! but is not bit-for-bit and the difference propagates down to newnuc.
+       del_h2so4_aeruptk(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4)
     else
        del_h2so4_aeruptk(:,:) = 0.0_r8
     end if
@@ -1324,6 +1329,11 @@ contains
           end do
        end if
     end do
+
+    ! Recover del_h2so4_aeruptk = vmr_after - vmr_before (see snapshot above).
+    if (ndx_h2so4 > 0) then
+       del_h2so4_aeruptk(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4) - del_h2so4_aeruptk(1:ncol,:)
+    end if
 
     ! Diagnostics: column tendencies for gas-aerosol exchange and renaming
     ! Accumulate qsrflx for gasaerexch (jsrflx_gaexch)
