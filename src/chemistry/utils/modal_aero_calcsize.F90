@@ -5,7 +5,6 @@ module modal_aero_calcsize
 !  Only dependency: shr_kind_mod for r8 kind.
 !
 !  RCE 07.04.13:  Adapted from MIRAGE2 code
-!  CCPPized: all CAM dependencies removed; arrays use ncol sizing.
 
 use shr_kind_mod, only: r8 => shr_kind_r8
 
