@@ -36,7 +36,7 @@ module physpkg
 
   use modal_aero_calcsize_cam, only: modal_aero_calcsize_init, modal_aero_calcsize_diag, modal_aero_calcsize_reg
   use modal_aero_calcsize_cam, only: modal_aero_calcsize_sub
-  use modal_aero_wateruptake, only: modal_aero_wateruptake_init, modal_aero_wateruptake_dr, modal_aero_wateruptake_reg
+  use modal_aero_wateruptake_cam, only: modal_aero_wateruptake_cam_init, modal_aero_wateruptake_dr, modal_aero_wateruptake_reg
 
   use carma_diags_mod, only: carma_diags_t
 
@@ -978,7 +978,7 @@ contains
           call modal_aero_calcsize_init(pbuf2d)
        endif
 
-       call modal_aero_wateruptake_init(pbuf2d)
+       call modal_aero_wateruptake_cam_init(pbuf2d)
 
     end if
 
