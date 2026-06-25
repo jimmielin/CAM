@@ -108,6 +108,7 @@ use mo_tracname,       only:  solsym
 use physconst,         only:  gravit, mwdry, rair
 use cam_abortutils,    only:  endrun
 use spmd_utils,        only:  iam, masterproc
+use cam_logfile,       only:  iulog
 use phys_control,      only:  cam_chempkg_is
 
 implicit none
@@ -795,6 +796,11 @@ implicit none
    dqdtsv1(:,:,:) = dqdt(:,:,:)
    dqqcwdtsv1(:,:,:) = dqqcwdt(:,:,:)
 
+   if (masterproc .and. nstep <= 1) then
+      write(iulog,'(a,2i9,1p,2e26.16)') 'GAEXDBG P3DQPRE [n c sum|dqdt_conden| dqdt_h2so4(1,pver)] ', &
+         nstep, lchnk, sum(abs(dqdtsv1(1:ncol,top_lev:pver,:))), dqdtsv1(1,pver,l_so4g)
+   end if
+
 
 !
 ! do renaming calcs
@@ -817,6 +823,12 @@ implicit none
         qsrflx,            qqcwsrflx            )
 
 
+   if (masterproc .and. nstep <= 1) then
+      write(iulog,'(a,2i9,1p,3e26.16)') 'GAEXDBG P4DQPOST [n c sum|dqdt+rn| dqdt_h2so4(1,pver) sum|dqqcwdt|] ', &
+         nstep, lchnk, sum(abs(dqdt(1:ncol,top_lev:pver,:))), &
+         dqdt(1,pver,l_so4g), sum(abs(dqqcwdt(1:ncol,top_lev:pver,:)))
+   end if
+
 !  This applies dqdt tendencies for all species
 !  apply the dqdt to update q (and same for qqcw)
 !
@@ -836,6 +848,12 @@ implicit none
          end do
       end if
    end do
+
+   if (masterproc .and. nstep <= 1) then
+      write(iulog,'(a,2i9,1p,3e26.16)') 'GAEXDBG P6VMROUT [n c sum|vmr| sum|vmrcw| vmr_h2so4(1,pver)] ', &
+         nstep, lchnk, sum(abs(q(1:ncol,top_lev:pver,:))), &
+         sum(abs(qqcw(1:ncol,top_lev:pver,:))), q(1,pver,l_so4g)
+   end if
 
 ! diagnostics start -------------------------------------------------------
 !!$   if (ldiag3 > 0) then

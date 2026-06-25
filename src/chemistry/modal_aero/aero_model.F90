@@ -1007,7 +1007,7 @@ contains
 
     use time_manager,          only : get_nstep
     use modal_aero_coag,       only : modal_aero_coag_sub
-    use modal_aero_gasaerexch, only : modal_aero_gasaerexch_sub
+    use modal_aero_gasaerexch, only : modal_aero_gasaerexch_sub, modefrm_pcage
     use modal_aero_newnuc,     only : modal_aero_newnuc_sub
     use modal_aero_data,       only : cnst_name_cw, qqcw_get_field
     use mo_chem_utls,          only : get_spc_ndx
@@ -1193,6 +1193,15 @@ contains
 
     call t_startf('modal_gas-aer_exchng')
 
+    ! GAEXDBG instrumentation (throwaway): cols are documented per tag.
+    if (masterproc .and. nstep <= 1) then
+       write(iulog,'(a,6i9)') 'GAEXDBG IDX     [n c loffset ndx_h2so4 modefrm_pcage top_lev] ', &
+          nstep, lchnk, loffset, ndx_h2so4, modefrm_pcage, top_lev
+       write(iulog,'(a,2i9,1p,3e26.16)') 'GAEXDBG P0VMRIN [n c sum|vmr| sum|vmrcw| vmr_h2so4(1,pver)] ', &
+          nstep, lchnk, sum(abs(vmr(1:ncol,top_lev:pver,:))), &
+          sum(abs(vmrcw(1:ncol,top_lev:pver,:))), vmr(1,pver,ndx_h2so4)
+    end if
+
     if ( sulfeq_idx>0 ) then
        call pbuf_get_field( pbuf, sulfeq_idx, sulfeq )
     else
@@ -1212,6 +1221,11 @@ contains
     if (ndx_h2so4 > 0) then
        del_h2so4_aeruptk(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4) - del_h2so4_aeruptk(1:ncol,:)
     endif
+
+    if (masterproc .and. nstep <= 1) then
+       write(iulog,'(a,2i9,1p,2e26.16)') 'GAEXDBG P5DELH  [n c sum|del_h2so4| del_h2so4(1,pver)] ', &
+          nstep, lchnk, sum(abs(del_h2so4_aeruptk(1:ncol,:))), del_h2so4_aeruptk(1,pver)
+    end if
 
     call t_stopf('modal_gas-aer_exchng')
 
