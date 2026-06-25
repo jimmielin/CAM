@@ -45,7 +45,6 @@ subroutine modal_aero_gasaerexch_cam_init()
    ! run phase receives loffset for gas_pcnst (vmr) space
 
 ! local
-   integer :: loffset_dummy  ! not used; indices stored in pcnst-space
    integer :: ipair, iq, iqfrm, iqtoo
    integer :: jac, jsoa, j
    integer :: l, lsfrm, lstoo, lunout
@@ -173,13 +172,11 @@ subroutine modal_aero_gasaerexch_cam_init()
 
 ! --- Resolve pcage species matching ---
 ! Copied from original modal_aero_gasaerexch_init (lines 1514-1575)
-! with -loffset applied to resolved arrays.
+! Indices stored in pcnst-space.
 
    nspecfrm_pcage_resolved = 0
    lspecfrm_pcage_resolved(:) = 0
    lspectoo_pcage_resolved(:) = 0
-   lspecfrm_pcage_q_resolved(:) = 0
-   lspectoo_pcage_q_resolved(:) = 0
 
    if ((modeptr_pcarbon > 0) .and. (modeptr_accum > 0)) then
       l = lptr_so4_a_amode(modeptr_accum)

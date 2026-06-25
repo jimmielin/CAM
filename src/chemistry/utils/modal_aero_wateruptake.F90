@@ -406,7 +406,7 @@ subroutine makoh_cubic( cx, p2, p1, p0, im )
       complex(r8) :: cx(3,imx)
 
       integer :: i
-      real(r8) :: eps, q(imx), r(imx), sqrt3, third_local
+      real(r8) :: q(imx), r(imx), sqrt3, third_local
       complex(r8) :: ci, cq, crad(imx), cw, cwsq, cy(imx), cz(imx)
 
       real(r8), parameter :: eps = 1.e-20_r8

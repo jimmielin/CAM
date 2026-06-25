@@ -74,7 +74,7 @@
 ! pcage and pcarbon
   integer :: modetoo_pcage
   integer :: modeptr_pcarbon_m
-! q-array-space pcage indices (private, for run phase, offset-adjusted)
+! vmr-space pcage indices (private, for run phase, offset-adjusted)
   integer, allocatable :: lspecfrm_pcage_q(:)
   integer, allocatable :: lspectoo_pcage_q(:)
 
@@ -450,7 +450,7 @@ implicit none
    integer,  intent(in)    :: pver                 ! number of vertical levels
    real(r8), intent(in)    :: deltat               ! time step (s)
    integer,  intent(in)    :: top_lev              ! top level for aerosol processes
-   integer,  intent(in)    :: loffset              ! offset to convert pcnst-space to q-array space
+   integer,  intent(in)    :: loffset              ! offset to convert pcnst-space to vmr-space
    integer,  intent(in)    :: troplev(:)           ! (ncol) tropopause vertical index
    real(r8), intent(in)    :: t(:,:)               ! (ncol,pver) temperature
    real(r8), intent(in)    :: pmid(:,:)            ! (ncol,pver) pressure
@@ -505,7 +505,7 @@ implicit none
    integer :: l_soag(nsoa_m)
    integer :: n, niter, niter_max, ntot_soamode
 
-   ! Local offset-adjusted index arrays (pcnst-space - loffset = q-array space)
+   ! Local offset-adjusted index arrays (pcnst-space - loffset = vmr space)
    integer :: idx_so4_a_q(ntot_amode_m), idx_nh4_a_q(ntot_amode_m)
    integer :: idx_soa_a_q(ntot_amode_m,nsoa_m), idx_pom_a_q(ntot_amode_m,npoa_m)
    integer :: idx_num_q(ntot_amode_m), idx_mass_q(nspec_max_m,ntot_amode_m)
@@ -555,7 +555,7 @@ implicit none
    errflg = 0
 
 ! set gas species indices from module-level storage, applying -loffset
-! to convert pcnst-space to q-array (gas_pcnst) space
+! to convert pcnst-space to vmr (gas_pcnst) space
    l_so4g = idx_h2so4_m - loffset
    l_nh4g = idx_nh3_m - loffset
    l_msag = idx_msa_m - loffset
@@ -647,6 +647,7 @@ implicit none
 
 ! compute gas-to-aerosol mass transfer rates
    call gas_aer_uptkrates( ncol,       pver,       top_lev,    &
+                           loffset,                            &
                            q,          t,          pmid,       &
                            dgncur_awet,            uptkrate    )
 
@@ -999,6 +1000,7 @@ implicit none
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
 subroutine gas_aer_uptkrates( ncol,       pver,       top_lev,    &
+                              loffset,                            &
                               q,          t,          pmid,       &
                               dgncur_awet,            uptkrate    )
 
@@ -1023,6 +1025,7 @@ implicit none
    integer,  intent(in) :: ncol                 ! number of atmospheric column
    integer,  intent(in) :: pver                 ! number of vertical levels
    integer,  intent(in) :: top_lev              ! top level for aerosol processes
+   integer,  intent(in) :: loffset              ! offset to convert pcnst-space to vmr space
    real(r8), intent(in) :: q(:,:,:)             ! (ncol,pver,num_q) Tracer array (mol,#/mol-air)
    real(r8), intent(in) :: t(:,:)               ! (ncol,pver) Temperature in Kelvin
    real(r8), intent(in) :: pmid(:,:)            ! (ncol,pver) Air pressure in Pa
@@ -1092,7 +1095,7 @@ implicit none
 !   number conc. (#/m3) -- note q(i,k,numptr) is (#/kmol-air)
 !   so need aircon in (kmol-air/m3)
          aircon = rhoair/mwdry              ! (kmol-air/m3)
-         num_a = q(i,k,idx_num_q(n))*aircon
+         num_a = q(i,k,idx_num_m(n)-loffset)*aircon
 
 !   gasdiffus = h2so4 gas diffusivity from mosaic code (m^2/s)
 !               (pmid must be Pa)
