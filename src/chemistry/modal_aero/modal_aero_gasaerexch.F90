@@ -74,9 +74,6 @@
 ! pcage and pcarbon
   integer :: modetoo_pcage
   integer :: modeptr_pcarbon_m
-! vmr-space pcage indices (private, for run phase, offset-adjusted)
-  integer, allocatable :: lspecfrm_pcage_q(:)
-  integer, allocatable :: lspectoo_pcage_q(:)
 
 ! Mass-to-volume conversion factors
   real (r8) :: fac_m2v_nh4, fac_m2v_so4
@@ -302,16 +299,12 @@ implicit none
    maxspec_pcage = nspec_max
    allocate(lspecfrm_pcage(maxspec_pcage))
    allocate(lspectoo_pcage(maxspec_pcage))
-   allocate(lspecfrm_pcage_q(maxspec_pcage))
-   allocate(lspectoo_pcage_q(maxspec_pcage))
    allocate(soa_equivso4_factor(nsoa))
    allocate(fac_m2v_soa(nsoa))
    allocate(fac_m2v_pcarbon(nspec_max))
 
    lspecfrm_pcage(:) = 0
    lspectoo_pcage(:) = 0
-   lspecfrm_pcage_q(:) = 0  ! populated on first _run call
-   lspectoo_pcage_q(:) = 0  ! populated on first _run call
 
    modefrm_pcage = -999888777
    modetoo_pcage = -999888777

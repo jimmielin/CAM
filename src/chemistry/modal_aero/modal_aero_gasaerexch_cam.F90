@@ -352,9 +352,10 @@ aa_iqfrm: do iqfrm = -1, nspec_amode(mfrm)
    ! pcage species
    if (nspecfrm_pcage_resolved > 0) then
       do iq = 1, nspecfrm_pcage_resolved
-         lsfrm = lspecfrm_pcage_resolved(iq) + loffset
+         ! lspec*_pcage_resolved are already pcnst-space (resolved above), so
+         ! they index dotend directly -- matching the original gasaerexch_init.
+         lsfrm = lspecfrm_pcage_resolved(iq)
          lstoo = lspectoo_pcage_resolved(iq)
-         if (lstoo > 0) lstoo = lstoo + loffset
          if ((lsfrm > 0) .and. (lsfrm <= pcnst)) then
             dotend(lsfrm) = .true.
             if ((lstoo > 0) .and. (lstoo <= pcnst)) then

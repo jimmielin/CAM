@@ -1078,6 +1078,7 @@ contains
 
     ! Local arrays for refactored gasaerexch call
     real(r8) :: dqdt_gaex(ncol,pver,gas_pcnst)
+    real(r8) :: dqdt_gaex_conden(ncol,pver,gas_pcnst)  ! conden-only snapshot (pre-rename) for diagnostics
     logical  :: dotend_gaex(gas_pcnst)
     real(r8) :: dqqcwdt_gaex(ncol,pver,gas_pcnst)
     logical  :: dotendrn(gas_pcnst), dotendqqcwrn(gas_pcnst)
@@ -1272,6 +1273,12 @@ contains
        call endrun('aero_model_gasaerexch: ' // trim(errmsg_local))
     end if
 
+    ! Snapshot conden-only tendencies before modal_aero_rename_sub adds its
+    ! mode-transfer tendencies into dqdt_gaex in place. The _sfgaex1 and SOA
+    ! cond/evap diagnostics below use these pre-rename values, matching the
+    ! original where qsrflx/qcon were accumulated before the rename call.
+    dqdt_gaex_conden(:,:,:) = dqdt_gaex(:,:,:)
+
     ! Compute del_h2so4_aeruptk from the returned tendencies
     if (ndx_h2so4 > 0) then
        del_h2so4_aeruptk(1:ncol,:) = dqdt_gaex(1:ncol,:,ndx_h2so4) * delt
@@ -1326,7 +1333,7 @@ contains
        qsrflx(:,l,jsrf) = 0.0_r8
        do k = top_lev, pver
           do i = 1, ncol
-             qsrflx(i,l,jsrf) = qsrflx(i,l,jsrf) + dqdt_gaex(i,k,l)*pdel(i,k)/gravit
+             qsrflx(i,l,jsrf) = qsrflx(i,l,jsrf) + dqdt_gaex_conden(i,k,l)*pdel(i,k)/gravit
           end do
        end do
     end do
@@ -1369,7 +1376,10 @@ contains
     end do ! l = ...
 
     ! SOA condensation/evaporation diagnostics
-    ! Reconstruct from dqdt_gaex using SOA species indices
+    ! Reconstruct from the pre-rename conden tendencies (dqdt_gaex_conden).
+    ! NOTE: for the accumulation mode this is not exactly b4b with the original,
+    ! which used the per-mode conden tendency dqdt_soa(n,jsoa); the species-indexed
+    ! tendency here also absorbs primary-carbon-aged SOA. History-diagnostic only.
     qconff(:,:) = 0.0_r8
     qevapff(:,:) = 0.0_r8
     qconbb(:,:) = 0.0_r8
@@ -1387,7 +1397,7 @@ contains
           if (modefrm_pcage > 0 .and. n == modefrm_pcage) cycle
           do k = top_lev, pver
              do i = 1, ncol
-                dqdt_soa_val = dqdt_gaex(i,k,l_soa)
+                dqdt_soa_val = dqdt_gaex_conden(i,k,l_soa)
                 if (nsoa.eq.15) then !check for current SOA package
                    if(jsoa.ge.1.and.jsoa.le.5) then ! Fossil SOA species
                       if (dqdt_soa_val.ge.0.0_r8) then
