@@ -20,8 +20,8 @@ use phys_control,     only: phys_getopts
 use cam_abortutils,   only: endrun
 
 use modal_aero_wateruptake, only: modal_aero_wateruptake_init, &
-                                  modal_aero_wateruptake_sub, &
-                                  modal_strat_sulfate
+                                  modal_aero_wateruptake_sub
+use aero_model,             only: modal_strat_sulfate
 
 implicit none
 private

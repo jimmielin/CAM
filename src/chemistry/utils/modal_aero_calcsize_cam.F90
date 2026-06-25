@@ -22,7 +22,7 @@ use cam_logfile,      only: iulog
 use cam_abortutils,   only: endrun
 use cam_history,      only: addfld, add_default, fieldname_len, horiz_only, outfld
 use constituents,     only: pcnst, cnst_name
-use modal_aero_wateruptake, only: modal_strat_sulfate
+use aero_model,             only: modal_strat_sulfate
 
 use ref_pres,         only: top_lev => clim_modal_aero_top_lev
 

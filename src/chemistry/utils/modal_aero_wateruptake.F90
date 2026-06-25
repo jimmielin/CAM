@@ -4,7 +4,6 @@ module modal_aero_wateruptake
 !  Contains Kohler theory wet radius calculation and polynomial solvers.
 !
 !  RCE 07.04.13:  Adapted from MIRAGE2 code
-!  Deps: shr_kind_mod, aerosol_properties_mod, aerosol_state_mod, wv_saturation
 
 use shr_kind_mod,  only: r8 => shr_kind_r8
 
@@ -16,12 +15,8 @@ public :: &
    modal_aero_wateruptake_init,  &
    modal_aero_wateruptake_sub
 
-public :: modal_strat_sulfate
-
 real(r8), parameter :: third = 1._r8/3._r8
 real(r8) :: pi43
-
-logical  :: modal_strat_sulfate = .false.
 
 !===============================================================================
 contains
@@ -246,95 +241,125 @@ subroutine modal_aero_wateruptake_sub( &
 end subroutine modal_aero_wateruptake_sub
 
 !-----------------------------------------------------------------------
-      subroutine modal_aero_kohler(   &
-          rdry_in, hygro, s, rwet_out, im )
+subroutine modal_aero_kohler(rdry_in, hygro, s, rwet_out, im)
+   ! calculates equlibrium radius r of haze droplets as function of
+   ! dry particle mass and relative humidity s using kohler solution
+   ! given in pruppacher and klett (eqn 6-35)
 
-! calculates equlibrium radius r of haze droplets as function of
-! dry particle mass and relative humidity s using kohler solution
-! given in pruppacher and klett (eqn 6-35)
+   ! for multiple aerosol types, assumes an internal mixture of aerosols
 
-! for multiple aerosol types, assumes an internal mixture of aerosols
+   ! arguments
+   integer :: im         ! number of grid points to be processed
+   real(r8) :: rdry_in(:)    ! aerosol dry radius (m)
+   real(r8) :: hygro(:)      ! aerosol volume-mean hygroscopicity (--)
+   real(r8) :: s(:)          ! relative humidity (1 = saturated)
+   real(r8) :: rwet_out(:)   ! aerosol wet radius (m)
 
-      implicit none
+   ! local variables
+   integer, parameter :: imax=200
+   integer :: i, n, nsol
 
-! arguments
-      integer :: im         ! number of grid points to be processed
-      real(r8) :: rdry_in(:)    ! aerosol dry radius (m)
-      real(r8) :: hygro(:)      ! aerosol volume-mean hygroscopicity (--)
-      real(r8) :: s(:)          ! relative humidity (1 = saturated)
-      real(r8) :: rwet_out(:)   ! aerosol wet radius (m)
+   real(r8) :: a, b
+   real(r8) :: p40(imax),p41(imax),p42(imax),p43(imax) ! coefficients of polynomial
+   real(r8) :: p30(imax),p31(imax),p32(imax) ! coefficients of polynomial
+   real(r8) :: p
+   real(r8) :: r3, r4
+   real(r8) :: r(im)         ! wet radius (microns)
+   real(r8) :: rdry(imax)    ! radius of dry particle (microns)
+   real(r8) :: ss            ! relative humidity (1 = saturated)
+   real(r8) :: slog(imax)    ! log relative humidity
+   real(r8) :: vol(imax)     ! total volume of particle (microns**3)
+   real(r8) :: xi, xr
 
-! local variables
-      integer, parameter :: imax=200
-      integer :: i, n, nsol
+   complex(r8) :: cx4(4,imax),cx3(3,imax)
 
-      real(r8) :: a, b
-      real(r8) :: p40(imax),p41(imax),p42(imax),p43(imax) ! coefficients of polynomial
-      real(r8) :: p30(imax),p31(imax),p32(imax) ! coefficients of polynomial
-      real(r8) :: p
-      real(r8) :: r3, r4
-      real(r8) :: r(im)         ! wet radius (microns)
-      real(r8) :: rdry(imax)    ! radius of dry particle (microns)
-      real(r8) :: ss            ! relative humidity (1 = saturated)
-      real(r8) :: slog(imax)    ! log relative humidity
-      real(r8) :: vol(imax)     ! total volume of particle (microns**3)
-      real(r8) :: xi, xr
-
-      complex(r8) :: cx4(4,imax),cx3(3,imax)
-
-      real(r8), parameter :: eps = 1.e-4_r8
-      real(r8), parameter :: mw = 18._r8
-      real(r8), parameter :: pi_local = 3.14159_r8
-      real(r8), parameter :: rhow = 1._r8
-      real(r8), parameter :: surften = 76._r8
-      real(r8), parameter :: tair = 273._r8
-      real(r8), parameter :: third_local = 1._r8/3._r8
-      real(r8), parameter :: ugascon = 8.3e7_r8
+   real(r8), parameter :: eps = 1.e-4_r8
+   real(r8), parameter :: mw = 18._r8
+   real(r8), parameter :: pi_local = 3.14159_r8
+   real(r8), parameter :: rhow = 1._r8
+   real(r8), parameter :: surften = 76._r8
+   real(r8), parameter :: tair = 273._r8
+   real(r8), parameter :: third_local = 1._r8/3._r8
+   real(r8), parameter :: ugascon = 8.3e7_r8
 
 
 !     effect of organics on surface tension is neglected
-      a=2.e4_r8*mw*surften/(ugascon*tair*rhow)
+   a=2.e4_r8*mw*surften/(ugascon*tair*rhow)
 
-      do i=1,im
-           rdry(i) = rdry_in(i)*1.0e6_r8   ! convert (m) to (microns)
-           vol(i) = rdry(i)**3          ! vol is r**3, not volume
-           b = vol(i)*hygro(i)
+   do i=1,im
+        rdry(i) = rdry_in(i)*1.0e6_r8   ! convert (m) to (microns)
+        vol(i) = rdry(i)**3          ! vol is r**3, not volume
+        b = vol(i)*hygro(i)
 
 !          quartic
-           ss=min(s(i),1._r8-eps)
-           ss=max(ss,1.e-10_r8)
-           slog(i)=log(ss)
-           p43(i)=-a/slog(i)
-           p42(i)=0._r8
-           p41(i)=b/slog(i)-vol(i)
-           p40(i)=a*vol(i)/slog(i)
+        ss=min(s(i),1._r8-eps)
+        ss=max(ss,1.e-10_r8)
+        slog(i)=log(ss)
+        p43(i)=-a/slog(i)
+        p42(i)=0._r8
+        p41(i)=b/slog(i)-vol(i)
+        p40(i)=a*vol(i)/slog(i)
 !          cubic for rh=1
-           p32(i)=0._r8
-           p31(i)=-b/a
-           p30(i)=-vol(i)
-      end do
+        p32(i)=0._r8
+        p31(i)=-b/a
+        p30(i)=-vol(i)
+   end do
 
 
-       do 100 i=1,im
+    do 100 i=1,im
 
 !       if(vol(i).le.1.e-20)then
-        if(vol(i).le.1.e-12_r8)then
-           r(i)=rdry(i)
-           go to 100
-        endif
+     if(vol(i).le.1.e-12_r8)then
+        r(i)=rdry(i)
+        go to 100
+     endif
 
+     p=abs(p31(i))/(rdry(i)*rdry(i))
+     if(p.lt.eps)then
+!          approximate solution for small particles
+        r(i)=rdry(i)*(1._r8+p*third_local/(1._r8-slog(i)*rdry(i)/a))
+     else
+        call makoh_quartic(cx4(1,i),p43(i),p42(i),p41(i),p40(i),1)
+!          find smallest real(r8) solution
+        r(i)=1000._r8*rdry(i)
+        nsol=0
+        do n=1,4
+           xr=real(cx4(n,i))
+           xi=aimag(cx4(n,i))
+           if(abs(xi).gt.abs(xr)*eps) cycle
+           if(xr.gt.r(i)) cycle
+           if(xr.lt.rdry(i)*(1._r8-eps)) cycle
+           if(xr.ne.xr) cycle
+           r(i)=xr
+           nsol=n
+        end do
+        if(nsol.eq.0)then
+           write(*,*)   &
+            'ccm kohlerc - no real(r8) solution found (quartic)'
+           write(*,*)'roots =', (cx4(n,i),n=1,4)
+           write(*,*)'p0-p3 =', p40(i), p41(i), p42(i), p43(i)
+           write(*,*)'rh=',s(i)
+           write(*,*)'setting radius to dry radius=',rdry(i)
+           r(i)=rdry(i)
+!             stop
+        endif
+     endif
+
+     if(s(i).gt.1._r8-eps)then
+!          save quartic solution at s=1-eps
+        r4=r(i)
+!          cubic for rh=1
         p=abs(p31(i))/(rdry(i)*rdry(i))
         if(p.lt.eps)then
-!          approximate solution for small particles
-           r(i)=rdry(i)*(1._r8+p*third_local/(1._r8-slog(i)*rdry(i)/a))
+           r(i)=rdry(i)*(1._r8+p*third_local)
         else
-           call makoh_quartic(cx4(1,i),p43(i),p42(i),p41(i),p40(i),1)
-!          find smallest real(r8) solution
+           call makoh_cubic(cx3,p32,p31,p30,im)
+!             find smallest real(r8) solution
            r(i)=1000._r8*rdry(i)
            nsol=0
-           do n=1,4
-              xr=real(cx4(n,i))
-              xi=aimag(cx4(n,i))
+           do n=1,3
+              xr=real(cx3(n,i))
+              xi=aimag(cx3(n,i))
               if(abs(xi).gt.abs(xr)*eps) cycle
               if(xr.gt.r(i)) cycle
               if(xr.lt.rdry(i)*(1._r8-eps)) cycle
@@ -344,68 +369,33 @@ end subroutine modal_aero_wateruptake_sub
            end do
            if(nsol.eq.0)then
               write(*,*)   &
-               'ccm kohlerc - no real(r8) solution found (quartic)'
-              write(*,*)'roots =', (cx4(n,i),n=1,4)
-              write(*,*)'p0-p3 =', p40(i), p41(i), p42(i), p43(i)
+               'ccm kohlerc - no real(r8) solution found (cubic)'
+              write(*,*)'roots =', (cx3(n,i),n=1,3)
+              write(*,*)'p0-p2 =', p30(i), p31(i), p32(i)
               write(*,*)'rh=',s(i)
               write(*,*)'setting radius to dry radius=',rdry(i)
               r(i)=rdry(i)
-!             stop
-           endif
-        endif
-
-        if(s(i).gt.1._r8-eps)then
-!          save quartic solution at s=1-eps
-           r4=r(i)
-!          cubic for rh=1
-           p=abs(p31(i))/(rdry(i)*rdry(i))
-           if(p.lt.eps)then
-              r(i)=rdry(i)*(1._r8+p*third_local)
-           else
-              call makoh_cubic(cx3,p32,p31,p30,im)
-!             find smallest real(r8) solution
-              r(i)=1000._r8*rdry(i)
-              nsol=0
-              do n=1,3
-                 xr=real(cx3(n,i))
-                 xi=aimag(cx3(n,i))
-                 if(abs(xi).gt.abs(xr)*eps) cycle
-                 if(xr.gt.r(i)) cycle
-                 if(xr.lt.rdry(i)*(1._r8-eps)) cycle
-                 if(xr.ne.xr) cycle
-                 r(i)=xr
-                 nsol=n
-              end do
-              if(nsol.eq.0)then
-                 write(*,*)   &
-                  'ccm kohlerc - no real(r8) solution found (cubic)'
-                 write(*,*)'roots =', (cx3(n,i),n=1,3)
-                 write(*,*)'p0-p2 =', p30(i), p31(i), p32(i)
-                 write(*,*)'rh=',s(i)
-                 write(*,*)'setting radius to dry radius=',rdry(i)
-                 r(i)=rdry(i)
 !                stop
-              endif
            endif
-           r3=r(i)
-!          now interpolate between quartic, cubic solutions
-           r(i)=(r4*(1._r8-s(i))+r3*(s(i)-1._r8+eps))/eps
         endif
+        r3=r(i)
+!          now interpolate between quartic, cubic solutions
+        r(i)=(r4*(1._r8-s(i))+r3*(s(i)-1._r8+eps))/eps
+     endif
 
-  100 continue
+100 continue
 
-! bound and convert from microns to m
-      do i=1,im
-         r(i) = min(r(i),30._r8) ! upper bound based on 1 day lifetime
-         rwet_out(i) = r(i)*1.e-6_r8
-      end do
+   ! bound and convert from microns to m
+   do i=1,im
+      r(i) = min(r(i),30._r8) ! upper bound based on 1 day lifetime
+      rwet_out(i) = r(i)*1.e-6_r8
+   end do
 
-      return
-      end subroutine modal_aero_kohler
+end subroutine modal_aero_kohler
 
 
 !-----------------------------------------------------------------------
-      subroutine makoh_cubic( cx, p2, p1, p0, im )
+subroutine makoh_cubic( cx, p2, p1, p0, im )
 !
 !     solves  x**3 + p2 x**2 + p1 x + p0 = 0
 !     where p0, p1, p2 are real
@@ -419,8 +409,7 @@ end subroutine modal_aero_wateruptake_sub
       real(r8) :: eps, q(imx), r(imx), sqrt3, third_local
       complex(r8) :: ci, cq, crad(imx), cw, cwsq, cy(imx), cz(imx)
 
-      save eps
-      data eps/1.e-20_r8/
+      real(r8), parameter :: eps = 1.e-20_r8
 
       third_local=1._r8/3._r8
       ci=cmplx(0._r8,1._r8,r8)
@@ -451,12 +440,11 @@ end subroutine modal_aero_wateruptake_sub
       endif
       enddo
 
-      return
-      end subroutine makoh_cubic
+end subroutine makoh_cubic
 
 
 !-----------------------------------------------------------------------
-      subroutine makoh_quartic( cx, p3, p2, p1, p0, im )
+subroutine makoh_quartic( cx, p3, p2, p1, p0, im )
 
 !     solves x**4 + p3 x**3 + p2 x**2 + p1 x + p0 = 0
 !     where p0, p1, p2, p3 are real
@@ -513,15 +501,12 @@ end subroutine modal_aero_wateruptake_sub
       endif
    10 continue
 
-      return
-      end subroutine makoh_quartic
+end subroutine makoh_quartic
 
 !----------------------------------------------------------------------
-      subroutine calc_h2so4_equilib_mixrat( temp, pres, qh2o, dmean, &
-                                            qh2so4_equilib, wtpct, sulden, &
-                                            errmsg, errflg )
-
-      implicit none
+subroutine calc_h2so4_equilib_mixrat( temp, pres, qh2o, dmean, &
+                                      qh2so4_equilib, wtpct, sulden, &
+                                      errmsg, errflg )
 
       real(r8), intent(in)  :: temp            ! temperature (K)
       real(r8), intent(in)  :: pres            ! pressure (Pa)
@@ -712,12 +697,10 @@ end subroutine modal_aero_wateruptake_sub
       akas = exp( expon )
       qh2so4_equilib = sulfequil * akas ! reduce H2SO4 equilibrium mixing ratio by Kelvin curvature factor
 
-      return
-      end subroutine calc_h2so4_equilib_mixrat
-
+end subroutine calc_h2so4_equilib_mixrat
 
 !----------------------------------------------------------------------
-      subroutine calc_h2so4_wtpct( temp, pres, qh2o, wtpct, errmsg, errflg )
+subroutine calc_h2so4_wtpct( temp, pres, qh2o, wtpct, errmsg, errflg )
 
   !!  This function calculates the weight % H2SO4 composition of
   !!  sulfate aerosol, using Tabazadeh et. al. (GRL, 1931, 1997).
@@ -735,8 +718,6 @@ end subroutine modal_aero_wateruptake_sub
   !! @ version October 2013
 
       use wv_saturation, only: qsat_water
-
-      implicit none
 
       real(r8), intent(in)  :: temp  ! temperature (K)
       real(r8), intent(in)  :: pres  ! pressure (Pa)
@@ -806,10 +787,8 @@ end subroutine modal_aero_wateruptake_sub
       wtpct = (100._r8*contt*98._r8)/conwtp
       wtpct = min(max(wtpct,25._r8),100._r8) ! restrict between 1 and 100 %
 
-      return
-      end subroutine calc_h2so4_wtpct
-
+end subroutine calc_h2so4_wtpct
 
 !----------------------------------------------------------------------
 
-   end module modal_aero_wateruptake
+end module modal_aero_wateruptake
