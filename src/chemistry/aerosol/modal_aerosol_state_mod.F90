@@ -458,7 +458,7 @@ contains
   !REMOVECAM - under CAM-SIMA, water uptake computed by CCPP scheme; results passed via constituent interface
   subroutine water_uptake(self, aero_props, bin_idx, ncol, nlev, dgnumwet, qaerwat)
     use modal_aero_wateruptake, only: modal_aero_wateruptake_dr
-    use modal_aero_calcsize,    only: modal_aero_calcsize_diag
+    use modal_aero_calcsize_cam, only: modal_aero_calcsize_diag
 
     class(modal_aerosol_state), intent(in) :: self
     class(aerosol_properties), intent(in) :: aero_props

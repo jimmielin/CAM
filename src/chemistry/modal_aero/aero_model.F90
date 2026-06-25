@@ -191,7 +191,7 @@ contains
     use aero_wetdep_cam, only: aero_wetdep_init
     use mo_setsox,       only: sox_inti
 
-    use modal_aero_calcsize,   only: modal_aero_calcsize_init
+    use modal_aero_calcsize_cam, only: modal_aero_calcsize_init
     use modal_aero_coag,       only: modal_aero_coag_init
     use aero_deposition_cam, only: aero_deposition_cam_init
     use modal_aero_gasaerexch, only: modal_aero_gasaerexch_init
