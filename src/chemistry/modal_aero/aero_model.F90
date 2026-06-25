@@ -1216,6 +1216,15 @@ contains
 
     call t_startf('modal_gas-aer_exchng')
 
+    ! GAEXDBG instrumentation (throwaway): cols are documented per tag.
+    if (masterproc .and. nstep <= 1) then
+       write(iulog,'(a,6i9)') 'GAEXDBG IDX     [n c loffset ndx_h2so4 modefrm_pcage top_lev] ', &
+          nstep, lchnk, loffset, ndx_h2so4, modefrm_pcage, top_lev
+       write(iulog,'(a,2i9,1p,3e26.16)') 'GAEXDBG P0VMRIN [n c sum|vmr| sum|vmrcw| vmr_h2so4(1,pver)] ', &
+          nstep, lchnk, sum(abs(vmr(1:ncol,top_lev:pver,:))), &
+          sum(abs(vmrcw(1:ncol,top_lev:pver,:))), vmr(1,pver,ndx_h2so4)
+    end if
+
     if ( sulfeq_idx>0 ) then
        call pbuf_get_field( pbuf, sulfeq_idx, sulfeq )
        use_sulfeq = .true.
@@ -1279,11 +1288,22 @@ contains
     ! original where qsrflx/qcon were accumulated before the rename call.
     dqdt_gaex_conden(:,:,:) = dqdt_gaex(:,:,:)
 
+    if (masterproc .and. nstep <= 1) then
+       write(iulog,'(a,2i9,1p,2e26.16)') 'GAEXDBG P3DQPRE [n c sum|dqdt_conden| dqdt_h2so4(1,pver)] ', &
+          nstep, lchnk, sum(abs(dqdt_gaex_conden(1:ncol,top_lev:pver,:))), &
+          dqdt_gaex_conden(1,pver,ndx_h2so4)
+    end if
+
     ! Compute del_h2so4_aeruptk from the returned tendencies
     if (ndx_h2so4 > 0) then
        del_h2so4_aeruptk(1:ncol,:) = dqdt_gaex(1:ncol,:,ndx_h2so4) * delt
     else
        del_h2so4_aeruptk(:,:) = 0.0_r8
+    end if
+
+    if (masterproc .and. nstep <= 1) then
+       write(iulog,'(a,2i9,1p,2e26.16)') 'GAEXDBG P5DELH  [n c sum|del_h2so4| del_h2so4(1,pver)] ', &
+          nstep, lchnk, sum(abs(del_h2so4_aeruptk(1:ncol,:))), del_h2so4_aeruptk(1,pver)
     end if
 
     ! Call rename as a separate step (was embedded in gasaerexch_sub)
@@ -1307,6 +1327,12 @@ contains
          jsrflx_rename,     nsrflx,              &
          qsrflx,            qqcwsrflx            )
 
+    if (masterproc .and. nstep <= 1) then
+       write(iulog,'(a,2i9,1p,3e26.16)') 'GAEXDBG P4DQPOST [n c sum|dqdt+rn| dqdt_h2so4(1,pver) sum|dqqcwdt|] ', &
+          nstep, lchnk, sum(abs(dqdt_gaex(1:ncol,top_lev:pver,:))), &
+          dqdt_gaex(1,pver,ndx_h2so4), sum(abs(dqqcwdt_gaex(1:ncol,top_lev:pver,:)))
+    end if
+
     ! Apply tendencies to vmr and vmrcw
     do l = 1, gas_pcnst
        if ( dotend_gaex(l) .or. dotendrn(l) ) then
@@ -1324,6 +1350,12 @@ contains
           end do
        end if
     end do
+
+    if (masterproc .and. nstep <= 1) then
+       write(iulog,'(a,2i9,1p,3e26.16)') 'GAEXDBG P6VMROUT [n c sum|vmr| sum|vmrcw| vmr_h2so4(1,pver)] ', &
+          nstep, lchnk, sum(abs(vmr(1:ncol,top_lev:pver,:))), &
+          sum(abs(vmrcw(1:ncol,top_lev:pver,:))), vmr(1,pver,ndx_h2so4)
+    end if
 
     ! Diagnostics: column tendencies for gas-aerosol exchange and renaming
     ! Accumulate qsrflx for gasaerexch (jsrflx_gaexch)
