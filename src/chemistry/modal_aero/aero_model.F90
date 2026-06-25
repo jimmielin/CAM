@@ -24,6 +24,7 @@ module aero_model
 
   use modal_aero_data,only: cnst_name_cw, lptr_so4_cw_amode
   use modal_aero_data,only: ntot_amode, modename_amode, nspec_max
+  use modal_aero_data,only: modal_strat_sulfate
 
   use ref_pres,       only: top_lev => clim_modal_aero_top_lev
 
@@ -45,8 +46,6 @@ module aero_model
   public :: aero_model_emissions  ! aerosol emissions
   public :: aero_model_surfarea  ! tropopspheric aerosol wet surface area for chemistry
   public :: aero_model_strat_surfarea ! stratospheric aerosol wet surface area for chemistry
-  public :: modal_strat_sulfate
-
   public :: calc_1_impact_rate
   public :: nimptblgrow_mind, nimptblgrow_maxd
 
@@ -100,7 +99,6 @@ module aero_model
   integer,allocatable :: drydep_indices(:)
   logical :: drydep_lq(pcnst)
 
-  logical :: modal_strat_sulfate = .false.
   logical :: modal_accum_coarse_exch = .false.
 
   class(aerosol_properties), pointer :: aero_props=>null()

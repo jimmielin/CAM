@@ -52,7 +52,7 @@
   integer :: ntot_amode_m, nsoa_m, npoa_m, nspec_max_m
   integer, allocatable :: nspec_amode_m(:)
 
-! Species indices in q array (set by _init)
+! Species indices in pcnst-space (set by _init, converted to vmr-space in _run)
   integer :: idx_h2so4_m, idx_nh3_m, idx_msa_m
   integer, allocatable :: idx_soag_m(:)
   integer, allocatable :: idx_so4_a_m(:), idx_nh4_a_m(:)
@@ -458,7 +458,7 @@ implicit none
    real(r8), intent(in)    :: dgncur_awet(:,:,:)   ! (ncol,pver,ntot_amode) wet diameter
    logical,  intent(in)    :: use_sulfeq           ! whether to use strat equilibrium
    real(r8), intent(in)    :: sulfeq(:,:,:)        ! (ncol,pver,ntot_amode) sulfeq values
-   integer,  intent(in)    :: num_q                ! number of species in q array
+   integer,  intent(in)    :: num_q                ! number of species in vmr array (= gas_pcnst)
    real(r8), intent(in)    :: q(:,:,:)             ! (ncol,pver,num_q) tracer VMR
                                                    ! *** MUST BE  #/kmol-air for number
                                                    ! *** MUST BE mol/mol-air for mass

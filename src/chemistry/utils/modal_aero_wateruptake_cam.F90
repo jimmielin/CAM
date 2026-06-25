@@ -21,7 +21,7 @@ use cam_abortutils,   only: endrun
 
 use modal_aero_wateruptake, only: modal_aero_wateruptake_init, &
                                   modal_aero_wateruptake_sub
-use aero_model,             only: modal_strat_sulfate
+use modal_aero_data,          only: modal_strat_sulfate
 
 implicit none
 private
