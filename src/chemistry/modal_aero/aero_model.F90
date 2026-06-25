@@ -27,7 +27,7 @@ module aero_model
 
   use ref_pres,       only: top_lev => clim_modal_aero_top_lev
 
-  use modal_aero_wateruptake, only: modal_strat_sulfate
+  use modal_aero_data, only: modal_strat_sulfate
   use mo_setsox,              only: setsox, has_sox
   use aerosol_properties_mod, only: aerosol_properties
   use aerosol_state_mod, only: aerosol_state

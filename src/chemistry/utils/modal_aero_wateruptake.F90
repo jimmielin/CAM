@@ -16,12 +16,8 @@ public :: &
    modal_aero_wateruptake_init,  &
    modal_aero_wateruptake_sub
 
-public :: modal_strat_sulfate
-
 real(r8), parameter :: third = 1._r8/3._r8
 real(r8) :: pi43
-
-logical  :: modal_strat_sulfate = .false.
 
 !===============================================================================
 contains
