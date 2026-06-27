@@ -795,6 +795,7 @@ subroutine modal_aero_calcdry(state, pbuf, aero_props, aero_state, dgnumdry_m, h
       pver             = pver,                  &
       top_lev          = top_lev,               &
       do_strat_sulfate = modal_strat_sulfate,   &
+      pi               = pi,                    &
       dgncur_a         = dgncur_a(:ncol,:,:),   &
       hygro            = hygro(:ncol,:,:),       &
       dryvol           = dryvol(:ncol,:,:),      &

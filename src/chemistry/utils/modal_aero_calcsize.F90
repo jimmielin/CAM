@@ -850,6 +850,7 @@ subroutine modal_aero_calcdry_run( &
    aero_props, aero_state, &
    ncol, pver, top_lev, &
    do_strat_sulfate, &
+   pi, &
    dgncur_a, &
    hygro, dryvol, dryrad, drymass, so4dryvol, naer, &
    errmsg, errflg)
@@ -863,7 +864,6 @@ subroutine modal_aero_calcdry_run( &
 
    use aerosol_properties_mod, only: aerosol_properties
    use aerosol_state_mod,      only: aerosol_state
-   use shr_const_mod,          only: pi => shr_const_pi
 
    ! Arguments
    class(aerosol_properties), intent(in) :: aero_props
@@ -872,6 +872,7 @@ subroutine modal_aero_calcdry_run( &
    integer,          intent(in)  :: pver                    ! number of vertical levels
    integer,          intent(in)  :: top_lev                 ! top level for aerosol calculations
    logical,          intent(in)  :: do_strat_sulfate        ! use stratospheric sulfate treatment
+   real(r8),         intent(in)  :: pi                      ! pi
    real(r8),         intent(in)  :: dgncur_a(:,:,:)         ! dry number mode diameter (m)
 
    real(r8),         intent(out) :: hygro(:,:,:)            ! volume-weighted mean hygroscopicity (--)
@@ -885,7 +886,7 @@ subroutine modal_aero_calcdry_run( &
 
    ! local variables
    real(r8), parameter :: third = 1._r8/3._r8
-   real(r8), parameter :: pi43 = pi*4._r8/3._r8
+   real(r8) :: pi43
 
    integer  :: i, k, l, m
    integer  :: nmodes, nspec
@@ -910,6 +911,8 @@ subroutine modal_aero_calcdry_run( &
 
    errmsg = ''
    errflg = 0
+
+   pi43 = pi*4._r8/3._r8
 
    nmodes = aero_props%nbins()
 
