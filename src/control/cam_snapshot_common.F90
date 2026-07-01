@@ -16,6 +16,7 @@ use physics_types,  only: physics_state, physics_tend, physics_ptend
 use camsrfexch,     only: cam_out_t, cam_in_t
 use ppgrid,         only: pcols, begchunk, endchunk
 use constituents,   only: pcnst
+use chem_mods,      only: gas_pcnst
 use phys_control,   only: phys_getopts
 use cam_logfile,    only: iulog
 
@@ -25,10 +26,13 @@ private
 
 public :: cam_snapshot_deactivate
 public :: cam_snapshot_all_outfld
+public :: cam_snapshot_aerochem_outfld         !SNAPSHOT SKETCH
+public :: cam_snapshot_aerochem_field_outfld   !SNAPSHOT SKETCH
 public :: cam_snapshot_ptend_outfld
 public :: snapshot_type
 public :: cam_state_snapshot_init
 public :: cam_cnst_snapshot_init
+public :: cam_aerochem_tend_snapshot_init      !SNAPSHOT SKETCH
 public :: cam_tend_snapshot_init
 public :: cam_ptend_snapshot_init
 public :: cam_in_snapshot_init
@@ -77,6 +81,9 @@ integer :: ntend_var
 integer :: ncam_in_var
 integer :: ncam_out_var
 integer :: npbuf_var
+integer :: naerochem_tend_var
+integer :: naerochem_vmr_var
+integer :: naerochem_stage_var
 
 integer :: cam_snapshot_before_num, cam_snapshot_after_num
 
@@ -87,6 +94,9 @@ type (snapshot_type)    ::  tend_snapshot(6)
 type (snapshot_type)    ::  cam_in_snapshot(pcnst+31)   ! needs to be bigger than pcnst because cam_in is split by constituent.
 type (snapshot_type)    ::  cam_out_snapshot(30)
 type (snapshot_type_nd) ::  pbuf_snapshot(300)
+type (snapshot_type)    ::  aerochem_tend_snapshot(gas_pcnst+pcnst)   ! setsox per-constituent tendencies: gas_pcnst interstitial (solsym) + at most pcnst cloud-borne (cnst_name_cw)
+type (snapshot_type)    ::  aerochem_vmr_snapshot(gas_pcnst+pcnst)    ! raw per-constituent vmr/vmrcw (aerochem_vmr_<name>), same name layout as aerochem_tend_snapshot
+type (snapshot_type)    ::  aerochem_stage_snapshot(3*gas_pcnst+pcnst+12) ! stage-boundary captures: post-newnuc + post-coag interstitial vmr per species, the del_h2so4 pair, pre-setsox interstitial (gas_pcnst) + cloud-borne (at most pcnst) vmr, and the setsox inputs (invariant O3/HO2 vmr, CO2 mmr)
 
 contains
 
@@ -137,6 +147,86 @@ use time_manager,   only: is_first_step
 
 end subroutine cam_snapshot_all_outfld
 
+!SNAPSHOT SKETCH ---------------------------------------------------------------
+! Dump ONLY state + constituents + pbuf to one tape (before_num or after_num).
+! Used to bracket an aerosol process buried inside chemistry (gas_phase_chemdr),
+! where tend/cam_in/cam_out are not in scope. state%q is intent(in) to chemistry
+! so it is the (unchanged) pre-chem baseline; the per-process working arrays ride
+! in as pbuf helper fields stashed at the call site. `position` selects the tape
+! so the caller does not need the before/after tape numbers.
+subroutine cam_snapshot_aerochem_outfld(state, pbuf, position)
+
+use time_manager,   only: is_first_step
+
+   type(physics_state),                intent(in) :: state
+   type(physics_buffer_desc), pointer, intent(in) :: pbuf(:)
+   character(len=*),                   intent(in) :: position   ! 'before' or 'after'
+
+   integer :: file_num, lchnk
+
+   if (is_first_step()) return
+
+   select case (trim(position))
+   case ('before')
+      file_num = cam_snapshot_before_num
+   case ('after')
+      file_num = cam_snapshot_after_num
+   case default
+      return
+   end select
+
+   if (file_num <= 0) return
+
+   lchnk = state%lchnk
+
+   call state_snapshot_all_outfld(lchnk, file_num, state)
+   call cnst_snapshot_all_outfld(lchnk, file_num, state%q)
+   call cam_pbuf_snapshot_all_outfld(lchnk, file_num, pbuf)
+
+end subroutine cam_snapshot_aerochem_outfld
+
+! Overwrite one already-registered snapshot field (e.g. cnst_<name>) on the
+! before/after tape. The aero_model contraption uses this to inject the
+! gasaerexch/rename working-array values (converted to mmr) into the per-
+! constituent snapshot fields, so CAM-SIMA reads them via its cnst_/pbuf_
+! fallback into the matching interstitial constituents. (Cloud-borne uses an
+! early vmr2qqcw push into pbuf instead, captured by the standard pbuf dump.)
+subroutine cam_snapshot_aerochem_field_outfld(fieldname, position, field, lchnk)
+
+use time_manager,   only: is_first_step
+use cam_history,    only: outfld
+
+   character(len=*), intent(in) :: fieldname
+   character(len=*), intent(in) :: position   ! 'before' or 'after'
+   real(r8),         intent(in) :: field(:,:)
+   integer,          intent(in) :: lchnk
+
+   integer :: file_num
+
+   if (is_first_step()) return
+
+   select case (trim(position))
+   case ('before')
+      file_num = cam_snapshot_before_num
+   case ('after')
+      file_num = cam_snapshot_after_num
+   case default
+      return
+   end select
+
+   if (file_num <= 0) return
+
+   call cam_history_snapshot_activate(trim(fieldname), file_num)
+   call outfld(trim(fieldname), field, size(field,1), lchnk)
+
+   ! Deactivate on all tapes after writing, so a later write of the same field
+   ! (e.g. the 'after' overwrite) does not leak onto the still-active 'before'
+   ! tape. Mirrors cnst_snapshot_all_outfld's activate/outfld/deactivate bracket.
+   call cam_history_snapshot_deactivate(trim(fieldname))
+
+end subroutine cam_snapshot_aerochem_field_outfld
+!SNAPSHOT SKETCH END -----------------------------------------------------------
+
 subroutine cam_snapshot_deactivate()
 
 !--------------------------------------------------------
@@ -174,6 +264,18 @@ subroutine cam_snapshot_deactivate()
 
    do i=1,npbuf_var
       call cam_history_snapshot_deactivate(pbuf_snapshot(i)%standard_name)
+   end do
+
+   do i=1,naerochem_tend_var
+      call cam_history_snapshot_deactivate(aerochem_tend_snapshot(i)%standard_name)
+   end do
+
+   do i=1,naerochem_vmr_var
+      call cam_history_snapshot_deactivate(aerochem_vmr_snapshot(i)%standard_name)
+   end do
+
+   do i=1,naerochem_stage_var
+      call cam_history_snapshot_deactivate(aerochem_stage_snapshot(i)%standard_name)
    end do
 
 end subroutine cam_snapshot_deactivate
@@ -311,6 +413,140 @@ subroutine cam_cnst_snapshot_init(cam_snapshot_before_num, cam_snapshot_after_nu
    end do
 
 end subroutine cam_cnst_snapshot_init
+
+!SNAPSHOT SKETCH ---------------------------------------------------------------
+! Register the aerochem per-constituent snapshot fields:
+! - mam_setsox_vmr_tend_<name>: setsox aqueous-chemistry tendencies, written to
+!   the before tape only by the aero_model P_start capture, so CAM-SIMA
+!   reassembles the interstitial/cloud-borne tendencies by constituent name for
+!   the modal_aero_rename "other growth" term.
+! - aerochem_vmr_<name>: the raw vmr/vmrcw working arrays (no unit conversion),
+!   written to both tapes. CAM-SIMA reads the before tape as bit-true vmr input
+!   (bypassing its mmr->vmr pack) and checks its post-apply vmr against the
+!   after tape, eliminating the mmr<->vmr round trip from the comparison.
+!
+! Fields captured on a single tape are registered on that tape only, by passing
+! -1 for the other tape number (snapshot_addfld skips non-positive tape
+! numbers). A field registered on a tape it is never written to flushes its
+! untouched, zero-initialized history buffer, and CAM-SIMA's ncdata_check then
+! compares real model values against those zeros. mam_del_h2so4_aeruptk is the
+! deliberate exception: registered on both tapes although only written 'after',
+! so the before tape carries an all-zero row that CAM-SIMA suites read as the
+! documented "does not exist yet at bracket entry" input.
+subroutine cam_aerochem_tend_snapshot_init(cam_snapshot_before_num, cam_snapshot_after_num)
+
+   use mo_tracname,     only: solsym
+   use modal_aero_data, only: cnst_name_cw
+   use mo_chem_utls,    only: get_inv_ndx
+
+   integer, intent(in) :: cam_snapshot_before_num, cam_snapshot_after_num
+
+   integer :: l, n
+
+   naerochem_tend_var = 0 ! Updated inside snapshot_addfld
+   naerochem_vmr_var  = 0 ! Updated inside snapshot_addfld
+
+   ! Interstitial chem species (indexed by gas_pcnst)
+   do l = 1, gas_pcnst
+      call snapshot_addfld(naerochem_tend_var, aerochem_tend_snapshot,           &
+           cam_snapshot_before_num, -1,                                          &
+           'mam_setsox_vmr_tend_'//trim(solsym(l)),                              &
+           'mam_setsox_vmr_tend_'//trim(solsym(l)), 's-1', 'lev')
+      call snapshot_addfld(naerochem_vmr_var, aerochem_vmr_snapshot,             &
+           cam_snapshot_before_num, cam_snapshot_after_num,                      &
+           'aerochem_vmr_'//trim(solsym(l)),                                     &
+           'aerochem_vmr_'//trim(solsym(l)), 'mol mol-1', 'lev')
+   end do
+
+   ! Cloud-borne constituents (register the full non-blank cnst_name_cw set)
+   do n = 1, size(cnst_name_cw)
+      if (cnst_name_cw(n) == ' ') cycle
+      call snapshot_addfld(naerochem_tend_var, aerochem_tend_snapshot,           &
+           cam_snapshot_before_num, -1,                                          &
+           'mam_setsox_vmr_tend_'//trim(cnst_name_cw(n)),                        &
+           'mam_setsox_vmr_tend_'//trim(cnst_name_cw(n)), 's-1', 'lev')
+      call snapshot_addfld(naerochem_vmr_var, aerochem_vmr_snapshot,             &
+           cam_snapshot_before_num, cam_snapshot_after_num,                      &
+           'aerochem_vmr_'//trim(cnst_name_cw(n)),                               &
+           'aerochem_vmr_'//trim(cnst_name_cw(n)), 'mol mol-1', 'lev')
+   end do
+
+   ! Stage-boundary fields for the newnuc/coag extension of the bracket:
+   ! raw interstitial vmr after newnuc (= coag entry) and after coag (= cluster
+   ! exit); cloud-borne is untouched by both, so the P_end cloud-borne capture
+   ! remains the valid state at these boundaries. Plus the per-level newnuc
+   ! inputs: the h2so4 gas-production and aerosol-uptake deltas (newnuc's
+   ! remaining host inputs need no dedicated fields: cldfr rides the pbuf dump
+   ! and qh2o is constituent Q = cnst_Q).
+   naerochem_stage_var = 0
+   do l = 1, gas_pcnst
+      call snapshot_addfld(naerochem_stage_var, aerochem_stage_snapshot,         &
+           -1, cam_snapshot_after_num,                                           &
+           'aerochem_vmr_postnewnuc_'//trim(solsym(l)),                          &
+           'aerochem_vmr_postnewnuc_'//trim(solsym(l)), 'mol mol-1', 'lev')
+      call snapshot_addfld(naerochem_stage_var, aerochem_stage_snapshot,         &
+           -1, cam_snapshot_after_num,                                           &
+           'aerochem_vmr_postcoag_'//trim(solsym(l)),                            &
+           'aerochem_vmr_postcoag_'//trim(solsym(l)), 'mol mol-1', 'lev')
+   end do
+   call snapshot_addfld(naerochem_stage_var, aerochem_stage_snapshot,            &
+        cam_snapshot_before_num, cam_snapshot_after_num,                         &
+        'mam_del_h2so4_gasprod', 'mam_del_h2so4_gasprod', 'mol mol-1', 'lev')
+   ! aeruptk deliberately stays on BOTH tapes: the before-tape all-zero row is
+   ! a read contract, not an artifact (see header).
+   call snapshot_addfld(naerochem_stage_var, aerochem_stage_snapshot,            &
+        cam_snapshot_before_num, cam_snapshot_after_num,                         &
+        'mam_del_h2so4_aeruptk', 'mam_del_h2so4_aeruptk', 'mol mol-1', 'lev')
+
+   ! Pre-setsox (P-1) boundary fields (before tape): raw interstitial AND
+   ! cloud-borne vmr entering the aqueous chemistry -- setsox updates
+   ! cloud-borne sulfate/ammonium, so unlike the newnuc/coag stages the
+   ! cloud-borne state must be captured at this boundary too. Plus the setsox
+   ! upstream inputs CAM-SIMA cannot reconstruct: invariant O3/HO2 as vmr
+   ! (registered only when the species IS an invariant -- in solution
+   ! mechanisms they already ride aerochem_vmr_presetsox_<name>) and the
+   ! rad_cnst CO2 mmr (pH carbonate term). Cloud fields ride the standard
+   ! state/pbuf dumps.
+   do l = 1, gas_pcnst
+      call snapshot_addfld(naerochem_stage_var, aerochem_stage_snapshot,         &
+           cam_snapshot_before_num, -1,                                          &
+           'aerochem_vmr_presetsox_'//trim(solsym(l)),                           &
+           'aerochem_vmr_presetsox_'//trim(solsym(l)), 'mol mol-1', 'lev')
+   end do
+   do n = 1, size(cnst_name_cw)
+      if (cnst_name_cw(n) == ' ') cycle
+      call snapshot_addfld(naerochem_stage_var, aerochem_stage_snapshot,         &
+           cam_snapshot_before_num, -1,                                          &
+           'aerochem_vmr_presetsox_'//trim(cnst_name_cw(n)),                     &
+           'aerochem_vmr_presetsox_'//trim(cnst_name_cw(n)), 'mol mol-1', 'lev')
+   end do
+   ! the invariant oxidants are written under BOTH base names: aerochem_vmr_
+   ! (the SIMA working array's own ic read) and aerochem_vmr_presetsox_ (the
+   ! mam_vmr_presetsox inject source, which resolves one base name for all
+   ! constituents). Invariants are constant across the bracket so the values
+   ! are identical.
+   if (get_inv_ndx('O3') > 0) then
+      call snapshot_addfld(naerochem_stage_var, aerochem_stage_snapshot,         &
+           cam_snapshot_before_num, -1,                                          &
+           'aerochem_vmr_O3', 'aerochem_vmr_O3', 'mol mol-1', 'lev')
+      call snapshot_addfld(naerochem_stage_var, aerochem_stage_snapshot,         &
+           cam_snapshot_before_num, -1,                                          &
+           'aerochem_vmr_presetsox_O3', 'aerochem_vmr_presetsox_O3', 'mol mol-1', 'lev')
+   end if
+   if (get_inv_ndx('HO2') > 0) then
+      call snapshot_addfld(naerochem_stage_var, aerochem_stage_snapshot,         &
+           cam_snapshot_before_num, -1,                                          &
+           'aerochem_vmr_HO2', 'aerochem_vmr_HO2', 'mol mol-1', 'lev')
+      call snapshot_addfld(naerochem_stage_var, aerochem_stage_snapshot,         &
+           cam_snapshot_before_num, -1,                                          &
+           'aerochem_vmr_presetsox_HO2', 'aerochem_vmr_presetsox_HO2', 'mol mol-1', 'lev')
+   end if
+   call snapshot_addfld(naerochem_stage_var, aerochem_stage_snapshot,            &
+        cam_snapshot_before_num, -1,                                             &
+        'aerochem_co2_mmr', 'aerochem_co2_mmr', 'kg kg-1', 'lev')
+
+end subroutine cam_aerochem_tend_snapshot_init
+!SNAPSHOT SKETCH END -----------------------------------------------------------
 
 subroutine cam_tend_snapshot_init(cam_snapshot_before_num, cam_snapshot_after_num)
 

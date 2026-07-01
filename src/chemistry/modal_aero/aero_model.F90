@@ -73,6 +73,12 @@ module aero_model
 
   integer :: sulfeq_idx = -1
 
+  !SNAPSHOT SKETCH: gate for the gasaerexch+rename before/after capture inside
+  ! aero_model_gasaerexch. Deliberately a hardcoded development switch, not a
+  ! namelist option: moving the bracket to another process requires editing the
+  ! capture sites anyway. Set .false. to disable without removing the plumbing.
+  logical :: do_aerochem_snapshot = .true.
+
   integer :: nh3_ndx    = 0
   integer :: nh4_ndx    = 0
 
@@ -1005,6 +1011,8 @@ contains
                                     vmr0, vmr, pbuf )
 
     use time_manager,          only : get_nstep
+    use cam_snapshot_common,   only : cam_snapshot_aerochem_outfld, &       !SNAPSHOT SKETCH
+                                      cam_snapshot_aerochem_field_outfld    !SNAPSHOT SKETCH
     use modal_aero_coag,       only : modal_aero_coag_run
     use modal_aero_gasaerexch, only : modal_aero_gasaerexch_run, modefrm_pcage
     use modal_aero_rename,     only : modal_aero_rename_run
@@ -1024,8 +1032,11 @@ contains
                                       modeptr_stracoar
     use mo_constants,          only : pi
     use mo_chem_utls,          only : get_spc_ndx
+    use mo_chem_utls,          only : get_inv_ndx          !SNAPSHOT SKETCH: invariant O3/HO2 capture
+    use rad_constituents,      only : rad_cnst_get_gas     !SNAPSHOT SKETCH: CO2 capture (setsox pH input)
     use constituents,          only : pcnst, cnst_name
     use physconst,             only : mwdry
+    use physconst,             only : boltz                !SNAPSHOT SKETCH: invariant->vmr conversion
 
     !-----------------------------------------------------------------------
     !      ... dummy arguments
@@ -1065,6 +1076,12 @@ contains
 
     real(r8), pointer :: dgnum(:,:,:), dgnumwet(:,:,:), wetdens(:,:,:)
     real(r8), pointer :: pblh(:)                    ! pbl height (m)
+    real(r8) :: snap_mmr(ncol,pver)   !SNAPSHOT SKETCH: per-species vmr->mmr work array
+    integer  :: lsnap                 !SNAPSHOT SKETCH: contraption loop index
+    integer  :: snap_idx              !SNAPSHOT SKETCH: constituent index of the snapshotted chem species (<=0 if not advected)
+    real(r8) :: snap_xhnm(ncol,pver)  !SNAPSHOT SKETCH: air number density, setsox's exact expression (molecules cm-3)
+    integer  :: snap_inv_ndx          !SNAPSHOT SKETCH: invariant index of O3/HO2 (<=0 if not an invariant)
+    real(r8), pointer :: snap_co2(:,:) !SNAPSHOT SKETCH: rad_cnst CO2 mmr (setsox pH input)
 
     real(r8), dimension(ncol) :: wrk
     character(len=32)         :: name
@@ -1171,6 +1188,61 @@ contains
     dvmrdt(:ncol,:,:) = vmr(:ncol,:,:)
     dvmrcwdt(:ncol,:,:) = vmrcw(:ncol,:,:)
 
+    !SNAPSHOT SKETCH: P-1 = pre-setsox boundary (immediately after qqcw2vmr).
+    ! vmr/vmrcw here are post-imp_sol, pre-aqueous-chemistry: the input state of
+    ! the setsox scheme. Capture raw interstitial AND cloud-borne vmr (setsox
+    ! updates cloud-borne sulfate/ammonium, so unlike the newnuc/coag stage
+    ! captures the cloud-borne state is needed here too), on the BEFORE tape:
+    ! the standalone setsox suite injects these, runs setsox, and gets two
+    ! bitwise gates for free from the existing P_start captures on the same
+    ! tape (post-setsox aerochem_vmr_<name> and mam_setsox_vmr_tend_<name>).
+    ! Also capture the setsox upstream inputs CAM-SIMA cannot reconstruct:
+    !  - invariant O3/HO2 as vmr, divided by the same air-number-density
+    !    expression setsox uses internally (so the captured value is bitwise
+    !    what the portable setsox_sub computes from invariants/xhnm; the SIMA
+    !    wrapper reads them as constituents through the qin path instead)
+    !  - the rad_cnst CO2 mmr (pH carbonate term; same rad_cnst_get_gas call
+    !    the CAM wrapper mo_setsox_cam makes)
+    ! Cloud fields (pbuf_CLD, cnst_CLDLIQ, cnst_NUMLIQ) ride the standard
+    ! state/pbuf dumps of the P_start capture below.
+    if (do_aerochem_snapshot) then
+       do l = 1, gas_pcnst
+          call cam_snapshot_aerochem_field_outfld( &
+               'aerochem_vmr_presetsox_'//trim(solsym(l)), 'before', vmr(:ncol,:,l), lchnk)
+       end do
+       do l = 1, gas_pcnst
+          call cnst_get_ind(solsym(l), snap_idx, abort=.false.)
+          if (snap_idx <= 0) cycle
+          if (cnst_name_cw(snap_idx) /= ' ') then
+             call cam_snapshot_aerochem_field_outfld( &
+                  'aerochem_vmr_presetsox_'//trim(cnst_name_cw(snap_idx)), 'before', vmrcw(:ncol,:,l), lchnk)
+          end if
+       end do
+       ! setsox: xhnm = press/(tfld * M3_TO_CM3 * BOLTZMANN), M3_TO_CM3 = 1.0e6
+       snap_xhnm(:ncol,:) = pmid(:ncol,:) / (tfld(:ncol,:) * 1.0e6_r8 * boltz)
+       snap_inv_ndx = get_inv_ndx('O3')
+       if (snap_inv_ndx > 0) then
+          snap_mmr(:ncol,:) = invariants(:ncol,:,snap_inv_ndx) / snap_xhnm(:ncol,:)
+          call cam_snapshot_aerochem_field_outfld( &
+               'aerochem_vmr_O3', 'before', snap_mmr(:ncol,:), lchnk)
+          ! same values under the presetsox base name: the SIMA inject reads
+          ! mam_vmr_presetsox with ONE base name for all constituents
+          call cam_snapshot_aerochem_field_outfld( &
+               'aerochem_vmr_presetsox_O3', 'before', snap_mmr(:ncol,:), lchnk)
+       end if
+       snap_inv_ndx = get_inv_ndx('HO2')
+       if (snap_inv_ndx > 0) then
+          snap_mmr(:ncol,:) = invariants(:ncol,:,snap_inv_ndx) / snap_xhnm(:ncol,:)
+          call cam_snapshot_aerochem_field_outfld( &
+               'aerochem_vmr_HO2', 'before', snap_mmr(:ncol,:), lchnk)
+          call cam_snapshot_aerochem_field_outfld( &
+               'aerochem_vmr_presetsox_HO2', 'before', snap_mmr(:ncol,:), lchnk)
+       end if
+       call rad_cnst_get_gas(0, 'CO2', state, pbuf, snap_co2)
+       call cam_snapshot_aerochem_field_outfld( &
+            'aerochem_co2_mmr', 'before', snap_co2(:ncol,:), lchnk)
+    end if
+
     ! aqueous chemistry ...
 
     if( has_sox ) then
@@ -1251,6 +1323,71 @@ contains
        nullify( sulfeq )
        use_sulfeq = .false.
     endif
+
+    !SNAPSHOT SKETCH: P_start of the gasaerexch+rename bracket. vmr/vmrcw here are
+    ! post-imp_sol + post-setsox (the scheme inputs). Capture per-constituent (by
+    ! name, so the CAM<->CAM-SIMA index reshuffle is handled) so CAM-SIMA seeds the
+    ! matching constituents via its cnst_/pbuf_ fallback:
+    !  - cloud-borne: push vmrcw -> pbuf qqcw (mmr); the standard pbuf dump then
+    !    writes pbuf_<name>. The real run's end-of-routine vmr2qqcw overwrites it,
+    !    so the live state is untouched.
+    !  - interstitial: overwrite each cnst_<name> snapshot field with vmr->mmr
+    !    (mbar==mwdry for non-WACCM-X, so the conversion is the dry-air constant).
+    if (do_aerochem_snapshot) then
+       call vmr2qqcw(lchnk, vmrcw, mbar, ncol, loffset, pbuf)
+       call cam_snapshot_aerochem_outfld(state, pbuf, 'before')
+       do lsnap = 1, gas_pcnst
+          ! Only the chem species that are advected constituents have a registered
+          ! cnst_<name> snapshot field; skip H2O (folded onto Q) and short-lived species.
+          call cnst_get_ind(solsym(lsnap), snap_idx, abort=.false.)
+          if (snap_idx <= 0) cycle
+          snap_mmr(:ncol,:) = vmr(:ncol,:,lsnap) * adv_mass(lsnap) / mwdry
+          call cam_snapshot_aerochem_field_outfld( &
+               'cnst_'//trim(solsym(lsnap)), 'before', snap_mmr(:ncol,:), lchnk)
+       end do
+       ! Dump the setsox aqueous-chemistry tendencies (interstitial dvmrdt and
+       ! cloud-borne dvmrcwdt) per constituent by name, so CAM-SIMA reassembles
+       ! them for the modal_aero_rename "other continuous growth" term.
+       do l = 1, gas_pcnst
+          call cam_snapshot_aerochem_field_outfld( &
+               'mam_setsox_vmr_tend_'//trim(solsym(l)), 'before', dvmrdt(:ncol,:,l), lchnk)
+       end do
+       do l = 1, gas_pcnst
+          ! Resolve the constituent index by name via cnst_get_ind, NOT l+loffset:
+          ! the chem->constituent offset is invalid for the non-advected tail and
+          ! overruns cnst_name_cw(pcnst). Interstitial names come straight from solsym
+          ! above; the matching cloud-borne name lives at the same constituent index.
+          call cnst_get_ind(solsym(l), snap_idx, abort=.false.)
+          if (snap_idx <= 0) cycle
+          if (cnst_name_cw(snap_idx) /= ' ') then
+             call cam_snapshot_aerochem_field_outfld( &
+                  'mam_setsox_vmr_tend_'//trim(cnst_name_cw(snap_idx)), 'before', dvmrcwdt(:ncol,:,l), lchnk)
+          end if
+       end do
+       ! Dump the raw vmr/vmrcw working arrays per constituent by name (no unit
+       ! conversion), so CAM-SIMA can inject bit-true vmr inputs directly instead
+       ! of reconstructing them from the mmr-converted cnst_ fields above.
+       do l = 1, gas_pcnst
+          call cam_snapshot_aerochem_field_outfld( &
+               'aerochem_vmr_'//trim(solsym(l)), 'before', vmr(:ncol,:,l), lchnk)
+       end do
+       do l = 1, gas_pcnst
+          call cnst_get_ind(solsym(l), snap_idx, abort=.false.)
+          if (snap_idx <= 0) cycle
+          if (cnst_name_cw(snap_idx) /= ' ') then
+             call cam_snapshot_aerochem_field_outfld( &
+                  'aerochem_vmr_'//trim(cnst_name_cw(snap_idx)), 'before', vmrcw(:ncol,:,l), lchnk)
+          end if
+       end do
+       ! Upstream-produced newnuc input: the h2so4 gas-phase-chemistry production
+       ! over the step (not reconstructable in CAM-SIMA without the MOZART
+       ! solver). Newnuc's other host inputs need no dedicated fields: cldfr
+       ! rides the pbuf dump (pbuf_CLD; the time dimension is inert, size 1,
+       ! in current dycores) and qh2o IS constituent Q (chemistry's H2O maps
+       ! to constituent 1 via map2chm; chemistry.F90) = cnst_Q on the tape.
+       call cam_snapshot_aerochem_field_outfld( &
+            'mam_del_h2so4_gasprod', 'before', del_h2so4_gasprod(:ncol,:), lchnk)
+    end if
 
     ! Call portable gasaerexch_run to get tendencies
     dqdt_gaex(:,:,:) = 0.0_r8
@@ -1418,6 +1555,48 @@ contains
     ! Recover del_h2so4_aeruptk = vmr_after - vmr_before (see snapshot above).
     if (ndx_h2so4 > 0) then
        del_h2so4_aeruptk(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4) - del_h2so4_aeruptk(1:ncol,:)
+    end if
+
+    !SNAPSHOT SKETCH: P_end of the gasaerexch+rename bracket. vmr/vmrcw now hold the
+    ! applied gasaerexch+rename result; newnuc/coag below have not run yet (and the
+    ! diagnostics between here and newnuc do not touch vmr/vmrcw). Capture exactly as
+    ! at P_start but to the "after" tape.
+    if (do_aerochem_snapshot) then
+       call vmr2qqcw(lchnk, vmrcw, mbar, ncol, loffset, pbuf)
+       call cam_snapshot_aerochem_outfld(state, pbuf, 'after')
+       do lsnap = 1, gas_pcnst
+          ! Only the chem species that are advected constituents have a registered
+          ! cnst_<name> snapshot field; skip H2O (folded onto Q) and short-lived species.
+          call cnst_get_ind(solsym(lsnap), snap_idx, abort=.false.)
+          if (snap_idx <= 0) cycle
+          snap_mmr(:ncol,:) = vmr(:ncol,:,lsnap) * adv_mass(lsnap) / mwdry
+          call cam_snapshot_aerochem_field_outfld( &
+               'cnst_'//trim(solsym(lsnap)), 'after', snap_mmr(:ncol,:), lchnk)
+       end do
+       ! Raw vmr/vmrcw on the after tape (as at P_start): the vmr-space truth that
+       ! CAM-SIMA's physics_check_data compares its post-apply vmr against, with no
+       ! mmr<->vmr conversion on either side of the comparison.
+       do l = 1, gas_pcnst
+          call cam_snapshot_aerochem_field_outfld( &
+               'aerochem_vmr_'//trim(solsym(l)), 'after', vmr(:ncol,:,l), lchnk)
+       end do
+       do l = 1, gas_pcnst
+          call cnst_get_ind(solsym(l), snap_idx, abort=.false.)
+          if (snap_idx <= 0) cycle
+          if (cnst_name_cw(snap_idx) /= ' ') then
+             call cam_snapshot_aerochem_field_outfld( &
+                  'aerochem_vmr_'//trim(cnst_name_cw(snap_idx)), 'after', vmrcw(:ncol,:,l), lchnk)
+          end if
+       end do
+       ! Newnuc-entry inputs on the after tape: together with the post-apply raw
+       ! vmr and the state/pbuf dumps above, the after tape is a complete input
+       ! set for a STANDALONE newnuc suite (del_h2so4_aeruptk exists only here,
+       ! recovered around the gasaerexch+rename apply; gasprod repeats the
+       ! before-tape value so the standalone suite reads one file).
+       call cam_snapshot_aerochem_field_outfld( &
+            'mam_del_h2so4_gasprod', 'after', del_h2so4_gasprod(:ncol,:), lchnk)
+       call cam_snapshot_aerochem_field_outfld( &
+            'mam_del_h2so4_aeruptk', 'after', del_h2so4_aeruptk(:ncol,:), lchnk)
     end if
 
     ! Diagnostics: column tendencies for gas-aerosol exchange and renaming.
@@ -1596,6 +1775,19 @@ contains
 
     call t_stopf('modal_nucl')
 
+    !SNAPSHOT SKETCH: P2 = post-newnuc / coag-entry boundary. Raw interstitial
+    ! vmr only: newnuc does not touch cloud-borne, so the P_end cloud-borne
+    ! capture remains the valid state here. Written to the after tape as the
+    ! check target of the standalone newnuc suite and the input of the
+    ! standalone coag suite (whose dgnum/dgnumwet/wetdens inputs ride the
+    ! standard pbuf dump on the same tape).
+    if (do_aerochem_snapshot) then
+       do l = 1, gas_pcnst
+          call cam_snapshot_aerochem_field_outfld( &
+               'aerochem_vmr_postnewnuc_'//trim(solsym(l)), 'after', vmr(:ncol,:,l), lchnk)
+       end do
+    end if
+
     call t_startf('modal_coag')
 
     ! do aerosol coagulation
@@ -1643,6 +1835,19 @@ contains
     end do ! l = ...
 
     call t_stopf('modal_coag')
+
+    !SNAPSHOT SKETCH: P3 = post-coag / cluster-exit boundary, before the
+    ! NH3->NH4 conservation fix-up (a no-op without NH3, e.g. trop_mam4) and
+    ! the end-of-routine vmr2qqcw. Check target of the standalone coag suite
+    ! and the assembled microphysics suite's final vmr-space (method B)
+    ! comparison point, from which the difference-based unpack forms the
+    ! constituent tendency.
+    if (do_aerochem_snapshot) then
+       do l = 1, gas_pcnst
+          call cam_snapshot_aerochem_field_outfld( &
+               'aerochem_vmr_postcoag_'//trim(solsym(l)), 'after', vmr(:ncol,:,l), lchnk)
+       end do
+    end if
 
     call vmr2qqcw( lchnk, vmrcw, mbar, ncol, loffset, pbuf )
 
