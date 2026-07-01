@@ -195,7 +195,7 @@ contains
     use aero_deposition_cam, only: aero_deposition_cam_init
     use modal_aero_gasaerexch_cam, only: modal_aero_gasaerexch_cam_init
     use modal_aero_newnuc,     only: modal_aero_newnuc_init
-    use modal_aero_rename,     only: modal_aero_rename_init
+    use modal_aero_rename_cam, only: modal_aero_rename_cam_init
 
     ! args
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -264,7 +264,7 @@ contains
     call modal_aero_data_init(pbuf2d)
     call modal_aero_bcscavcoef_init()
 
-    call modal_aero_rename_init( modal_accum_coarse_exch )
+    call modal_aero_rename_cam_init( modal_accum_coarse_exch )
     !   calcsize call must follow rename call
     call modal_aero_calcsize_init( pbuf2d )
     call modal_aero_gasaerexch_cam_init()
@@ -1007,7 +1007,7 @@ contains
     use time_manager,          only : get_nstep
     use modal_aero_coag,       only : modal_aero_coag_sub
     use modal_aero_gasaerexch, only : modal_aero_gasaerexch_run, modefrm_pcage
-    use modal_aero_rename,     only : modal_aero_rename_sub
+    use modal_aero_rename_cam, only : modal_aero_rename_cam_run
     use modal_aero_newnuc,     only : modal_aero_newnuc_sub
     use modal_aero_data,       only : cnst_name_cw, qqcw_get_field, &
                                       nsoa, lptr2_soa_a_amode, lptr2_soa_g_amode, &
@@ -1286,7 +1286,7 @@ contains
        call endrun('aero_model_gasaerexch: ' // trim(errmsg_local))
     end if
 
-    ! Snapshot conden-only tendencies before modal_aero_rename_sub adds its
+    ! Snapshot conden-only tendencies before modal_aero_rename_cam_run adds its
     ! mode-transfer tendencies into dqdt_gaex in place. The _sfgaex1 and SOA
     ! cond/evap diagnostics below use these pre-rename values, matching the
     ! original where qsrflx/qcon were accumulated before the rename call.
@@ -1312,7 +1312,7 @@ contains
     is_dorename_atik = .true.
     qsrflx(:,:,:) = 0.0_r8
     qqcwsrflx(:,:,:) = 0.0_r8
-    call modal_aero_rename_sub(                              &
+    call modal_aero_rename_cam_run(                          &
          'aero_model_gasaerexch',              &
          lchnk,             ncol,      nstep,    &
          loffset,           delt,                &
@@ -1323,7 +1323,13 @@ contains
          dqqcwdt_gaex,      dvmrcwdt,            &
          is_dorename_atik,  dorename_atik,       &
          jsrflx_rename,     nsrflx,              &
-         qsrflx,            qqcwsrflx            )
+         qsrflx,            qqcwsrflx,           &
+         pver=pver,           gravit=gravit,       &
+         errmsg=errmsg_local, errflg=errflg_local )
+
+    if (errflg_local /= 0) then
+       call endrun('aero_model_gasaerexch (rename): ' // trim(errmsg_local))
+    end if
 
     ! Apply tendencies to vmr and vmrcw
     do l = 1, gas_pcnst

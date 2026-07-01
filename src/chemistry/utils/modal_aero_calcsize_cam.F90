@@ -39,7 +39,7 @@ use modal_aero_data,  only: numptrcw_amode, mprognum_amode, qqcw_get_field, lmas
            specmw_amode, specdens_amode, voltonumb_amode, &
            cnst_name_cw
 
-use modal_aero_rename, only: lspectooa_renamexf, lspecfrma_renamexf, lspectooc_renamexf, lspecfrmc_renamexf, &
+use modal_aero_rename_cam, only: lspectooa_renamexf, lspecfrma_renamexf, lspectooc_renamexf, lspecfrmc_renamexf, &
            modetoo_renamexf, nspecfrm_renamexf, npair_renamexf, modefrm_renamexf
 
 #endif

@@ -21,7 +21,7 @@ contains
                                lptr_so4_a_amode, lptr_nh4_a_amode, &
                                lptr2_soa_a_amode, lptr2_soa_g_amode, lptr2_pom_a_amode, &
                                numptr_amode, lmassptr_amode, cnst_name_cw
-    use modal_aero_rename, only: npair_renamexf, nspecfrm_renamexf, &
+    use modal_aero_rename_cam, only: npair_renamexf, nspecfrm_renamexf, &
                                  lspecfrma_renamexf, lspectooa_renamexf, &
                                  lspecfrmc_renamexf, lspectooc_renamexf
     use radiative_aerosol, only: rad_aer_get_info
