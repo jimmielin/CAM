@@ -14,7 +14,7 @@
   use spmd_utils,      only: masterproc
   use modal_aero_data, only: maxspec_renamexf=>nspec_max, ntot_amode
   use modal_aero_data, only: alnsg_amode, voltonumblo_amode, voltonumbhi_amode, dgnum_amode, nspec_amode
-  use modal_aero_data, only: specmw_amode, specdens_amode, lmassptr_amode, lmassptrcw_amode
+  use modal_aero_data, only: lmassptr_amode, lmassptrcw_amode
   use modal_aero_data, only: numptr_amode, numptrcw_amode, modeptr_coarse, modeptr_accum
   use modal_aero_data, only: modeptr_stracoar
   use modal_aero_data, only: dgnumhi_amode, dgnumlo_amode, cnst_name_cw, modeptr_aitken
@@ -27,7 +27,6 @@
 
 ! !PUBLIC MEMBER FUNCTIONS:
   public :: modal_aero_rename_cam_init
-  public :: modal_aero_rename_cam_run
 
 ! !PUBLIC DATA MEMBERS:
 ! Resolved renaming-pair tables (host constituent-index space).  These are
@@ -50,15 +49,15 @@
 ! 5001 = stracoar --> accum
   integer :: ipair_select_renamexf(maxpair_renamexf)
 
-! Renaming-pair flags used only by the portable science (resolved here, threaded
-! through modal_aero_rename_init).
-  integer :: igrow_shrink_renamexf(maxpair_renamexf)
-  integer :: ixferable_all_renamexf(maxpair_renamexf)
+! Renaming-pair flags resolved here and consumed by the portable science: handed
+! to modal_aero_rename_init, and passed by aero_model to modal_aero_rename_run.
+  integer, protected, public :: igrow_shrink_renamexf(maxpair_renamexf)
+  integer, protected, public :: ixferable_all_renamexf(maxpair_renamexf)
   integer :: ixferable_all_needed_renamexf(maxpair_renamexf)
-  integer, allocatable :: ixferable_a_renamexf(:,:)
-  integer, allocatable :: ixferable_c_renamexf(:,:)
+  integer, allocatable, protected, public :: ixferable_a_renamexf(:,:)
+  integer, allocatable, protected, public :: ixferable_c_renamexf(:,:)
 
-  logical :: strat_only_renamexf(maxpair_renamexf)
+  logical, protected, public :: strat_only_renamexf(maxpair_renamexf)
 ! strat_only_renamexf - when true for a particular renaming pair, renaming is only
 !                       done in stratosphere (when k < troplev(icol) )
 
@@ -156,93 +155,6 @@ contains
     end if
 
   end subroutine modal_aero_rename_cam_init
-
-  !------------------------------------------------------------------
-  ! CAM marshaling driver: gather the shared mode metadata (modal_aero_data) and
-  ! the resolved renaming-pair tables, then call the portable modal_aero_rename_run.
-  ! Keeps the aero_model call site free of MAM metadata plumbing (the SIMA wrapper
-  ! will marshal from mam_mode_metadata instead).
-  !------------------------------------------------------------------
-  subroutine modal_aero_rename_cam_run(                   &
-       fromwhere,         lchnk,               &
-       ncol,              nstep,               &
-       loffset,           deltat,              &
-       pdel,              troplev,             &
-       dotendrn,          q,                   &
-       dqdt,              dqdt_other,          &
-       dotendqqcwrn,      qqcw,                &
-       dqqcwdt,           dqqcwdt_other,       &
-       is_dorename_atik,  dorename_atik,       &
-       jsrflx_rename,     nsrflx,              &
-       qsrflx,            qqcwsrflx,           &
-       pver,              gravit,              &
-       errmsg,            errflg,              &
-       dqdt_rnpos                              )
-    use modal_aero_rename, only: modal_aero_rename_run
-
-    character(len=*), intent(in)    :: fromwhere
-    integer,  intent(in)    :: lchnk
-    integer,  intent(in)    :: ncol
-    integer,  intent(in)    :: nstep
-    integer,  intent(in)    :: loffset
-    real(r8), intent(in)    :: deltat
-    integer,  intent(in)    :: troplev(:)
-    real(r8), intent(in)    :: pdel(:,:)
-    real(r8), intent(in)    :: q(:,:,:)
-    real(r8), intent(in)    :: qqcw(:,:,:)
-    real(r8), intent(inout) :: dqdt(:,:,:)
-    real(r8), intent(inout) :: dqqcwdt(:,:,:)
-    real(r8), intent(in)    :: dqdt_other(:,:,:)
-    real(r8), intent(in)    :: dqqcwdt_other(:,:,:)
-    logical,  intent(inout) :: dotendrn(:)
-    logical,  intent(inout) :: dotendqqcwrn(:)
-    logical,  intent(in)    :: is_dorename_atik
-    logical,  intent(in)    :: dorename_atik(:,:)
-    integer,  intent(in)    :: jsrflx_rename
-    integer,  intent(in)    :: nsrflx
-    real(r8), intent(inout) :: qsrflx(:,:,:)
-    real(r8), intent(inout) :: qqcwsrflx(:,:,:)
-    integer,  intent(in)    :: pver
-    real(r8), intent(in)    :: gravit
-    character(len=*), intent(out) :: errmsg
-    integer,  intent(out)   :: errflg
-    real(r8), optional, intent(out) :: dqdt_rnpos(:,:,:)
-
-    call modal_aero_rename_run(                             &
-       fromwhere        = fromwhere,        lchnk         = lchnk,         &
-       ncol             = ncol,             nstep         = nstep,         &
-       loffset          = loffset,          deltat        = deltat,        &
-       pdel             = pdel,             troplev       = troplev,       &
-       dotendrn         = dotendrn,         q             = q,             &
-       dqdt             = dqdt,             dqdt_other    = dqdt_other,    &
-       dotendqqcwrn     = dotendqqcwrn,     qqcw          = qqcw,          &
-       dqqcwdt          = dqqcwdt,          dqqcwdt_other = dqqcwdt_other, &
-       is_dorename_atik = is_dorename_atik, dorename_atik = dorename_atik, &
-       jsrflx_rename    = jsrflx_rename,    nsrflx        = nsrflx,        &
-       qsrflx           = qsrflx,           qqcwsrflx     = qqcwsrflx,     &
-       dqdt_rnpos       = dqdt_rnpos,                                      &
-       ntot_amode         = ntot_amode,       npair_renamexf   = npair_renamexf,   &
-       modefrm_renamexf   = modefrm_renamexf, modetoo_renamexf = modetoo_renamexf, &
-       nspecfrm_renamexf  = nspecfrm_renamexf,                                     &
-       lspecfrma_renamexf = lspecfrma_renamexf, lspecfrmc_renamexf = lspecfrmc_renamexf, &
-       lspectooa_renamexf = lspectooa_renamexf, lspectooc_renamexf = lspectooc_renamexf, &
-       alnsg_amode        = alnsg_amode,      voltonumblo_amode = voltonumblo_amode, &
-       voltonumbhi_amode  = voltonumbhi_amode, dgnum_amode      = dgnum_amode,      &
-       nspec_amode        = nspec_amode,      specmw_amode      = specmw_amode,     &
-       specdens_amode     = specdens_amode,   lmassptr_amode    = lmassptr_amode,   &
-       lmassptrcw_amode   = lmassptrcw_amode, numptr_amode      = numptr_amode,     &
-       numptrcw_amode     = numptrcw_amode,   pi                = pi,               &
-       modeptr_accum      = modeptr_accum,    modeptr_coarse    = modeptr_coarse,   &
-       modeptr_stracoar   = modeptr_stracoar,                                       &
-       igrow_shrink_renamexf  = igrow_shrink_renamexf,                              &
-       ixferable_all_renamexf = ixferable_all_renamexf,                            &
-       ixferable_a_renamexf   = ixferable_a_renamexf, ixferable_c_renamexf = ixferable_c_renamexf, &
-       strat_only_renamexf    = strat_only_renamexf,                               &
-       modal_accum_coarse_exch = modal_accum_coarse_exch,                          &
-       pver             = pver,             gravit        = gravit,        &
-       errmsg           = errmsg,           errflg        = errflg         )
-
-  end subroutine modal_aero_rename_cam_run
 
 !----------------------------------------------------------------------
 ! private methods -- renaming-pair resolution (verbatim from the original

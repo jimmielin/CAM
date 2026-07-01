@@ -1007,11 +1007,22 @@ contains
     use time_manager,          only : get_nstep
     use modal_aero_coag,       only : modal_aero_coag_sub
     use modal_aero_gasaerexch, only : modal_aero_gasaerexch_run, modefrm_pcage
-    use modal_aero_rename_cam, only : modal_aero_rename_cam_run
+    use modal_aero_rename,     only : modal_aero_rename_run
+    use modal_aero_rename_cam, only : npair_renamexf, modefrm_renamexf, modetoo_renamexf, &
+                                      nspecfrm_renamexf, lspecfrma_renamexf, lspecfrmc_renamexf, &
+                                      lspectooa_renamexf, lspectooc_renamexf, &
+                                      igrow_shrink_renamexf, ixferable_all_renamexf, &
+                                      ixferable_a_renamexf, ixferable_c_renamexf, strat_only_renamexf
     use modal_aero_newnuc,     only : modal_aero_newnuc_sub
     use modal_aero_data,       only : cnst_name_cw, qqcw_get_field, &
                                       nsoa, lptr2_soa_a_amode, lptr2_soa_g_amode, &
-                                      nspec_amode
+                                      nspec_amode, &
+                                      alnsg_amode, voltonumblo_amode, voltonumbhi_amode, &
+                                      dgnum_amode, specmw_amode, specdens_amode, &
+                                      lmassptr_amode, lmassptrcw_amode, numptr_amode, &
+                                      numptrcw_amode, modeptr_accum, modeptr_coarse, &
+                                      modeptr_stracoar
+    use mo_constants,          only : pi
     use mo_chem_utls,          only : get_spc_ndx
     use constituents,          only : pcnst, cnst_name
     use physconst,             only : mwdry
@@ -1079,6 +1090,7 @@ contains
     ! Local arrays for refactored gasaerexch call
     real(r8) :: dqdt_gaex(ncol,pver,gas_pcnst)
     real(r8) :: dqdt_gaex_conden(ncol,pver,gas_pcnst)  ! conden-only snapshot (pre-rename) for diagnostics
+    real(r8) :: dqdt_rnpos_unused(ncol,pver,gas_pcnst) ! required rename output, unused by CAM
     logical  :: dotend_gaex(gas_pcnst)
     real(r8) :: dqqcwdt_gaex(ncol,pver,gas_pcnst)
     logical  :: dotendrn(gas_pcnst), dotendqqcwrn(gas_pcnst)
@@ -1286,7 +1298,7 @@ contains
        call endrun('aero_model_gasaerexch: ' // trim(errmsg_local))
     end if
 
-    ! Snapshot conden-only tendencies before modal_aero_rename_cam_run adds its
+    ! Snapshot conden-only tendencies before modal_aero_rename_run adds its
     ! mode-transfer tendencies into dqdt_gaex in place. The _sfgaex1 and SOA
     ! cond/evap diagnostics below use these pre-rename values, matching the
     ! original where qsrflx/qcon were accumulated before the rename call.
@@ -1304,28 +1316,73 @@ contains
        del_h2so4_aeruptk(:,:) = 0.0_r8
     end if
 
-    ! Call rename as a separate step (was embedded in gasaerexch_sub)
+    ! Call rename as a separate step (was embedded in gasaerexch_sub).
+    ! Marshal MAM mode metadata + the resolved renaming-pair tables (owned by
+    ! modal_aero_rename_cam) into the portable modal_aero_rename_run directly.
     dqqcwdt_gaex(:,:,:) = 0.0_r8
     dotendrn(:) = .false.
     dotendqqcwrn(:) = .false.
     dorename_atik(1:ncol,:) = .true.
     is_dorename_atik = .true.
-    qsrflx(:,:,:) = 0.0_r8
+    ! Zero the (pcols-padded) column-tendency outputs over the full domain; the
+    ! scheme is called on :ncol and defines only that subset.
+    qsrflx(:,:,:)    = 0.0_r8
     qqcwsrflx(:,:,:) = 0.0_r8
-    call modal_aero_rename_cam_run(                          &
-         'aero_model_gasaerexch',              &
-         lchnk,             ncol,      nstep,    &
-         loffset,           delt,                &
-         pdel,              troplev,             &
-         dotendrn,          vmr,                 &
-         dqdt_gaex,         dvmrdt,              &
-         dotendqqcwrn,      vmrcw,               &
-         dqqcwdt_gaex,      dvmrcwdt,            &
-         is_dorename_atik,  dorename_atik,       &
-         jsrflx_rename,     nsrflx,              &
-         qsrflx,            qqcwsrflx,           &
-         pver=pver,           gravit=gravit,       &
-         errmsg=errmsg_local, errflg=errflg_local )
+    call modal_aero_rename_run(                                             &
+       ncol                    = ncol,                                      &
+       loffset                 = loffset,                                   &
+       deltat                  = delt,                                      &
+       pdel                    = pdel(:ncol,:),                             &
+       troplev                 = troplev(:ncol),                            &
+       dotendrn                = dotendrn,                                  &
+       q                       = vmr(:ncol,:,:),                            &
+       dqdt                    = dqdt_gaex(:ncol,:,:),                       &
+       dqdt_other              = dvmrdt(:ncol,:,:),                         &
+       dotendqqcwrn            = dotendqqcwrn,                              &
+       qqcw                    = vmrcw(:ncol,:,:),                          &
+       dqqcwdt                 = dqqcwdt_gaex(:ncol,:,:),                    &
+       dqqcwdt_other           = dvmrcwdt(:ncol,:,:),                       &
+       is_dorename_atik        = is_dorename_atik,                         &
+       dorename_atik           = dorename_atik(:ncol,:),                     &
+       jsrflx_rename           = jsrflx_rename,                            &
+       nsrflx                  = nsrflx,                                    &
+       qsrflx                  = qsrflx(:ncol,:,:),                          &
+       qqcwsrflx               = qqcwsrflx(:ncol,:,:),                       &
+       dqdt_rnpos              = dqdt_rnpos_unused,                          &
+       ntot_amode              = ntot_amode,                               &
+       npair_renamexf          = npair_renamexf,                            &
+       modefrm_renamexf        = modefrm_renamexf,                          &
+       modetoo_renamexf        = modetoo_renamexf,                          &
+       nspecfrm_renamexf       = nspecfrm_renamexf,                         &
+       lspecfrma_renamexf      = lspecfrma_renamexf,                        &
+       lspecfrmc_renamexf      = lspecfrmc_renamexf,                        &
+       lspectooa_renamexf      = lspectooa_renamexf,                        &
+       lspectooc_renamexf      = lspectooc_renamexf,                        &
+       alnsg_amode             = alnsg_amode,                              &
+       voltonumblo_amode       = voltonumblo_amode,                        &
+       voltonumbhi_amode       = voltonumbhi_amode,                        &
+       dgnum_amode             = dgnum_amode,                              &
+       nspec_amode             = nspec_amode,                              &
+       specmw_amode            = specmw_amode,                             &
+       specdens_amode          = specdens_amode,                           &
+       lmassptr_amode          = lmassptr_amode,                           &
+       lmassptrcw_amode        = lmassptrcw_amode,                         &
+       numptr_amode            = numptr_amode,                             &
+       numptrcw_amode          = numptrcw_amode,                           &
+       pi                      = pi,                                        &
+       modeptr_accum           = modeptr_accum,                            &
+       modeptr_coarse          = modeptr_coarse,                           &
+       modeptr_stracoar        = modeptr_stracoar,                         &
+       igrow_shrink_renamexf   = igrow_shrink_renamexf,                    &
+       ixferable_all_renamexf  = ixferable_all_renamexf,                   &
+       ixferable_a_renamexf    = ixferable_a_renamexf,                     &
+       ixferable_c_renamexf    = ixferable_c_renamexf,                     &
+       strat_only_renamexf     = strat_only_renamexf,                      &
+       modal_accum_coarse_exch = modal_accum_coarse_exch,                  &
+       pver                    = pver,                                      &
+       gravit                  = gravit,                                    &
+       errmsg                  = errmsg_local,                             &
+       errflg                  = errflg_local                             )
 
     if (errflg_local /= 0) then
        call endrun('aero_model_gasaerexch (rename): ' // trim(errmsg_local))

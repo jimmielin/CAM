@@ -231,8 +231,7 @@ contains
   end subroutine modal_aero_rename_init
 
   subroutine modal_aero_rename_run(                      &
-       fromwhere,         lchnk,               &
-       ncol,              nstep,               &
+       ncol,                                   &
        loffset,           deltat,              &
        pdel,              troplev,             &
        dotendrn,          q,                   &
@@ -263,10 +262,7 @@ contains
        modal_accum_coarse_exch,                &
        pver,              gravit,              &
        errmsg,            errflg               )
-    character(len=*), intent(in) :: fromwhere       ! identifies which module is making the call
-    integer,  intent(in)    :: lchnk                ! chunk identifier
     integer,  intent(in)    :: ncol                 ! number of atmospheric column
-    integer,  intent(in)    :: nstep                ! model time-step number
     integer,  intent(in)    :: loffset              ! offset applied to modal aero "ptrs"
     real(r8), intent(in)    :: deltat               ! time step (s)
     integer,  intent(in)    :: troplev(:)
@@ -283,9 +279,9 @@ contains
     logical,  intent(in)    :: dorename_atik(:,:)   ! true if renaming should be done at i,k
     integer,  intent(in)    :: jsrflx_rename        ! qsrflx index for renaming
     integer,  intent(in)    :: nsrflx               ! last dimension of qsrflx
-    real(r8), intent(inout) :: qsrflx(:,:,:)        ! process-specific column tracer tendencies
-    real(r8), intent(inout) :: qqcwsrflx(:,:,:)
-    real(r8), optional, intent(out) :: dqdt_rnpos(:,:,:)  ! positive (production) part of renaming tendency
+    real(r8), intent(out)   :: qsrflx(:,:,:)        ! process-specific column tracer tendencies
+    real(r8), intent(out)   :: qqcwsrflx(:,:,:)
+    real(r8), intent(out)   :: dqdt_rnpos(:,:,:)  ! positive (production) part of renaming tendency
     ! shared mode metadata + resolved renaming-pair tables (host-owned; passed in)
     integer,  intent(in)    :: ntot_amode
     integer,  intent(in)    :: npair_renamexf
@@ -328,8 +324,7 @@ contains
 
     if (modal_accum_coarse_exch) then
        call modal_aero_rename_acc_crs_sub(        &
-            fromwhere,         lchnk,               &
-            ncol,              nstep,               &
+            ncol,                                   &
             loffset,           deltat,              &
             pdel,              troplev,             &
             dotendrn,          q,                   &
@@ -360,9 +355,10 @@ contains
             pver,              gravit,              &
             errmsg,            errflg               )
     else
+       ! no_acc path does not produce dqdt_rnpos; define the required output here.
+       dqdt_rnpos(:,:,:) = 0.0_r8
        call modal_aero_rename_no_acc_crs_sub(             &
-            fromwhere,         lchnk,               &
-            ncol,              nstep,               &
+            ncol,                                   &
             loffset,           deltat,              &
             pdel,                                   &
             dotendrn,          q,                   &
@@ -392,8 +388,7 @@ contains
   ! private methods
 
   subroutine modal_aero_rename_no_acc_crs_sub(                       &
-                        fromwhere,         lchnk,               &
-                        ncol,              nstep,               &
+                        ncol,                                   &
                         loffset,           deltat,              &
                         pdel,                                   &
                         dotendrn,          q,                   &
@@ -418,11 +413,7 @@ contains
                         errmsg,            errflg               )
    use shr_spfn_mod, only: erfc => shr_spfn_erfc
 
-   character(len=*), intent(in) :: fromwhere    ! identifies which module
-                                                ! is making the call
-   integer,  intent(in)    :: lchnk                ! chunk identifier
    integer,  intent(in)    :: ncol                 ! number of atmospheric column
-   integer,  intent(in)    :: nstep                ! model time-step number
    integer,  intent(in)    :: loffset              ! offset applied to modal aero "ptrs"
    real(r8), intent(in)    :: deltat               ! time step (s)
 
@@ -452,9 +443,9 @@ contains
    integer,  intent(in)    :: jsrflx_rename        ! qsrflx index for renaming
    integer,  intent(in)    :: nsrflx               ! last dimension of qsrflx
 
-   real(r8), intent(inout) :: qsrflx(:,:,:)
+   real(r8), intent(out)   :: qsrflx(:,:,:)
                               ! process-specific column tracer tendencies
-   real(r8), intent(inout) :: qqcwsrflx(:,:,:)
+   real(r8), intent(out)   :: qqcwsrflx(:,:,:)
 
    integer,  intent(in)    :: pver                 ! number of vertical levels
    real(r8), intent(in)    :: gravit               ! gravitational acceleration (m/s2)
@@ -540,6 +531,9 @@ contains
   lunout = iulog
   errmsg = ''
   errflg = 0
+  ! intent(out): fully define before any early return
+  qsrflx(:,:,:) = 0.0_r8
+  qqcwsrflx(:,:,:) = 0.0_r8
 
 !
 !   calculations done once on initial entry
@@ -813,8 +807,7 @@ mainloop1_ipair:  do ipair = 1, npair_renamexf
 
 
   subroutine modal_aero_rename_acc_crs_sub(                       &
-                        fromwhere,         lchnk,               &
-                        ncol,              nstep,               &
+                        ncol,                                   &
                         loffset,           deltat,              &
                         pdel,              troplev,             &
                         dotendrn,          q,                   &
@@ -850,11 +843,7 @@ mainloop1_ipair:  do ipair = 1, npair_renamexf
    use shr_spfn_mod, only: erfc => shr_spfn_erfc
 
 ! !PARAMETERS:
-   character(len=*), intent(in) :: fromwhere    ! identifies which module
-                                                ! is making the call
-   integer,  intent(in)    :: lchnk                ! chunk identifier
    integer,  intent(in)    :: ncol                 ! number of atmospheric column
-   integer,  intent(in)    :: nstep                ! model time-step number
    integer,  intent(in)    :: loffset              ! offset applied to modal aero "ptrs"
    real(r8), intent(in)    :: deltat               ! time step (s)
    integer,  intent(in)    :: troplev(:)
@@ -885,11 +874,10 @@ mainloop1_ipair:  do ipair = 1, npair_renamexf
    integer,  intent(in)    :: jsrflx_rename        ! qsrflx index for renaming
    integer,  intent(in)    :: nsrflx               ! last dimension of qsrflx
 
-   real(r8), intent(inout) :: qsrflx(:,:,:)
+   real(r8), intent(out)   :: qsrflx(:,:,:)
                               ! process-specific column tracer tendencies
-   real(r8), intent(inout) :: qqcwsrflx(:,:,:)
-   real(r8), optional, intent(out) &
-                           :: dqdt_rnpos(:,:,:)
+   real(r8), intent(out)   :: qqcwsrflx(:,:,:)
+   real(r8), intent(out)   :: dqdt_rnpos(:,:,:)
                               ! the positive (production) part of the renaming tendency
 
    integer,  intent(in)    :: pver                 ! number of vertical levels
@@ -983,6 +971,9 @@ mainloop1_ipair:  do ipair = 1, npair_renamexf
   lunout = iulog
   errmsg = ''
   errflg = 0
+  ! intent(out): fully define before any early return
+  qsrflx(:,:,:) = 0.0_r8
+  qqcwsrflx(:,:,:) = 0.0_r8
 
 !
 !   calculations done once on initial entry
@@ -1005,12 +996,9 @@ mainloop1_ipair:  do ipair = 1, npair_renamexf
   onethird = 1.0_r8/3.0_r8
   xferfrac_max = 1.0_r8 - 10.0_r8*epsilon(1.0_r8)   ! 1-eps
 
-  if ( present( dqdt_rnpos ) ) then
-      l_dqdt_rnpos = .true.
-      dqdt_rnpos(:,:,:) = 0.0_r8
-  else
-      l_dqdt_rnpos = .false.
-  end if
+  ! dqdt_rnpos is now a required output; always produced.
+  l_dqdt_rnpos = .true.
+  dqdt_rnpos(:,:,:) = 0.0_r8
 
 
 
