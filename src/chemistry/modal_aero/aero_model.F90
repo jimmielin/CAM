@@ -191,7 +191,7 @@ contains
     use mo_setsox,       only: sox_inti
 
     use modal_aero_calcsize_cam, only: modal_aero_calcsize_init
-    use modal_aero_coag,       only: modal_aero_coag_init
+    use modal_aero_coag_cam,   only: modal_aero_coag_cam_init
     use aero_deposition_cam, only: aero_deposition_cam_init
     use modal_aero_gasaerexch_cam, only: modal_aero_gasaerexch_cam_init
     use modal_aero_newnuc_cam, only: modal_aero_newnuc_cam_init
@@ -269,7 +269,7 @@ contains
     call modal_aero_calcsize_init( pbuf2d )
     call modal_aero_gasaerexch_cam_init()
     !   coag call must follow gasaerexch call
-    call modal_aero_coag_init
+    call modal_aero_coag_cam_init
     call modal_aero_newnuc_cam_init
 
     ! call aero_deposition_cam_init only if the user has not specified
@@ -1005,7 +1005,7 @@ contains
                                     vmr0, vmr, pbuf )
 
     use time_manager,          only : get_nstep
-    use modal_aero_coag,       only : modal_aero_coag_sub
+    use modal_aero_coag,       only : modal_aero_coag_run
     use modal_aero_gasaerexch, only : modal_aero_gasaerexch_run, modefrm_pcage
     use modal_aero_rename,     only : modal_aero_rename_run
     use modal_aero_rename_cam, only : npair_renamexf, modefrm_renamexf, modetoo_renamexf, &
@@ -1105,6 +1105,11 @@ contains
     real(r8) :: dqdt_nnuc(ncol,pver,gas_pcnst)
     logical  :: dotend_nnuc(gas_pcnst)
     real(r8) :: qsrflx_nnuc(pcols,gas_pcnst,1)        ! column-integrated nucleation source/sink
+    ! Local arrays for refactored coag call (dqdt_coag is diagnostic-only;
+    ! the scheme updates vmr in place)
+    real(r8) :: dqdt_coag(ncol,pver,gas_pcnst)
+    logical  :: dotend_coag(gas_pcnst)
+    real(r8) :: qsrflx_coag(pcols)                    ! column-integrated coagulation source/sink
     character(len=fieldname_len+3) :: fieldname
     integer  :: jac, jsrf, jsoa, lb
     logical  :: use_sulfeq
@@ -1594,13 +1599,48 @@ contains
     call t_startf('modal_coag')
 
     ! do aerosol coagulation
-    call modal_aero_coag_sub(                               &
-         lchnk,    ncol,     nstep,            &
-         loffset,            delt,             &
-         tfld,     pmid,     pdel,             &
-         vmr,                                  &
-         dgnum,              dgnumwet,         &
-         wetdens                          )
+    ! vmr is updated in place by the scheme; dqdt_coag is returned for the
+    ! history diagnostics only (dqdt*delt is not bit-identical to the stored
+    ! change, so it must not be re-applied)
+    call modal_aero_coag_run(                            &
+         ncol      = ncol,                               &
+         pver      = pver,                               &
+         top_lev   = top_lev,                            &
+         num_q     = gas_pcnst,                          &
+         loffset   = loffset,                            &
+         nstep     = nstep,                              &
+         deltat_main = delt,                             &
+         t         = tfld(:ncol,:),                      &
+         pmid      = pmid(:ncol,:),                      &
+         pdel      = pdel(:ncol,:),                      &
+         q         = vmr(:ncol,:,:),                     &
+         dgncur_a  = dgnum(:ncol,:,:),                   &
+         dgncur_awet = dgnumwet(:ncol,:,:),              &
+         wetdens_a = wetdens(:ncol,:,:),                 &
+         dqdt      = dqdt_coag,                          &
+         dotend    = dotend_coag,                        &
+         errmsg    = errmsg_local,                       &
+         errflg    = errflg_local )
+
+    if (errflg_local /= 0) then
+       call endrun('aero_model_gasaerexch (coag): ' // trim(errmsg_local))
+    end if
+
+    ! do history file column-tendency fields
+    do l = 1, gas_pcnst
+       if ( .not. dotend_coag(l) ) cycle
+       lb = l + loffset
+
+       qsrflx_coag(:) = 0.0_r8
+       do k = top_lev, pver
+       do i = 1, ncol
+          qsrflx_coag(i) = qsrflx_coag(i) + dqdt_coag(i,k,l)*pdel(i,k)
+       end do
+       end do
+       qsrflx_coag(:) = qsrflx_coag(:)*(adv_mass(l)/(gravit*mwdry))
+       fieldname = trim(cnst_name(lb)) // '_sfcoag1'
+       call outfld( fieldname, qsrflx_coag, pcols, lchnk )
+    end do ! l = ...
 
     call t_stopf('modal_coag')
 
