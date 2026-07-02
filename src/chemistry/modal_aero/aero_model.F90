@@ -194,7 +194,7 @@ contains
     use modal_aero_coag,       only: modal_aero_coag_init
     use aero_deposition_cam, only: aero_deposition_cam_init
     use modal_aero_gasaerexch_cam, only: modal_aero_gasaerexch_cam_init
-    use modal_aero_newnuc,     only: modal_aero_newnuc_init
+    use modal_aero_newnuc_cam, only: modal_aero_newnuc_cam_init
     use modal_aero_rename_cam, only: modal_aero_rename_cam_init
 
     ! args
@@ -270,7 +270,7 @@ contains
     call modal_aero_gasaerexch_cam_init()
     !   coag call must follow gasaerexch call
     call modal_aero_coag_init
-    call modal_aero_newnuc_init
+    call modal_aero_newnuc_cam_init
 
     ! call aero_deposition_cam_init only if the user has not specified
     ! prescribed aerosol deposition fluxes
@@ -1013,7 +1013,7 @@ contains
                                       lspectooa_renamexf, lspectooc_renamexf, &
                                       igrow_shrink_renamexf, ixferable_all_renamexf, &
                                       ixferable_a_renamexf, ixferable_c_renamexf, strat_only_renamexf
-    use modal_aero_newnuc,     only : modal_aero_newnuc_sub
+    use modal_aero_newnuc,     only : modal_aero_newnuc_run
     use modal_aero_data,       only : cnst_name_cw, qqcw_get_field, &
                                       nsoa, lptr2_soa_a_amode, lptr2_soa_g_amode, &
                                       nspec_amode, &
@@ -1101,6 +1101,10 @@ contains
     real(r8) :: qsrflx(pcols,gas_pcnst,nsrflx)
     real(r8) :: qqcwsrflx(pcols,gas_pcnst,nsrflx)
     real(r8) :: qsrflx_gaexch_out(ncol,gas_pcnst)     ! column-integrated gaexch source/sink from the scheme
+    ! Local arrays for refactored newnuc call
+    real(r8) :: dqdt_nnuc(ncol,pver,gas_pcnst)
+    logical  :: dotend_nnuc(gas_pcnst)
+    real(r8) :: qsrflx_nnuc(pcols,gas_pcnst,1)        ! column-integrated nucleation source/sink
     character(len=fieldname_len+3) :: fieldname
     integer  :: jac, jsrf, jsoa, lb
     logical  :: use_sulfeq
@@ -1532,14 +1536,58 @@ contains
     call t_startf('modal_nucl')
 
     ! do aerosol nucleation (new particle formation)
-    call modal_aero_newnuc_sub(                             &
-         lchnk,    ncol,     nstep,            &
-         loffset,            delt,             &
-         tfld,     pmid,     pdel,             &
-         zm,       pblh,                       &
-         qh2o,     cldfr,                      &
-         vmr,                                  &
-         del_h2so4_gasprod,  del_h2so4_aeruptk )
+    ! Zero the (pcols-padded) column-tendency output over the full domain; the
+    ! scheme is called on :ncol and defines only that subset.
+    qsrflx_nnuc(:,:,:) = 0.0_r8
+    call modal_aero_newnuc_run(                          &
+         ncol      = ncol,                               &
+         pver      = pver,                               &
+         top_lev   = top_lev,                            &
+         num_q     = gas_pcnst,                          &
+         loffset   = loffset,                            &
+         deltat    = delt,                               &
+         t         = tfld(:ncol,:),                      &
+         pmid      = pmid(:ncol,:),                      &
+         pdel      = pdel(:ncol,:),                      &
+         zm        = zm(:ncol,:),                        &
+         pblh      = pblh(:ncol),                        &
+         qv        = qh2o(:ncol,:),                      &
+         cld       = cldfr(:ncol,:),                     &
+         q         = vmr(:ncol,:,:),                     &
+         gravit    = gravit,                             &
+         del_h2so4_gasprod = del_h2so4_gasprod(:ncol,:), &
+         del_h2so4_aeruptk = del_h2so4_aeruptk(:ncol,:), &
+         dqdt      = dqdt_nnuc,                          &
+         dotend    = dotend_nnuc,                        &
+         qsrflx    = qsrflx_nnuc(:ncol,:,:),             &
+         errmsg    = errmsg_local,                       &
+         errflg    = errflg_local )
+
+    if (errflg_local /= 0) then
+       call endrun('aero_model_gasaerexch (newnuc): ' // trim(errmsg_local))
+    end if
+
+    ! Apply nucleation tendencies to vmr (was applied in place by the scheme)
+    do l = 1, gas_pcnst
+       if ( dotend_nnuc(l) ) then
+          do k = top_lev, pver
+             do i = 1, ncol
+                vmr(i,k,l) = vmr(i,k,l) + dqdt_nnuc(i,k,l)*delt
+             end do
+          end do
+       end if
+    end do
+
+    ! do history file column-tendency fields
+    do l = 1, gas_pcnst
+       if ( .not. dotend_nnuc(l) ) cycle
+       lb = l + loffset
+       do i = 1, ncol
+          qsrflx_nnuc(i,l,1) = qsrflx_nnuc(i,l,1)*(adv_mass(l)/mwdry)
+       end do
+       fieldname = trim(cnst_name(lb)) // '_sfnnuc1'
+       call outfld( fieldname, qsrflx_nnuc(:,l,1), pcols, lchnk )
+    end do ! l = ...
 
     call t_stopf('modal_nucl')
 
