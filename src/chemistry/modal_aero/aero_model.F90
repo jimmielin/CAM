@@ -28,7 +28,7 @@ module aero_model
 
   use ref_pres,       only: top_lev => clim_modal_aero_top_lev
 
-  use mo_setsox,              only: setsox, has_sox
+  use mo_setsox_cam,          only: setsox, has_sox
   use aerosol_properties_mod, only: aerosol_properties
   use aerosol_state_mod, only: aerosol_state
   use aerosol_instances_mod, only: aerosol_instances_get_props, &
@@ -188,7 +188,7 @@ contains
     use seasalt_model,   only: seasalt_init, seasalt_names, seasalt_active,seasalt_nbin
     use aer_drydep_mod,  only: inidrydep
     use aero_wetdep_cam, only: aero_wetdep_init
-    use mo_setsox,       only: sox_inti
+    use mo_setsox_cam,   only: sox_inti
 
     use modal_aero_calcsize_cam, only: modal_aero_calcsize_init
     use modal_aero_coag_cam,   only: modal_aero_coag_cam_init

@@ -144,8 +144,8 @@ contains
     use seasalt_model,  only: seasalt_init
     use aer_drydep_mod, only: inidrydep
     use wetdep,         only: wetdep_init
-    use mo_setsox,      only: has_sox
-    use mo_setsox,      only: sox_inti
+    use mo_setsox_cam,  only: has_sox
+    use mo_setsox_cam,  only: sox_inti
 
     ! args
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -1041,7 +1041,7 @@ contains
 
     use chem_mods,   only : gas_pcnst
     use mo_aerosols, only : aerosols_formation, has_aerosols
-    use mo_setsox,   only : setsox, has_sox
+    use mo_setsox_cam, only : setsox, has_sox
     use mo_setsoa,   only : setsoa, has_soa
     use aerosol_state_mod, only : aerosol_state
 
