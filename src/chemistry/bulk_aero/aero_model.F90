@@ -12,7 +12,7 @@ module aero_model
   use aerodep_flx,       only: aerodep_flx_prescribed
   use physics_types,     only: physics_state, physics_ptend, physics_ptend_init
   use physics_buffer,    only: physics_buffer_desc
-  use physconst,         only: gravit, rair
+  use physconst,         only: gravit, rair, tmelt
   use dust_model,        only: dust_active, dust_names, dust_nbin
   use seasalt_model,     only: sslt_active=>seasalt_active, seasalt_names, seasalt_nbin
   use spmd_utils,        only: masterproc
@@ -143,7 +143,7 @@ contains
     use dust_model,     only: dust_init
     use seasalt_model,  only: seasalt_init
     use aer_drydep_mod, only: inidrydep
-    use wetdep,         only: wetdep_init
+    use wetdep_cam,     only: wetdep_init
     use mo_setsox_cam,  only: has_sox
     use mo_setsox_cam,  only: sox_inti
 
@@ -581,7 +581,8 @@ contains
   !=============================================================================
   subroutine aero_model_wetdep( state, dt, dlf, cam_out, ptend, pbuf)
 
-    use wetdep,        only : wetdepa_v1, wetdep_inputs_set, wetdep_inputs_t
+    use wetdep,        only : wetdepa_v1
+    use wetdep_cam,    only : wetdep_inputs_set, wetdep_inputs_t
     use dust_model,    only : dust_names
     use seasalt_model, only : sslt_names=>seasalt_names
 
@@ -614,6 +615,8 @@ contains
     real(r8) :: bsscavt(pcols, pver)
 
     real(r8) :: sol_factb, sol_facti
+    character(len=512) :: errmsg   ! error handling for the portable wetdepa_v1
+    integer            :: errflg
 
     real(r8) :: rainmr(pcols,pver)       ! mixing ratio of rain within cloud volume
     real(r8) :: cldv(pcols,pver)         ! cloudy volume undergoing scavenging
@@ -653,9 +656,10 @@ contains
             dep_inputs%evapr, dep_inputs%totcond, state%q(:,:,mm), dt, &
             scavt, iscavt, dep_inputs%cldv, &
             fracis(:,:,mm), sol_factb, ncol, &
-            scavcoef, &
+            scavcoef, tmelt, gravit, pver, errmsg, errflg, &
             sol_facti_in=sol_facti, &
             icscavt=icscavt, isscavt=isscavt, bcscavt=bcscavt, bsscavt=bsscavt )
+       if (errflg /= 0) call endrun(trim(errmsg))
 
        ptend%q(:ncol,:,mm)=scavt(:ncol,:)
 

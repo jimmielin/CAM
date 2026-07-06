@@ -1660,7 +1660,8 @@ end subroutine aero_convproc_tend
 !
 !-----------------------------------------------------------------------
 
-   use ndrop, only: activate_aerosol
+   use aero_activate, only: activate_aerosol
+   use physconst,     only: pi, rhoh2o, rh2o, latvap, cpair
 
 !-----------------------------------------------------------------------
 ! arguments  (note:  TMR = tracer mixing ratio)
@@ -1713,6 +1714,9 @@ end subroutine aero_convproc_tend
    real(r8) :: tmpa, tmpb, tmpc ! working variable
    real(r8) :: naerosol_a(1,1)    ! number conc (1/m3)
    real(r8) :: vaerosol_a(1,1)    ! volume conc (m3/m3)
+
+   character(len=512) :: errmsg   ! error message from activate_aerosol
+   integer :: errflg              ! error flag from activate_aerosol
 
 !-----------------------------------------------------------------------
 
@@ -1797,7 +1801,9 @@ end subroutine aero_convproc_tend
    call activate_aerosol(                                                    &
          wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,                    &
          naerosol, nbins, vaerosol, hygro, aero_props,            &
-         fn, fm, fluxn, fluxm, flux_fullact                                )
+         fn, fm, fluxn, fluxm, flux_fullact,                              &
+         pi, rhoh2o, rh2o, gravit, latvap, cpair, rair, errmsg, errflg    )
+   if (errflg /= 0) call endrun(trim(errmsg))
 
 ! apply the activation fractions to the updraft aerosol mixing ratios
    dt_u_inv = 1.0_r8/dt_u
@@ -1866,7 +1872,8 @@ end subroutine aero_convproc_tend
 !
 !-----------------------------------------------------------------------
 
-   use ndrop, only: activate_aerosol
+   use aero_activate, only: activate_aerosol
+   use physconst,     only: pi, rhoh2o, rh2o, latvap, cpair
 
 !-----------------------------------------------------------------------
 ! arguments  (note:  TMR = tracer mixing ratio)
@@ -1920,6 +1927,9 @@ end subroutine aero_convproc_tend
    real(r8) :: tmpa, tmpb, tmpc ! working variable
    real(r8) :: naerosol_a(1,1)    ! number conc (1/m3)
    real(r8) :: vaerosol_a(1,1)    ! volume conc (m3/m3)
+
+   character(len=512) :: errmsg   ! error message from activate_aerosol
+   integer :: errflg              ! error flag from activate_aerosol
 
 !-----------------------------------------------------------------------
 
@@ -2020,8 +2030,9 @@ end subroutine aero_convproc_tend
       call activate_aerosol(                                                 &
          wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,                    &
          naerosol, nbins, vaerosol, hygro, aero_props,            &
-         fn, fm, fluxn, fluxm, flux_fullact                                )
-
+         fn, fm, fluxn, fluxm, flux_fullact,                              &
+         pi, rhoh2o, rh2o, gravit, latvap, cpair, rair, errmsg, errflg    )
+      if (errflg /= 0) call endrun(trim(errmsg))
 
    else
 ! above cloud base - do secondary activation with prescribed supersat
@@ -2030,7 +2041,10 @@ end subroutine aero_convproc_tend
       call activate_aerosol(                                                 &
          wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,                    &
          naerosol, nbins, vaerosol, hygro, aero_props,            &
-         fn, fm, fluxn, fluxm, flux_fullact, smax_prescribed               )
+         fn, fm, fluxn, fluxm, flux_fullact,                              &
+         pi, rhoh2o, rh2o, gravit, latvap, cpair, rair, errmsg, errflg,   &
+         smax_prescribed                                                  )
+      if (errflg /= 0) call endrun(trim(errmsg))
    end if
 
 ! apply the activation fractions to the updraft aerosol mixing ratios

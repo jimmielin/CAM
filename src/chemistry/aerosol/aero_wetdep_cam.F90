@@ -14,7 +14,7 @@ module aero_wetdep_cam
   use infnan,        only: nan, assignment(=)
 
   use cam_history,   only: addfld, add_default, horiz_only, outfld
-  use wetdep,        only: wetdep_init
+  use wetdep_cam,    only: wetdep_init
 
   use radiative_aerosol, only: rad_aer_get_info
 
@@ -327,7 +327,8 @@ contains
   !------------------------------------------------------------------------------
   !------------------------------------------------------------------------------
   subroutine aero_wetdep_tend( state, dt, dlf, cam_out, ptend, pbuf)
-    use wetdep, only: wetdepa_v2, wetdep_inputs_set, wetdep_inputs_t
+    use wetdep,     only: wetdepa_v2
+    use wetdep_cam, only: wetdep_inputs_set, wetdep_inputs_t
     use aerodep_flx, only: aerodep_flx_prescribed
     use aero_deposition_cam, only: aero_deposition_cam_setwet
 
@@ -340,6 +341,8 @@ contains
 
     character(len=*), parameter :: subrname = 'aero_wetdep_tend'
     type(wetdep_inputs_t) :: dep_inputs
+    character(len=512) :: errmsg   ! error handling for the portable wetdepa_v2
+    integer            :: errflg
     real(r8), pointer :: fracis(:,:,:)   ! fraction of transported species that are insoluble (pcols, pver, pcnst)
     real(r8), target :: fracis_nadv(pcols,pver)  ! fraction of not-transported aerosols
 
@@ -617,15 +620,16 @@ contains
                   dep_inputs%evapc, dep_inputs%conicw, dep_inputs%prain, dep_inputs%qme, &
                   dep_inputs%evapr, dep_inputs%totcond, q_tmp, dt, &
                   dqdt_tmp, iscavt, dep_inputs%cldvcu, dep_inputs%cldvst, &
-                  dlf, insolfr_ptr, sol_factb, ncol, &
-                  scavcoefnv(:,:,jnv), &
+                  dlf, insolfr_ptr, sol_factb(:ncol,:), ncol, &
+                  scavcoefnv(:,:,jnv), gravit, pver, errmsg, errflg, &
                   is_strat_cloudborne=cldbrn, &
                   qqcw=qqcw_in(:,:), f_act_conv=f_act_conv, &
                   icscavt=icscavt, isscavt=isscavt, bcscavt=bcscavt, bsscavt=bsscavt, &
                   convproc_do_aer=convproc_do_aer, rcscavt=rcscavt, rsscavt=rsscavt,  &
-                  sol_facti_in=sol_facti, sol_factic_in=sol_factic, &
+                  sol_facti_in=sol_facti(:ncol,:), sol_factic_in=sol_factic(:ncol,:), &
                   convproc_do_evaprain_atonce_in=convproc_do_evaprain_atonce, &
                   bergso_in=dep_inputs%bergso )
+             if (errflg /= 0) call endrun(trim(errmsg))
 
              if(convproc_do_aer) then
                 if(cldbrn) then
