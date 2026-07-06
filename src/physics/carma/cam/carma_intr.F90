@@ -2054,7 +2054,7 @@ contains
     use phys_control,  only: cam_physpkg_is
     use wetdep,        only: clddiag, wetdepa_v1, wetdepa_v2
     use camsrfexch,       only: cam_out_t
-    use physconst,     only: gravit
+    use physconst,     only: gravit, tmelt, rair
 
     implicit none
 
@@ -2086,6 +2086,8 @@ contains
     real(r8)                            :: totcond(pcols, pver)   ! total condensate
     real(r8)                            :: solfac(pcols, pver)    ! solubility factor
     real(r8)                            :: solfac_in              ! solubility factor
+    character(len=512)                  :: errmsg                 ! error handling for the portable wetdepa
+    integer                             :: errflg
     real(r8)                            :: scavcoef               ! scavenging Coefficient
     logical                             :: do_wetdep
     integer                             :: ncol                   ! number of columns
@@ -2156,7 +2158,7 @@ contains
 
     !   fields needed for wet scavenging
     call clddiag( state%t, state%pmid, state%pdel, cmfdqr, evapc, cldn, cldc, clds, cme, evapr, prain, &
-         cldv, cldvcu, cldvst, rainmr, ncol )
+         cldv, cldvcu, cldvst, rainmr, ncol, pver, gravit, tmelt, rair )
 
     call cnst_get_ind('CLDICE', ixcldice)
     call cnst_get_ind('CLDLIQ', ixcldliq)
@@ -2199,7 +2201,7 @@ contains
 
               call wetdepa_v2( &
                            state%pmid, &
-                           state%q, &
+                           state%q(:,:,1), &
                            state%pdel, &
                            cldn, &
                            cldc, &
@@ -2218,15 +2220,16 @@ contains
                            cldvst, &
                            dlf, &
                            fracis(:, :, icnst), &
-                           solfac, &
+                           solfac(:ncol,:), &
                            ncol, &
-                           z_scavcoef)
+                           z_scavcoef, gravit, pver, errmsg, errflg)
+              if (errflg /= 0) call endrun(trim(errmsg))
 
             else if (cam_physpkg_is('cam4')) then
 
               call wetdepa_v1(state%t, &
                            state%pmid, &
-                           state%q, &
+                           state%q(:,:,1), &
                            state%pdel, &
                            cldn, &
                            cldc, &
@@ -2244,7 +2247,8 @@ contains
                            fracis(:, :, icnst), &
                            solfac_in, &
                            ncol, &
-                           z_scavcoef)
+                           z_scavcoef, tmelt, gravit, pver, errmsg, errflg)
+              if (errflg /= 0) call endrun(trim(errmsg))
             else
 
               call endrun('carma_wetdep_tend:: No wet deposition routine is available for this configuration.')
