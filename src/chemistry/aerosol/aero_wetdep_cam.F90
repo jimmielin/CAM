@@ -144,7 +144,7 @@ contains
   subroutine aero_wetdep_init( )
 
     use wetdep,       only: init_bcscavcoef
-    use mo_constants, only: pi, boltz_cgs, rhoh2o_cgs, rgas_cgs
+    use mo_constants, only: pi, boltz_cgs, rgas_cgs
 
     character(len=*), parameter :: subrname = 'aero_wetdep_init'
 
@@ -246,7 +246,7 @@ contains
 
     ! build the below-cloud impaction/interception scavenging lookup table
     ! (allocation + fill are owned by the portable init_bcscavcoef)
-    call init_bcscavcoef( aero_props, pi, boltz_cgs, rhoh2o_cgs, rgas_cgs, &
+    call init_bcscavcoef( aero_props, pi, boltz_cgs, rgas_cgs, &
                           errmsg, errflg )
     if (errflg /= 0) call endrun(trim(errmsg))
 
@@ -608,9 +608,9 @@ contains
 
              dqdt_tmp(1:ncol,:) = 0.0_r8
 
-             call wetdepa_v2(state%pmid, state%q(:,:,1), state%pdel, &
+             call wetdepa_v2(state%pdel, &
                   dep_inputs%cldt, dep_inputs%cldcu, dep_inputs%cmfdqr, &
-                  dep_inputs%evapc, dep_inputs%conicw, dep_inputs%prain, dep_inputs%qme, &
+                  dep_inputs%evapc, dep_inputs%conicw, dep_inputs%prain, &
                   dep_inputs%evapr, dep_inputs%totcond, q_tmp, dt, &
                   dqdt_tmp, iscavt, dep_inputs%cldvcu, dep_inputs%cldvst, &
                   dlf, insolfr_ptr, sol_factb(:ncol,:), ncol, &

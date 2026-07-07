@@ -32,7 +32,6 @@ real(r8), parameter :: omsm = 1._r8-2*epsilon(1._r8) ! used to prevent roundoff 
 
 type wetdep_inputs_t
    real(r8), pointer :: cldt(:,:) => null()  ! cloud fraction
-   real(r8), pointer :: qme(:,:) => null()
    real(r8), pointer :: prain(:,:) => null()
    real(r8), pointer :: bergso(:,:) => null()
    real(r8), pointer :: evapr(:,:) => null()
@@ -47,7 +46,6 @@ type wetdep_inputs_t
 end type wetdep_inputs_t
 
 integer :: cld_idx             = 0
-integer :: qme_idx             = 0
 integer :: prain_idx           = 0
 integer :: bergso_idx          = 0
 integer :: nevapr_idx          = 0
@@ -75,7 +73,6 @@ subroutine wetdep_init()
   integer :: ierr
 
   cld_idx             = pbuf_get_index('CLD')
-  qme_idx             = pbuf_get_index('QME')
   prain_idx           = pbuf_get_index('PRAIN')
   bergso_idx          = pbuf_get_index('BERGSO', errcode=ierr )
   nevapr_idx          = pbuf_get_index('NEVAPR')
@@ -127,7 +124,6 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
   itim = pbuf_old_tim_idx()
 
   call pbuf_get_field(pbuf, cld_idx,         inputs%cldt, start=(/1,1,itim/), kount=(/pcols,pver,1/) )
-  call pbuf_get_field(pbuf, qme_idx,         inputs%qme     )
   call pbuf_get_field(pbuf, prain_idx,       inputs%prain   )
   call pbuf_get_field(pbuf, nevapr_idx,      inputs%evapr   )
   call pbuf_get_field(pbuf, icwmrdp_idx,     icwmrdp )
@@ -165,7 +161,7 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
   inputs%totcond(:ncol,:) = state%q(:ncol,:,ixcldliq) + state%q(:ncol,:,ixcldice)
 
   call clddiag( state%t,     state%pmid,   state%pdel,   inputs%cmfdqr, inputs%evapc, &
-               inputs%cldt,  inputs%cldcu,       cldst,  inputs%qme,    inputs%evapr, &
+               inputs%cldt,  inputs%cldcu,       cldst,  inputs%evapr, &
                inputs%prain, inputs%cldv, inputs%cldvcu, inputs%cldvst,       rainmr, &
                 state%ncol, pver, gravit, tmelt, rair )
 
