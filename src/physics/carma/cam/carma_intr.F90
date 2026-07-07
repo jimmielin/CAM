@@ -2102,7 +2102,6 @@ contains
     ! physics buffer
     integer itim_old
     real(r8), pointer, dimension(:,:)   :: cldn                   ! cloud fraction
-    real(r8), pointer, dimension(:,:)   :: cme
     real(r8), pointer, dimension(:,:)   :: prain
     real(r8), pointer, dimension(:,:)   :: evapr
     real(r8), pointer, dimension(:,:)   :: icwmrdp                ! in cloud water mixing ratio, deep convection
@@ -2131,7 +2130,6 @@ contains
     itim_old = pbuf_old_tim_idx()
 
     call pbuf_get_field(pbuf, pbuf_get_index('CLD'), cldn, (/1,1,itim_old/),(/pcols,pver,1/))
-    call pbuf_get_field(pbuf, pbuf_get_index('QME'), cme )
     call pbuf_get_field(pbuf, pbuf_get_index('PRAIN'), prain )
     call pbuf_get_field(pbuf, pbuf_get_index('NEVAPR'), evapr )
     call pbuf_get_field(pbuf, pbuf_get_index('FRACIS'), fracis )
@@ -2157,7 +2155,7 @@ contains
    cmfdqr(:ncol,:) = rprddp(:ncol,:)  + rprdsh(:ncol,:)
 
     !   fields needed for wet scavenging
-    call clddiag( state%t, state%pmid, state%pdel, cmfdqr, evapc, cldn, cldc, clds, cme, evapr, prain, &
+    call clddiag( state%t, state%pmid, state%pdel, cmfdqr, evapc, cldn, cldc, clds, evapr, prain, &
          cldv, cldvcu, cldvst, rainmr, ncol, pver, gravit, tmelt, rair )
 
     call cnst_get_ind('CLDICE', ixcldice)
@@ -2200,8 +2198,6 @@ contains
             if (cam_physpkg_is('cam5') .or. cam_physpkg_is('cam6')) then
 
               call wetdepa_v2( &
-                           state%pmid, &
-                           state%q(:,:,1), &
                            state%pdel, &
                            cldn, &
                            cldc, &
@@ -2209,7 +2205,6 @@ contains
                            evapc, &
                            conicw, &
                            prain, &
-                           cme, &
                            evapr, &
                            totcond, &
                            state%q(:, :, icnst), &
@@ -2228,15 +2223,11 @@ contains
             else if (cam_physpkg_is('cam4')) then
 
               call wetdepa_v1(state%t, &
-                           state%pmid, &
-                           state%q(:,:,1), &
                            state%pdel, &
                            cldn, &
-                           cldc, &
                            cmfdqr, &
                            conicw, &
                            prain, &
-                           cme, &
                            evapr, &
                            totcond, &
                            state%q(:, :, icnst), &

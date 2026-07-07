@@ -650,9 +650,9 @@ contains
 
        scavcoef(:ncol,:) = aer_scav_coef(m)
 
-       call wetdepa_v1( state%t, state%pmid, state%q(:,:,1), state%pdel, &
-            dep_inputs%cldt, dep_inputs%cldcu, dep_inputs%cmfdqr, &
-            dep_inputs%conicw, dep_inputs%prain, dep_inputs%qme, &
+       call wetdepa_v1( state%t, state%pdel, &
+            dep_inputs%cldt, dep_inputs%cmfdqr, &
+            dep_inputs%conicw, dep_inputs%prain, &
             dep_inputs%evapr, dep_inputs%totcond, state%q(:,:,mm), dt, &
             scavt, iscavt, dep_inputs%cldv, &
             fracis(:,:,mm), sol_factb, ncol, &

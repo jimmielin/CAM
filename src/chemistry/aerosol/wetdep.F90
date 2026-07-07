@@ -35,7 +35,7 @@ contains
 !==============================================================================
 
 subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
-                   cldt, cldcu, cldst, cme, evapr, &
+                   cldt, cldcu, cldst, evapr, &
                    prain, cldv, cldvcu, cldvst, rain, &
                    ncol, pver, gravit, tmelt, rair)
 
@@ -58,7 +58,6 @@ subroutine clddiag(t, pmid, pdel, cmfdqr, evapc, &
    real(r8), intent(in) :: cldt(:,:)    ! total cloud fraction
    real(r8), intent(in) :: cldcu(:,:)    ! Cumulus cloud fraction
    real(r8), intent(in) :: cldst(:,:)    ! Stratus cloud fraction
-   real(r8), intent(in) :: cme(:,:)      ! rate of cond-evap within the cloud
    real(r8), intent(in) :: evapr(:,:)    ! rate of evaporation of falling precipitation (kg/kg/s)
    real(r8), intent(in) :: prain(:,:)    ! rate of conversion of condensate to precipitation (kg/kg/s)
    integer, intent(in) :: ncol
@@ -156,8 +155,8 @@ end subroutine clddiag
 ! This is the CAM5 version of wetdepa.
 
 subroutine wetdepa_v2(                                  &
-   p, q, pdel, cldt, cldc,                              &
-   cmfdqr, evapc, conicw, precs, conds,                 &
+   pdel, cldt, cldc,                                    &
+   cmfdqr, evapc, conicw, precs,                        &
    evaps, cwat, tracer, deltat, scavt,                  &
    iscavt, cldvcu, cldvst, dlf, fracis,                 &
    sol_fact, ncol, scavcoef, gravit, pver, errmsg, errflg, &
@@ -173,8 +172,6 @@ subroutine wetdepa_v2(                                  &
    !-----------------------------------------------------------------------
 
    real(r8), intent(in) ::&
-      p(:,:),        &! pressure
-      q(:,:),        &! moisture
       pdel(:,:),     &! pressure thikness
       cldt(:,:),     &! total cloud fraction
       cldc(:,:),     &! convective cloud fraction
@@ -183,7 +180,6 @@ subroutine wetdepa_v2(                                  &
       conicw(:,:),   &! convective cloud water
       cwat(:,:),     &! cloud water amount
       precs(:,:),    &! rate of production of stratiform precip
-      conds(:,:),    &! rate of production of condensate
       evaps(:,:),    &! rate of evaporation of precip
       cldvcu(:,:),   &! Convective precipitation area at the top interface of each layer
       cldvst(:,:),   &! Stratiform precipitation area at the top interface of each layer
@@ -548,8 +544,8 @@ end subroutine wetdepa_v2
 ! This is the frozen CAM4 version of wetdepa.
 
 
-   subroutine wetdepa_v1( t, p, q, pdel, &
-                       cldt, cldc, cmfdqr, conicw, precs, conds, &
+   subroutine wetdepa_v1( t, pdel, &
+                       cldt, cmfdqr, conicw, precs, &
                        evaps, cwat, tracer, deltat, &
                        scavt, iscavt, cldv, fracis, sol_fact, ncol, &
                        scavcoef, tmelt, gravit, pver, errmsg, errflg, &
@@ -569,16 +565,12 @@ end subroutine wetdepa_v2
 
       real(r8), intent(in) ::&
          t(:,:),        &! temperature
-         p(:,:),        &! pressure
-         q(:,:),        &! moisture
          pdel(:,:),     &! pressure thikness
          cldt(:,:),     &! total cloud fraction
-         cldc(:,:),     &! convective cloud fraction
          cmfdqr(:,:),   &! rate of production of convective precip
          conicw(:,:),   &! convective cloud water
          cwat(:,:),     &! cloud water amount
          precs(:,:),    &! rate of production of stratiform precip
-         conds(:,:),    &! rate of production of condensate
          evaps(:,:),    &! rate of evaporation of precip
          cldv(:,:),     &! total cloud fraction
          deltat,               &! time step
@@ -618,25 +610,10 @@ end subroutine wetdepa_v2
       integer i                 ! x index
       integer k                 ! z index
 
-      real(r8) adjfac               ! factor stolen from cmfmca
-      real(r8) aqfrac               ! fraction of tracer in aqueous phase
-      real(r8) cwatc                ! local convective total water amount
-      real(r8) cwats                ! local stratiform total water amount
-      real(r8) cwatp                ! local water amount falling from above precip
       real(r8) fracev(ncol)        ! fraction of precip from above that is evaporating
       real(r8) fracp                ! fraction of cloud water converted to precip
-      real(r8) gafrac               ! fraction of tracer in gas phasea
-      real(r8) hconst               ! henry's law solubility constant when equation is expressed
-                                ! in terms of mixing ratios
-      real(r8) mpla                 ! moles / liter H2O entering the layer from above
-      real(r8) mplb                 ! moles / liter H2O leaving the layer below
-      real(r8) part                 !  partial pressure of tracer in atmospheres
-      real(r8) patm                 ! total pressure in atmospheres
-      real(r8) pdog                 ! work variable (pdel/gravit)
       real(r8) precabc(ncol)       ! conv precip from above (work array)
       real(r8) precabs(ncol)       ! strat precip from above (work array)
-      real(r8) precbl               ! precip falling out of level (work array)
-      real(r8) precmin              ! minimum convective precip causing scavenging
       real(r8) rat(ncol)           ! ratio of amount available to amount removed
       real(r8) scavab(ncol)        ! scavenged tracer flux from above (work array)
       real(r8) scavabc(ncol)       ! scavenged tracer flux from above (work array)
@@ -670,10 +647,6 @@ end subroutine wetdepa_v2
       ! ------------------------------------------------------------------------
       errmsg = ''
       errflg = 0
-
-      precmin =  0.1_r8/8.64e4_r8      ! set critical value to 0.1 mm/day in kg/m2/s
-
-      adjfac = deltat/(max(deltat,cmftau)) ! adjustment factor from hack scheme
 
       ! default (if other sol_facts aren't in call, set all to required sol_fact
       sol_facti = sol_fact
@@ -714,8 +687,6 @@ end subroutine wetdepa_v2
             tc     = t(i,k) - tmelt
             weight = max(0._r8,min(-tc*0.05_r8,1.0_r8)) ! fraction of condensate that is ice
             weight = 0._r8                                 ! assume no ice
-
-            pdog = pdel(i,k)/gravit
 
             ! ****************** Evaporation **************************
             ! calculate the fraction of strat precip from above
@@ -941,7 +912,7 @@ end subroutine get_bcscavcoefs
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
-subroutine init_bcscavcoef( aero_props, pi, boltz_cgs, rhoh2o_cgs, rgas_cgs, &
+subroutine init_bcscavcoef( aero_props, pi, boltz_cgs, rgas_cgs, &
                             errmsg, errflg )
   !-----------------------------------------------------------------------
   !
@@ -957,7 +928,6 @@ subroutine init_bcscavcoef( aero_props, pi, boltz_cgs, rhoh2o_cgs, rgas_cgs, &
   class(aerosol_properties), intent(in) :: aero_props
   real(r8), intent(in)  :: pi           ! ratio of circle circumference to diameter
   real(r8), intent(in)  :: boltz_cgs    ! Boltzmann's constant (erg/K)
-  real(r8), intent(in)  :: rhoh2o_cgs   ! density of liquid water (g/cm3)
   real(r8), intent(in)  :: rgas_cgs     ! universal gas constant (erg/mol/K)
   character(len=*), intent(out) :: errmsg
   integer,          intent(out) :: errflg
@@ -1036,7 +1006,7 @@ subroutine init_bcscavcoef( aero_props, pi, boltz_cgs, rhoh2o_cgs, rgas_cgs, &
         call calc_1_impact_rate( &
              dg0_cgs, logsig, rhowetaero_cgs, temp, press, &
              scavratenum, scavratevol, &
-             pi, boltz_cgs, rhoh2o_cgs, rgas_cgs, errmsg, errflg )
+             pi, boltz_cgs, rgas_cgs, errmsg, errflg )
         if (errflg /= 0) return
 
         nnfit = nnfit + 1
@@ -1065,7 +1035,7 @@ contains
   subroutine calc_1_impact_rate(          &
        dg0, logsig, rhoaero, temp, press, &
        scavratenum, scavratevol, &
-       pi, boltz_cgs, rhowater, rgas, errmsg, errflg )
+       pi, boltz_cgs, rgas, errmsg, errflg )
     !
     !   routine computes a single impaction scavenging rate
     !	for precipitation rate of 1 mm/h
@@ -1087,7 +1057,6 @@ contains
     real(r8), intent(out) :: scavratenum, scavratevol
     real(r8), intent(in) :: pi           ! ratio of circle circumference to diameter
     real(r8), intent(in) :: boltz_cgs    ! Boltzmann's constant (erg/K)
-    real(r8), intent(in) :: rhowater     ! density of liquid water (g/cm3)
     real(r8), intent(in) :: rgas         ! universal gas constant (erg/mol/K)
     character(len=*), intent(out) :: errmsg
     integer,          intent(out) :: errflg
