@@ -8,7 +8,7 @@ module wetdep
 
 use shr_kind_mod, only: r8 => shr_kind_r8
 use aerosol_properties_mod, only: aerosol_properties
-use infnan,       only: nan, assignment(=)
+use shr_infnan_mod,       only: nan => shr_infnan_nan, assignment(=)
 
 implicit none
 save
