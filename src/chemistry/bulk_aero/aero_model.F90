@@ -410,7 +410,7 @@ contains
   subroutine aero_model_drydep  ( state, pbuf, obklen, ustar, cam_in, dt, cam_out, ptend )
 
     use dust_sediment_mod, only: dust_sediment_tend
-    use aer_drydep_mod,    only: d3ddflux, calcram
+    use aer_drydep_mod,    only: calcram
     use dust_model,        only: dust_depvel, dust_nbin, dust_names
     use seasalt_model,     only: sslt_depvel=>seasalt_depvel, sslt_nbin=>seasalt_nbin, sslt_names=>seasalt_names
 
@@ -458,7 +458,6 @@ contains
     real(r8) :: pvaeros(pcols,pverp)    ! sedimentation velocity in Pa
     real(r8) :: sflx(pcols)
 
-    real(r8) :: tvs(pcols,pver)
     real(r8) :: rho(pcols,pver)      ! air density in kg/m3
 
     integer :: m,mm, i, im
@@ -493,7 +492,6 @@ contains
     lchnk = state%lchnk
     ncol  = state%ncol
 
-    tvs(:ncol,:) = state%t(:ncol,:)
     rho(:ncol,:) = state%pmid(:ncol,:)/(rair*state%t(:ncol,:))
 
     ! compute dep velocities for sea salt and dust...
@@ -522,18 +520,14 @@ contains
 
        call outfld( trim(cnst_name(mm))//'DV', pvaeros(:,2:pverp), pcols, lchnk )
 
-       if(.true.) then ! use phil's method
-          !      convert from meters/sec to pascals/sec
-          !      pvaeros(:,1) is assumed zero, use density from layer above in conversion
-          pvaeros(:ncol,2:pverp) = pvaeros(:ncol,2:pverp) * rho(:ncol,:)*gravit
+       !      convert from meters/sec to pascals/sec
+       !      pvaeros(:,1) is assumed zero, use density from layer above in conversion
+       pvaeros(:ncol,2:pverp) = pvaeros(:ncol,2:pverp) * rho(:ncol,:)*gravit
 
-          !      calculate the tendencies and sfc fluxes from the above velocities
-          call dust_sediment_tend( &
-               ncol,             dt,       state%pint(:,:), state%pmid, state%pdel, state%t , &
-               state%q(:,:,mm) , pvaeros  , ptend%q(:,:,mm), sflx  )
-       else   !use charlie's method
-          call d3ddflux(ncol, vlc_dry(:,:,im), state%q(:,:,mm),state%pmid,state%pdel, tvs,sflx,ptend%q(:,:,mm),dt)
-       endif
+       !      calculate the tendencies and sfc fluxes from the above velocities
+       call dust_sediment_tend( &
+            ncol,             dt,       state%pint(:,:), state%pdel, &
+            state%q(:,:,mm) , pvaeros  , ptend%q(:,:,mm), sflx  )
        ! apportion dry deposition into turb and gravitational settling for tapes
        do i=1,ncol
           dep_trb(i)=sflx(i)*vlc_trb(i,im)/vlc_dry(i,pver,im)
