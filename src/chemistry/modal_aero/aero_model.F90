@@ -186,7 +186,6 @@ contains
     use radiative_aerosol,only: rad_aer_get_info
     use dust_model,      only: dust_init, dust_names, dust_active, dust_nbin, dust_nnum
     use seasalt_model,   only: seasalt_init, seasalt_names, seasalt_active,seasalt_nbin
-    use aer_drydep_mod,  only: inidrydep
     use aero_wetdep_cam, only: aero_wetdep_init
     use mo_setsox_cam,   only: sox_inti
 
@@ -306,8 +305,6 @@ contains
     enddo
 
     if (ndrydep>0) then
-
-       call inidrydep(rair, gravit)
 
        dummy = 'RAM1'
        call addfld (dummy,horiz_only, 'A','frac','RAM1')

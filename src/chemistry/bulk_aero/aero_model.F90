@@ -142,7 +142,6 @@ contains
     use mo_setsoa,      only: soa_inti
     use dust_model,     only: dust_init
     use seasalt_model,  only: seasalt_init
-    use aer_drydep_mod, only: inidrydep
     use wetdep_cam,     only: wetdep_init
     use mo_setsox_cam,  only: has_sox
     use mo_setsox_cam,  only: sox_inti
@@ -265,8 +264,6 @@ contains
     enddo
 
     if (ndrydep>0) then
-
-       call inidrydep(rair, gravit)
 
        dummy = 'RAM1'
        call addfld (dummy,horiz_only, 'A','frac','RAM1')
