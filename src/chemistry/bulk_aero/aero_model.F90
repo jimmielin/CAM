@@ -410,7 +410,7 @@ contains
   subroutine aero_model_drydep  ( state, pbuf, obklen, ustar, cam_in, dt, cam_out, ptend )
 
     use dust_sediment_mod, only: dust_sediment_tend
-    use aer_drydep_mod,    only: calcram
+    use aero_drydep,       only: calcram
     use dust_model,        only: dust_depvel, dust_nbin, dust_names
     use seasalt_model,     only: sslt_depvel=>seasalt_depvel, sslt_nbin=>seasalt_nbin, sslt_names=>seasalt_names
 
@@ -462,6 +462,9 @@ contains
 
     integer :: m,mm, i, im
 
+    character(len=512) :: errmsg
+    integer            :: errflg
+
     if (ndrydep<1) return
 
     landfrac => cam_in%landfrac(:)
@@ -476,7 +479,7 @@ contains
     ! calc ram and fv over ocean and sea ice ...
     call calcram( ncol,landfrac,icefrac,ocnfrac,obklen,&
                   ustar,ram1in,ram1,state%t(:,pver),state%pmid(:,pver),&
-                  state%pdel(:,pver),fvin,fv)
+                  state%pdel(:,pver),fvin,fv,rair,gravit)
 
     call outfld( 'airFV', fv(:), pcols, lchnk )
     call outfld( 'RAM1', ram1(:), pcols, lchnk )
@@ -527,7 +530,9 @@ contains
        !      calculate the tendencies and sfc fluxes from the above velocities
        call dust_sediment_tend( &
             ncol,             dt,       state%pint(:,:), state%pdel, &
-            state%q(:,:,mm) , pvaeros  , ptend%q(:,:,mm), sflx  )
+            state%q(:,:,mm) , pvaeros  , ptend%q(:,:,mm), sflx, &
+            pver,             gravit,   errmsg,          errflg )
+       if (errflg /= 0) call endrun('aero_model_drydep: '//trim(errmsg))
        ! apportion dry deposition into turb and gravitational settling for tapes
        do i=1,ncol
           dep_trb(i)=sflx(i)*vlc_trb(i,im)/vlc_dry(i,pver,im)

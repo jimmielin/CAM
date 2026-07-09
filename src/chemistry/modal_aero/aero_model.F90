@@ -589,7 +589,9 @@ contains
   subroutine aero_model_drydep  ( state, pbuf, obklen, ustar, cam_in, dt, cam_out, ptend )
 
     use dust_sediment_mod, only: dust_sediment_tend
-    use aer_drydep_mod,    only: calcram
+    use aero_drydep,       only: modal_aero_depvel_part, calcram
+    use mo_drydep,         only: n_land_type, fraction_landuse
+    use physconst,         only: pi, boltz
     use modal_aero_data,   only: qqcw_get_field
     use modal_aero_data,   only: cnst_name_cw
     use modal_aero_data,   only: alnsg_amode
@@ -656,6 +658,9 @@ contains
 
     logical :: aspherical
 
+    character(len=512) :: errmsg_local
+    integer :: errflg_local
+
     landfrac => cam_in%landfrac(:)
     icefrac  => cam_in%icefrac(:)
     ocnfrac  => cam_in%ocnfrac(:)
@@ -668,7 +673,7 @@ contains
     ! calc ram and fv over ocean and sea ice ...
     call calcram( ncol,landfrac,icefrac,ocnfrac,obklen,&
                   ustar,ram1in,ram1,state%t(:,pver),state%pmid(:,pver),&
-                  state%pdel(:,pver),fvin,fv)
+                  state%pdel(:,pver),fvin,fv,rair,gravit)
 
     call outfld( 'airFV', fv(:), pcols, lchnk )
     call outfld( 'RAM1', ram1(:), pcols, lchnk )
@@ -694,11 +699,15 @@ contains
     jvlc = 3    ! dmleung: jvlc = 3, moment = 0 => dry dep velocity for number of cloud-borne aerosols
     call modal_aero_depvel_part( ncol,state%t(:,:), state%pmid(:,:), ram1, fv,  &
                      vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc),  &
-                     rad_drop(:,:), dens_drop(:,:), sg_drop(:,:), 0, lchnk)
+                     rad_drop(:,:), dens_drop(:,:), sg_drop(:,:), 0, &
+                     pver, top_lev, n_land_type, fraction_landuse(:,:,lchnk), &
+                     pi, boltz, gravit, rair)
     jvlc = 4    ! jvlc = 4, moment = 3 => dry dep velocity for vol/mass of cloud-borne aerosols
     call modal_aero_depvel_part( ncol,state%t(:,:), state%pmid(:,:), ram1, fv,  &
                      vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc),  &
-                     rad_drop(:,:), dens_drop(:,:), sg_drop(:,:), 3, lchnk)
+                     rad_drop(:,:), dens_drop(:,:), sg_drop(:,:), 3, &
+                     pver, top_lev, n_land_type, fraction_landuse(:,:,lchnk), &
+                     pi, boltz, gravit, rair)
 
     do m = 1, ntot_amode   ! main loop over aerosol modes
 
@@ -726,11 +735,15 @@ contains
              jvlc = 1   ! dmleung: jvlc = 1, moment = 0 => dry dep velocity for number of interstitial aerosols
              call modal_aero_depvel_part( ncol, state%t(:,:), state%pmid(:,:), ram1, fv,  &
                         vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc),  &
-                        rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), 0, lchnk, aspherical=aspherical)
+                        rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), 0, &
+                        pver, top_lev, n_land_type, fraction_landuse(:,:,lchnk), &
+                        pi, boltz, gravit, rair, aspherical=aspherical)
              jvlc = 2   ! jvlc = 2, moment = 3 => dry dep velocity for vol/mass of interstitial aerosols
              call modal_aero_depvel_part( ncol, state%t(:,:), state%pmid(:,:), ram1, fv,  &
                         vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc),  &
-                        rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), 3, lchnk, aspherical=aspherical)
+                        rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), 3, &
+                        pver, top_lev, n_land_type, fraction_landuse(:,:,lchnk), &
+                        pi, boltz, gravit, rair, aspherical=aspherical)
 
           end if
 
@@ -785,7 +798,9 @@ contains
              !      calculate the tendencies and sfc fluxes from the above velocities
                 call dust_sediment_tend( &
                      ncol,             dt,       state%pint(:,:), state%pdel, &
-                     state%q(:,:,mm),  pvmzaer,  ptend%q(:,:,mm), sflx  )
+                     state%q(:,:,mm),  pvmzaer,  ptend%q(:,:,mm), sflx, &
+                     pver,             gravit,   errmsg_local,    errflg_local )
+                if (errflg_local /= 0) call endrun('aero_model_drydep: '//trim(errmsg_local))
 
              ! apportion dry deposition into turb and gravitational settling for tapes
              dep_trb = 0._r8
@@ -815,7 +830,9 @@ contains
              !      calculate the tendencies and sfc fluxes from the above velocities
                 call dust_sediment_tend( &
                      ncol,             dt,       state%pint(:,:), state%pdel, &
-                     qaerwat(:,:,mm),  pvmzaer,  dqdt_tmp(:,:), sflx  )
+                     qaerwat(:,:,mm),  pvmzaer,  dqdt_tmp(:,:), sflx, &
+                     pver,             gravit,   errmsg_local,  errflg_local )
+                if (errflg_local /= 0) call endrun('aero_model_drydep: '//trim(errmsg_local))
 
              ! apportion dry deposition into turb and gravitational settling for tapes
              dep_trb = 0._r8
@@ -842,7 +859,9 @@ contains
              !      calculate the tendencies and sfc fluxes from the above velocities
                 call dust_sediment_tend( &
                      ncol,             dt,       state%pint(:,:), state%pdel, &
-                     fldcw(:,:),  pvmzaer,  dqdt_tmp(:,:), sflx  )
+                     fldcw(:,:),  pvmzaer,  dqdt_tmp(:,:), sflx, &
+                     pver,        gravit,   errmsg_local,  errflg_local )
+                if (errflg_local /= 0) call endrun('aero_model_drydep: '//trim(errmsg_local))
 
              ! apportion dry deposition into turb and gravitational settling for tapes
              dep_trb = 0._r8
@@ -1925,203 +1944,6 @@ contains
     return
   end subroutine modal_aero_bcscavcoef_init
 
-  !===============================================================================
-  !===============================================================================
-  subroutine modal_aero_depvel_part( ncol, t, pmid, ram1, fv, vlc_dry, vlc_trb, vlc_grv,  &
-                                     radius_part, density_part, sig_part, moment, lchnk, aspherical )   ! dmleung added aspherical flag 20 Oct 2025
-
-!    calculates surface deposition velocity of particles
-!    L. Zhang, S. Gong, J. Padro, and L. Barrie
-!    A size-seggregated particle dry deposition scheme for an atmospheric aerosol module
-!    Atmospheric Environment, 35, 549-560, 2001.
-!
-!    Authors: X. Liu
-
-    !
-    ! !USES
-    !
-    use physconst,     only: pi,boltz, gravit, rair
-    use mo_drydep,     only: n_land_type, fraction_landuse
-
-    ! !ARGUMENTS:
-    !
-    implicit none
-    !
-    real(r8), intent(in) :: t(pcols,pver)       !atm temperature (K)
-    real(r8), intent(in) :: pmid(pcols,pver)    !atm pressure (Pa)
-    real(r8), intent(in) :: fv(pcols)           !friction velocity (m/s)
-    real(r8), intent(in) :: ram1(pcols)         !aerodynamical resistance (s/m)
-    real(r8), intent(in) :: radius_part(pcols,pver)    ! mean (volume/number) particle radius (m)
-    real(r8), intent(in) :: density_part(pcols,pver)   ! density of particle material (kg/m3)
-    real(r8), intent(in) :: sig_part(pcols,pver)       ! geometric standard deviation of particles
-    integer,  intent(in) :: moment ! moment of size distribution (0 for number, 2 for surface area, 3 for volume)
-    integer,  intent(in) :: ncol
-    integer,  intent(in) :: lchnk
-
-    real(r8), intent(out) :: vlc_trb(pcols)       !Turbulent deposn velocity (m/s)
-    real(r8), intent(out) :: vlc_grv(pcols,pver)       !grav deposn velocity (m/s)
-    real(r8), intent(out) :: vlc_dry(pcols,pver)       !dry deposn velocity (m/s)
-    logical,  intent(in), OPTIONAL :: aspherical   ! dmleung: asphericity is strong for coarse-mode interstitial
-    ! aerosols only, mostly dust and seasalt. For coarse mode aerosols, asphericity reduces coarse-mode gravitational
-    ! settling velocity by 20 % following Fig. 4 of Yue Huang et al. (2020).
-    !------------------------------------------------------------------------
-
-    !------------------------------------------------------------------------
-    ! Local Variables
-    integer  :: m,i,k,ix                !indices
-    real(r8) :: rho     !atm density (kg/m**3)
-    real(r8) :: vsc_dyn_atm(pcols,pver)   ![kg m-1 s-1] Dynamic viscosity of air
-    real(r8) :: vsc_knm_atm(pcols,pver)   ![m2 s-1] Kinematic viscosity of atmosphere
-    real(r8) :: shm_nbr       ![frc] Schmidt number
-    real(r8) :: stk_nbr       ![frc] Stokes number
-    real(r8) :: mfp_atm(pcols,pver)       ![m] Mean free path of air
-    real(r8) :: dff_aer       ![m2 s-1] Brownian diffusivity of particle
-    real(r8) :: slp_crc(pcols,pver) ![frc] Slip correction factor
-    real(r8) :: rss_trb       ![s m-1] Resistance to turbulent deposition
-    real(r8) :: rss_lmn       ![s m-1] Quasi-laminar layer resistance
-    real(r8) :: brownian      ! collection efficiency for Browning diffusion
-    real(r8) :: impaction     ! collection efficiency for impaction
-    real(r8) :: interception  ! collection efficiency for interception
-    real(r8) :: stickfrac     ! fraction of particles sticking to surface
-    real(r8) :: radius_moment(pcols,pver) ! median radius (m) for moment
-    real(r8) :: lnsig         ! ln(sig_part)
-    real(r8) :: dispersion    ! accounts for influence of size dist dispersion on bulk settling velocity
-                              ! assuming radius_part is number mode radius * exp(1.5 ln(sigma))
-
-    integer  :: lt
-    real(r8) :: lnd_frc
-    real(r8) :: wrk1, wrk2, wrk3
-
-    ! constants
-
-     real(r8), parameter :: asphericaldust_drydep = 0.8_r8 ! dmleung added 20 Oct 2025: aspherical dust reduces
-     ! gravitational settling velocity by 15-20 %. Yue Huang et al. (2020)
-     ! Climate Models and Remote Sensing Retrievals Neglect Substantial Desert Dust Asphericity
-
-    real(r8) gamma(11)      ! exponent of schmidt number
-!   data gamma/0.54d+00,  0.56d+00,  0.57d+00,  0.54d+00,  0.54d+00, &
-!              0.56d+00,  0.54d+00,  0.54d+00,  0.54d+00,  0.56d+00, &
-!              0.50d+00/
-    data gamma/0.56e+00_r8,  0.54e+00_r8,  0.54e+00_r8,  0.56e+00_r8,  0.56e+00_r8, &
-               0.56e+00_r8,  0.50e+00_r8,  0.54e+00_r8,  0.54e+00_r8,  0.54e+00_r8, &
-               0.54e+00_r8/
-    save gamma
-
-    real(r8) alpha(11)      ! parameter for impaction
-!   data alpha/50.00d+00,  0.95d+00,  0.80d+00,  1.20d+00,  1.30d+00, &
-!               0.80d+00, 50.00d+00, 50.00d+00,  2.00d+00,  1.50d+00, &
-!             100.00d+00/
-    data alpha/1.50e+00_r8,   1.20e+00_r8,  1.20e+00_r8,  0.80e+00_r8,  1.00e+00_r8, &
-               0.80e+00_r8, 100.00e+00_r8, 50.00e+00_r8,  2.00e+00_r8,  1.20e+00_r8, &
-              50.00e+00_r8/
-    save alpha
-
-    real(r8) radius_collector(11) ! radius (m) of surface collectors
-!   data radius_collector/-1.00d+00,  5.10d-03,  3.50d-03,  3.20d-03, 10.00d-03, &
-!                          5.00d-03, -1.00d+00, -1.00d+00, 10.00d-03, 10.00d-03, &
-!                         -1.00d+00/
-    data radius_collector/10.00e-03_r8,  3.50e-03_r8,  3.50e-03_r8,  5.10e-03_r8,  2.00e-03_r8, &
-                           5.00e-03_r8, -1.00e+00_r8, -1.00e+00_r8, 10.00e-03_r8,  3.50e-03_r8, &
-                          -1.00e+00_r8/
-    save radius_collector
-
-    integer            :: iwet(11) ! flag for wet surface = 1, otherwise = -1
-!   data iwet/1,   -1,   -1,   -1,   -1,  &
-!            -1,   -1,   -1,    1,   -1,  &
-!             1/
-    data iwet/-1,  -1,   -1,   -1,   -1,  &
-              -1,   1,   -1,    1,   -1,  &
-              -1/
-    save iwet
-
-
-    vlc_trb = 0._r8
-    vlc_grv = 0._r8
-    vlc_dry = 0._r8
-
-    !------------------------------------------------------------------------
-    do k=top_lev,pver ! radius_part is not defined above top_lev
-       do i=1,ncol
-
-          lnsig = log(sig_part(i,k))
-! use a maximum radius of 50 microns when calculating deposition velocity
-          radius_moment(i,k) = min(50.0e-6_r8,radius_part(i,k))*   &
-                          exp((float(moment)-1.5_r8)*lnsig*lnsig)
-          dispersion = exp(2._r8*lnsig*lnsig)
-
-          rho=pmid(i,k)/rair/t(i,k)
-
-          ! Quasi-laminar layer resistance: call rss_lmn_get
-          ! Size-independent thermokinetic properties
-          vsc_dyn_atm(i,k) = 1.72e-5_r8 * ((t(i,k)/273.0_r8)**1.5_r8) * 393.0_r8 / &
-               (t(i,k)+120.0_r8)      ![kg m-1 s-1] RoY94 p. 102
-          mfp_atm(i,k) = 2.0_r8 * vsc_dyn_atm(i,k) / &   ![m] SeP97 p. 455
-               (pmid(i,k)*sqrt(8.0_r8/(pi*rair*t(i,k))))
-          vsc_knm_atm(i,k) = vsc_dyn_atm(i,k) / rho ![m2 s-1] Kinematic viscosity of air
-
-          slp_crc(i,k) = 1.0_r8 + mfp_atm(i,k) * &
-                  (1.257_r8+0.4_r8*exp(-1.1_r8*radius_moment(i,k)/(mfp_atm(i,k)))) / &
-                  radius_moment(i,k)   ![frc] Slip correction factor SeP97 p. 464
-          vlc_grv(i,k) = (4.0_r8/18.0_r8) * radius_moment(i,k)*radius_moment(i,k)*density_part(i,k)* &
-                  gravit*slp_crc(i,k) / vsc_dyn_atm(i,k) ![m s-1] Stokes' settling velocity SeP97 p. 466
-          vlc_grv(i,k) = vlc_grv(i,k) * dispersion
-
-          ! dmleung edited 20 Oct 2025 based on Longlei Li's edits ++
-          ! asphericity reduces gravitational settling velocity of coarse-mode aerosols by 20 %.
-          ! scale flag is only true for coarse mode (m == n_coarse_dust).
-          if (present(aspherical)) then
-             if(aspherical) then
-                vlc_grv(i,k) = vlc_grv(i,k) * asphericaldust_drydep
-             end if
-          end if
-          ! dmleung --
-
-          vlc_dry(i,k)=vlc_grv(i,k)
-       enddo
-    enddo
-    k=pver  ! only look at bottom level for next part
-    do i=1,ncol
-       dff_aer = boltz * t(i,k) * slp_crc(i,k) / &    ![m2 s-1]
-                 (6.0_r8*pi*vsc_dyn_atm(i,k)*radius_moment(i,k)) !SeP97 p.474
-       shm_nbr = vsc_knm_atm(i,k) / dff_aer                        ![frc] SeP97 p.972
-
-       wrk2 = 0._r8
-       wrk3 = 0._r8
-       do lt = 1,n_land_type
-          lnd_frc = fraction_landuse(i,lt,lchnk)
-          if ( lnd_frc /= 0._r8 ) then
-             brownian = shm_nbr**(-gamma(lt))
-             if (radius_collector(lt) > 0.0_r8) then
-!       vegetated surface
-                stk_nbr = vlc_grv(i,k) * fv(i) / (gravit*radius_collector(lt))
-                interception = 2.0_r8*(radius_moment(i,k)/radius_collector(lt))**2.0_r8
-             else
-!       non-vegetated surface
-                stk_nbr = vlc_grv(i,k) * fv(i) * fv(i) / (gravit*vsc_knm_atm(i,k))  ![frc] SeP97 p.965
-                interception = 0.0_r8
-             endif
-             impaction = (stk_nbr/(alpha(lt)+stk_nbr))**2.0_r8
-
-             if (iwet(lt) > 0) then
-                stickfrac = 1.0_r8
-             else
-                stickfrac = exp(-sqrt(stk_nbr))
-                if (stickfrac < 1.0e-10_r8) stickfrac = 1.0e-10_r8
-             endif
-             rss_lmn = 1.0_r8 / (3.0_r8 * fv(i) * stickfrac * (brownian+interception+impaction))
-             rss_trb = ram1(i) + rss_lmn + ram1(i)*rss_lmn*vlc_grv(i,k)
-
-             wrk1 = 1.0_r8 / rss_trb
-             wrk2 = wrk2 + lnd_frc*( wrk1 )
-             wrk3 = wrk3 + lnd_frc*( wrk1 + vlc_grv(i,k) )
-          endif
-       enddo  ! n_land_type
-       vlc_trb(i) = wrk2
-       vlc_dry(i,k) = wrk3
-    enddo !ncol
-
-    return
-  end subroutine modal_aero_depvel_part
 
   !===============================================================================
   subroutine modal_aero_bcscavcoef_get( m, ncol, isprx, dgn_awet, scavcoefnum, scavcoefvol )
