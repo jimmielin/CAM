@@ -589,7 +589,7 @@ contains
   subroutine aero_model_drydep  ( state, pbuf, obklen, ustar, cam_in, dt, cam_out, ptend )
 
     use dust_sediment_mod, only: dust_sediment_tend
-    use aer_drydep_mod,    only: d3ddflux, calcram
+    use aer_drydep_mod,    only: calcram
     use modal_aero_data,   only: qqcw_get_field
     use modal_aero_data,   only: cnst_name_cw
     use modal_aero_data,   only: alnsg_amode
@@ -630,7 +630,6 @@ contains
     integer :: mm                      ! tracer index
     integer :: i
 
-    real(r8) :: tvs(pcols,pver)
     real(r8) :: rho(pcols,pver)      ! air density in kg/m3
     real(r8) :: sflx(pcols)          ! deposition flux
     real(r8) :: dep_trb(pcols)       !kg/m2/s
@@ -683,7 +682,6 @@ contains
     call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
     call pbuf_get_field(pbuf, qaerwat_idx,    qaerwat,     start=(/1,1,1/), kount=(/pcols,pver,nmodes/) )
 
-    tvs(:ncol,:) = state%t(:ncol,:)!*(1+state%q(:ncol,k)
     rho(:ncol,:)=  state%pmid(:ncol,:)/(rair*state%t(:ncol,:))
 
 !
@@ -780,19 +778,14 @@ contains
 
              call outfld( trim(cnst_name(mm))//'DDV', pvmzaer(:,2:pverp), pcols, lchnk )
 
-             if(.true.) then ! use phil's method
              !      convert from meters/sec to pascals/sec
              !      pvprogseasalts(:,1) is assumed zero, use density from layer above in conversion
                 pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
 
              !      calculate the tendencies and sfc fluxes from the above velocities
                 call dust_sediment_tend( &
-                     ncol,             dt,       state%pint(:,:), state%pmid, state%pdel, state%t , &
+                     ncol,             dt,       state%pint(:,:), state%pdel, &
                      state%q(:,:,mm),  pvmzaer,  ptend%q(:,:,mm), sflx  )
-             else   !use charlie's method
-                call d3ddflux( ncol, vlc_dry(:,:,jvlc), state%q(:,:,mm), state%pmid, &
-                               state%pdel, tvs, sflx, ptend%q(:,:,mm), dt )
-             endif
 
              ! apportion dry deposition into turb and gravitational settling for tapes
              dep_trb = 0._r8
@@ -815,19 +808,14 @@ contains
              pvmzaer(:ncol,1)=0._r8
              pvmzaer(:ncol,2:pverp) = vlc_dry(:ncol,:,jvlc)
 
-             if(.true.) then ! use phil's method
              !      convert from meters/sec to pascals/sec
              !      pvprogseasalts(:,1) is assumed zero, use density from layer above in conversion
                 pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
 
              !      calculate the tendencies and sfc fluxes from the above velocities
                 call dust_sediment_tend( &
-                     ncol,             dt,       state%pint(:,:), state%pmid, state%pdel, state%t , &
+                     ncol,             dt,       state%pint(:,:), state%pdel, &
                      qaerwat(:,:,mm),  pvmzaer,  dqdt_tmp(:,:), sflx  )
-             else   !use charlie's method
-                call d3ddflux( ncol, vlc_dry(:,:,jvlc), qaerwat(:,:,mm), state%pmid, &
-                               state%pdel, tvs, sflx, dqdt_tmp(:,:), dt )
-             endif
 
              ! apportion dry deposition into turb and gravitational settling for tapes
              dep_trb = 0._r8
@@ -847,19 +835,14 @@ contains
              pvmzaer(:ncol,2:pverp) = vlc_dry(:ncol,:,jvlc)
              fldcw => qqcw_get_field(pbuf, mm,lchnk)
 
-             if(.true.) then ! use phil's method
              !      convert from meters/sec to pascals/sec
              !      pvprogseasalts(:,1) is assumed zero, use density from layer above in conversion
                 pvmzaer(:ncol,2:pverp) = pvmzaer(:ncol,2:pverp) * rho(:ncol,:)*gravit
 
              !      calculate the tendencies and sfc fluxes from the above velocities
                 call dust_sediment_tend( &
-                     ncol,             dt,       state%pint(:,:), state%pmid, state%pdel, state%t , &
+                     ncol,             dt,       state%pint(:,:), state%pdel, &
                      fldcw(:,:),  pvmzaer,  dqdt_tmp(:,:), sflx  )
-             else   !use charlie's method
-                call d3ddflux( ncol, vlc_dry(:,:,jvlc), fldcw(:,:), state%pmid, &
-                               state%pdel, tvs, sflx, dqdt_tmp(:,:), dt )
-             endif
 
              ! apportion dry deposition into turb and gravitational settling for tapes
              dep_trb = 0._r8

@@ -11,77 +11,21 @@ module dust_sediment_mod
 
   use shr_kind_mod,      only: r8=>shr_kind_r8
   use ppgrid,            only: pcols, pver, pverp
-  use physconst,         only: gravit, rair
+  use physconst,         only: gravit
   use cam_logfile,       only: iulog
   use cam_abortutils,    only: endrun
 
   private
-  public :: dust_sediment_vel, dust_sediment_tend
+  public :: dust_sediment_tend
 
 
-  real (r8), parameter :: vland  = 2.8_r8            ! dust fall velocity over land  (cm/s)
-  real (r8), parameter :: vocean = 1.5_r8            ! dust fall velocity over ocean (cm/s)
   real (r8), parameter :: mxsedfac   = 0.99_r8       ! maximum sedimentation flux factor
 
 contains
 
 !===============================================================================
-  subroutine dust_sediment_vel (ncol,                               &
-       icefrac , landfrac, ocnfrac , pmid    , pdel    , t       , &
-       dustmr  , pvdust   )
-
-!----------------------------------------------------------------------
-
-! Compute gravitational sedimentation velocities for dust
-
-    implicit none
-
-! Arguments
-    integer, intent(in) :: ncol                     ! number of colums to process
-
-    real(r8), intent(in)  :: icefrac (pcols)        ! sea ice fraction (fraction)
-    real(r8), intent(in)  :: landfrac(pcols)        ! land fraction (fraction)
-    real(r8), intent(in)  :: ocnfrac (pcols)        ! ocean fraction (fraction)
-    real(r8), intent(in)  :: pmid  (pcols,pver)     ! pressure of midpoint levels (Pa)
-    real(r8), intent(in)  :: pdel  (pcols,pver)     ! pressure diff across layer (Pa)
-    real(r8), intent(in)  :: t     (pcols,pver)     ! temperature (K)
-    real(r8), intent(in)  :: dustmr(pcols,pver)     ! dust (kg/kg)
-
-    real(r8), intent(out) :: pvdust (pcols,pverp)    ! vertical velocity of dust (Pa/s)
-! -> note that pvel is at the interfaces (loss from cell is based on pvel(k+1))
-
-! Local variables
-    real (r8) :: rho(pcols,pver)                    ! air density in kg/m3
-    real (r8) :: vfall(pcols)                       ! settling velocity of dust particles (m/s)
-
-    integer i,k
-
-    real (r8) :: lbound, ac, bc, cc
-
-!-----------------------------------------------------------------------
-!--------------------- dust fall velocity ----------------------------
-!-----------------------------------------------------------------------
-
-    do k = 1,pver
-       do i = 1,ncol
-
-          ! merge the dust fall velocities for land and ocean (cm/s)
-          ! SHOULD ALSO ACCOUNT FOR ICEFRAC
-          vfall(i) = vland*landfrac(i) + vocean*(1._r8-landfrac(i))
-          !!         vfall(i) = vland*landfrac(i) + vocean*ocnfrac(i) + vseaice*icefrac(i)
-
-          ! fall velocity (assume positive downward)
-          pvdust(i,k+1) = vfall(i)     
-       end do
-    end do
-
-    return
-  end subroutine dust_sediment_vel
-
-
-!===============================================================================
   subroutine dust_sediment_tend ( &
-       ncol,   dtime,  pint,     pmid,    pdel,  t,   &
+       ncol,   dtime,  pint,     pdel,  &
        dustmr ,pvdust, dusttend, sfdust )
 
 !----------------------------------------------------------------------
@@ -95,9 +39,7 @@ contains
 
     real(r8), intent(in)  :: dtime                     ! time step
     real(r8), intent(in)  :: pint  (pcols,pverp)       ! interfaces pressure (Pa)
-    real(r8), intent(in)  :: pmid  (pcols,pver)        ! midpoint pressures (Pa)
     real(r8), intent(in)  :: pdel  (pcols,pver)        ! pressure diff across layer (Pa)
-    real(r8), intent(in)  :: t     (pcols,pver)        ! temperature (K)
     real(r8), intent(in)  :: dustmr(pcols,pver)        ! dust (kg/kg)
     real(r8), intent(in)  :: pvdust (pcols,pverp)      ! vertical velocity of dust drops  (Pa/s)
 ! -> note that pvel is at the interfaces (loss from cell is based on pvel(k+1))
