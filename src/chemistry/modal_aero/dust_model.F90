@@ -30,7 +30,6 @@ module dust_model
 
   integer , protected, allocatable :: dust_indices(:)
   real(r8), allocatable :: dust_dmt_vwr(:)
-  real(r8), allocatable :: dust_stk_crc(:)
 
   real(r8)          :: dust_emis_fact = 0._r8     ! tuning parameter for dust emissions
   character(len=cl) :: soil_erod_file = 'none'    ! full pathname for soil erodibility dataset
@@ -113,6 +112,7 @@ module dust_model
     character(len=32) :: spec_name
     integer, parameter :: mymodes(7) = (/ 2, 1, 3, 4, 5, 6, 7 /) ! tricky order ...
     class(aerosol_properties), pointer :: aero_props_modal
+    real(r8) :: dust_stk_crc(ndst)   ! Stokes correction from dust_set_params; unused by emissions
 
     dust_nbin = ndst
     dust_nnum = ndst
@@ -122,7 +122,6 @@ module dust_model
     allocate( dust_dmt_grd(ndst+1) )
     allocate( dust_emis_sclfctr(ndst) )
     allocate( dust_dmt_vwr(ndst) )
-    allocate( dust_stk_crc(ndst) )
 
     ! dmleung edited the mass fraction of the emitted dust size distribution. 27 Oct 2025 ++
     ! The new mass fraction comes from Jun Meng et al. (2022) and MERRA-2.
@@ -183,7 +182,6 @@ module dust_model
   !===============================================================================
   !===============================================================================
   subroutine dust_emis( ncol, lchnk, dust_flux_in, cflx, soil_erod )
-    use soil_erod_mod, only : soil_erod_fact
     use soil_erod_mod, only : soil_erodibility
     use mo_constants,  only : dust_density
     use physconst,     only : pi
