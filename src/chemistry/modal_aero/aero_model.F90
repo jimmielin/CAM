@@ -1680,8 +1680,6 @@ contains
     integer :: m, mm
     real(r8) :: soil_erod_tmp(pcols)
     real(r8) :: sflx(pcols)   ! accumulate over all bins for output
-    real(r8) :: u10cubed(pcols)
-    real (r8), parameter :: z0=0.0001_r8  ! m roughness length over oceans--from ocean model
 
     lchnk = state%lchnk
     ncol = state%ncol
@@ -1702,18 +1700,10 @@ contains
     endif
 
     if (seasalt_active) then
-       u10cubed(:ncol)=sqrt(state%u(:ncol,pver)**2+state%v(:ncol,pver)**2)
-       ! move the winds to 10m high from the midpoint of the gridbox:
-       ! follows Tie and Seinfeld and Pandis, p.859 with math.
-
-       u10cubed(:ncol)=u10cubed(:ncol)*log(10._r8/z0)/log(state%zm(:ncol,pver)/z0)
-
-       ! we need them to the 3.41 power, according to Gong et al., 1997:
-       u10cubed(:ncol)=u10cubed(:ncol)**3.41_r8
-
        sflx(:)=0._r8
 
-       call seasalt_emis( u10cubed, cam_in%sst, cam_in%ocnfrac, ncol, cam_in%cflx )
+       call seasalt_emis( state%u(:ncol,pver), state%v(:ncol,pver), state%zm(:ncol,pver), &
+                          cam_in%sst, cam_in%ocnfrac, ncol, cam_in%cflx )
 
        do m=1,seasalt_nbin
           mm = seasalt_indices(m)
