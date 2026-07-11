@@ -2,8 +2,7 @@
 ! Seasalt for Modal Aerosol Model
 !===============================================================================
 module seasalt_model
-  use shr_kind_mod,   only: r8 => shr_kind_r8, cl => shr_kind_cl
-  use ppgrid,         only: pcols, pver
+  use shr_kind_mod,   only: r8 => shr_kind_r8
   use modal_aero_data,only: ntot_amode, nslt=>nSeaSalt
 
   implicit none
@@ -94,7 +93,7 @@ contains
     real(r8), intent(inout) :: cflx(:,:)
 
     ! local vars
-    integer  :: mn, mm, ibin, isec, i
+    integer  :: mn, mm, ibin, i
     real(r8) :: fi(ncol,nsections)
 
     real(r8) :: sst_sz_range_lo (nslt)
