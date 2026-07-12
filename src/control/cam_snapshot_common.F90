@@ -84,7 +84,7 @@ integer :: cam_snapshot_before_num, cam_snapshot_after_num
 type (snapshot_type)    ::  state_snapshot(30)
 type (snapshot_type)    ::  cnst_snapshot(pcnst)
 type (snapshot_type)    ::  tend_snapshot(6)
-type (snapshot_type)    ::  cam_in_snapshot(pcnst+31)   ! needs to be bigger than pcnst because cam_in is split by constituent.
+type (snapshot_type)    ::  cam_in_snapshot(pcnst+35)   ! needs to be bigger than pcnst because cam_in%cflx is split by constituent and cam_in%dstflx by bin.
 type (snapshot_type)    ::  cam_out_snapshot(30)
 type (snapshot_type_nd) ::  pbuf_snapshot(300+pcnst)   ! needs headroom beyond the named pbuf fields because FRACIS is split by constituent.
 
@@ -441,6 +441,7 @@ subroutine cam_in_snapshot_init(cam_snapshot_before_num, cam_snapshot_after_num,
 
    ! for constituent loop.
    integer :: mcnst
+   integer :: ibin
    character(len=64)  :: fname
    character(len=128) :: lname
 
@@ -529,9 +530,16 @@ subroutine cam_in_snapshot_init(cam_snapshot_before_num, cam_snapshot_after_num,
     call snapshot_addfld( ncam_in_var, cam_in_snapshot,  cam_snapshot_before_num, cam_snapshot_after_num, &
       'cam_in%ram1',            'cam_in_ram1',              'unset',          horiz_only)
 
-    if (associated (cam_in%dstflx)) &
-    call snapshot_addfld( ncam_in_var, cam_in_snapshot,  cam_snapshot_before_num, cam_snapshot_after_num, &
-      'cam_in%dstflx',          'cam_in_dstflx',            'unset',          horiz_only)
+   ! cam_in%dstflx is sized (pcols, bins); a single horiz_only snapshot variable would
+   ! only capture the first bin, so it is split into a series of snapshot variables
+   ! cam_in_dstflx_bin(N), mirroring the per-constituent handling of cam_in%cflx.
+    if (associated (cam_in%dstflx)) then
+       do ibin = 1, size(cam_in%dstflx, 2)
+          write(fname, '(a,i0)') 'cam_in_dstflx_bin', ibin
+          call snapshot_addfld( ncam_in_var, cam_in_snapshot,  cam_snapshot_before_num, cam_snapshot_after_num, &
+                                trim(fname), trim(fname), 'kg m-2 s-1', horiz_only)
+       end do
+    end if
 
 end subroutine cam_in_snapshot_init
 
@@ -1034,6 +1042,7 @@ subroutine cam_in_snapshot_all_outfld(lchnk, file_num, cam_in)
 
    integer :: i
    integer :: mcnst
+   integer :: ibin
    character(len=64) :: fname
 
    do i=1, ncam_in_var
@@ -1094,13 +1103,12 @@ subroutine cam_in_snapshot_all_outfld(lchnk, file_num, cam_in)
       case ('cam_in%ram1')
          if (associated (cam_in%ram1)) &
          call outfld(cam_in_snapshot(i)%standard_name, cam_in%ram1, pcols, lchnk)
-      case ('cam_in%dstflx')
-         if (associated (cam_in%dstflx)) &
-         call outfld(cam_in_snapshot(i)%standard_name, cam_in%dstflx, pcols, lchnk)
 
       case default
          if (cam_in_snapshot(i)%ddt_string(1:12) == 'cam_in_cflx_') then
             ! This case is handled below in a loop (not looked up here as it would be i*pcnst iterations)
+         else if (cam_in_snapshot(i)%ddt_string(1:17) == 'cam_in_dstflx_bin') then
+            ! This case is handled below in a loop over dust bins
          else
             call endrun('ERROR in cam_in_snapshot_all_outfld: no match found for '//trim(cam_in_snapshot(i)%ddt_string))
          endif
@@ -1119,6 +1127,17 @@ subroutine cam_in_snapshot_all_outfld(lchnk, file_num, cam_in)
       call outfld(fname, cam_in%cflx(:,mcnst), pcols, lchnk)
       call cam_history_snapshot_deactivate(trim(fname))
    end do
+
+   ! Handle cam_in%dstflx bin loop
+   if (associated (cam_in%dstflx)) then
+      do ibin = 1, size(cam_in%dstflx, 2)
+         write(fname, '(a,i0)') 'cam_in_dstflx_bin', ibin
+
+         call cam_history_snapshot_activate(trim(fname), file_num)
+         call outfld(trim(fname), cam_in%dstflx(:,ibin), pcols, lchnk)
+         call cam_history_snapshot_deactivate(trim(fname))
+      end do
+   end if
 
 end subroutine cam_in_snapshot_all_outfld
 
