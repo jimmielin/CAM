@@ -586,7 +586,7 @@ contains
   subroutine aero_model_drydep  ( state, pbuf, obklen, ustar, cam_in, dt, cam_out, ptend )
 
     use dust_sediment_mod, only: dust_sediment_tend
-    use aero_drydep,       only: modal_aero_depvel_part, calcram
+    use aero_drydep_core,  only: modal_aero_depvel_part, calcram
     use mo_drydep,         only: n_land_type, fraction_landuse
     use physconst,         only: pi, boltz
     use modal_aero_data,   only: qqcw_get_field
