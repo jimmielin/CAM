@@ -725,6 +725,7 @@ contains
     use prescribed_ozone,   only: prescribed_ozone_init
     use prescribed_ghg,     only: prescribed_ghg_init
     use prescribed_aero,    only: prescribed_aero_init
+    use prescribed_aop,     only: prescribed_aop_init
     use aerodep_flx,        only: aerodep_flx_init
     use aircraft_emit,      only: aircraft_emit_init
     use prescribed_volcaero,only: prescribed_volcaero_init
@@ -888,6 +889,7 @@ contains
        call prescribed_ozone_init()
        call prescribed_ghg_init()
        call prescribed_aero_init()
+       call prescribed_aop_init()
        call aerodep_flx_init()
        call aircraft_emit_init()
        call prescribed_volcaero_init()
@@ -3132,6 +3134,7 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   use prescribed_ozone,    only: prescribed_ozone_adv
   use prescribed_ghg,      only: prescribed_ghg_adv
   use prescribed_aero,     only: prescribed_aero_adv
+  use prescribed_aop,      only: prescribed_aop_adv
   use aerodep_flx,         only: aerodep_flx_adv
   use aircraft_emit,       only: aircraft_emit_adv
   use prescribed_volcaero, only: prescribed_volcaero_adv
@@ -3181,6 +3184,7 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   call prescribed_ozone_adv(phys_state, pbuf2d)
   call prescribed_ghg_adv(phys_state, pbuf2d)
   call prescribed_aero_adv(phys_state, pbuf2d)
+  call prescribed_aop_adv(phys_state, pbuf2d)
   call aircraft_emit_adv(phys_state, pbuf2d)
   call prescribed_volcaero_adv(phys_state, pbuf2d)
   call prescribed_strataero_adv(phys_state, pbuf2d)

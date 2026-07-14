@@ -14,6 +14,7 @@ use radconstants,     only: nswbands, nlwbands, idx_sw_diag
 use aerosol_instances_mod, only: aerosol_instances_get_num_models, &
                                   aerosol_instances_is_active
 use aerosol_optics_cam,only: aerosol_optics_cam_init, aerosol_optics_cam_sw, aerosol_optics_cam_lw
+use prescribed_aop,   only: prescribe_aop
 use cam_history,      only: fieldname_len, addfld, outfld, add_default, horiz_only
 use cam_history_support, only : fillvalue
 
@@ -156,6 +157,10 @@ subroutine aer_rad_props_sw(list_idx, state, pbuf,  nnite, idxnite, &
                                  tau, tau_w, tau_w_g, tau_w_f)
    end if
 
+   ! Contribution from prescribed aerosol optical properties, applied ahead of the diagnostics
+   ! below so that they describe the properties radiation is given.
+   call prescribe_aop(list_idx, state, tau, tau_w, tau_w_g, tau_w_f)
+
    !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
    troplev = 0
    !REMOVECAM_END
@@ -204,6 +209,10 @@ subroutine aer_rad_props_lw(list_idx, state, pbuf, odap_aer)
    if (aerosol_instances_get_num_models() > 0) then
       call aerosol_optics_cam_lw(list_idx, state, pbuf, odap_aer)
    end if
+
+   ! Contribution from prescribed aerosol optical properties, applied ahead of the diagnostics
+   ! below so that they describe the properties radiation is given.
+   call prescribe_aop(list_idx, state, odap_aer)
 
    ! debug diags
    if (bam_debug) then

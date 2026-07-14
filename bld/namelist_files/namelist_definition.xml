@@ -7313,6 +7313,144 @@ if {{ hilight }}prescribed_aero_type{{ closehilight }} is 'FIXED'.
 Default: 0 seconds
 </entry>
 
+<!-- Prescribed aerosol optical properties -->
+
+<entry id="prescribed_aop_style" type="char*32" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="NONE,ADD,REPLACE" >
+How prescribed aerosol optical properties are combined with those computed from the model's
+own aerosols.  'ADD' superposes the prescribed properties on those of the model's aerosols,
+in the same way that the model sums over its own species.  'REPLACE' overwrites them, which
+discards the optical properties of every aerosol the model carries, not only those of the
+species being prescribed.  'NONE' disables prescribed aerosol optical properties, and no
+dataset is read.
+
+After applying, the totals are floored at their physical bounds (non-negative optical depths,
+moments no larger than the scattering optical depth), since a dataset holding the difference
+between two runs can locally exceed the background aerosol it is added to.
+Default: 'NONE'
+</entry>
+
+<entry id="prescribed_aop_datapath" type="char*256" input_pathname="abs" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="" >
+Full pathname of the directory that contains the files specified in
+{{ hilight }}prescribed_aop_filelist{{ closehilight }}.
+Default: none
+</entry>
+
+<entry id="prescribed_aop_file" type="char*256" input_pathname="rel:prescribed_aop_datapath" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="" >
+Filename of dataset for prescribed aerosol optical properties.  The data must be on the
+model's vertical grid; this is checked at initialization.
+Default: none
+</entry>
+
+<entry id="prescribed_aop_filelist" type="char*256" input_pathname="rel:prescribed_aop_datapath" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="" >
+Filename of file that contains a sequence of filenames for prescribed aerosol optical
+properties.  The filenames in this file are relative to the directory specified by
+{{ hilight }}prescribed_aop_datapath{{ closehilight }}.
+Default: none
+</entry>
+
+<entry id="prescribed_aop_rmfile" type="logical" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="" >
+Remove the file containing prescribed aerosol optical properties from local disk when no
+longer needed.
+Default: FALSE
+</entry>
+
+<entry id="prescribed_aop_lw_tau" type="char*32" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="" >
+Name, without the band number, of the longwave absorption optical depth fields in the
+prescribed aerosol optical properties dataset.  The band number is appended to form one field
+name per longwave band, so that for example 'AER_LW_ABSOD' reads AER_LW_ABSOD_1 through
+AER_LW_ABSOD_16.  Leave blank to leave the longwave properties of the model's aerosols alone.
+Default: none
+</entry>
+
+<entry id="prescribed_aop_sw_tau" type="char*32" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="" >
+Name, without the band number, of the shortwave extinction optical depth fields in the
+prescribed aerosol optical properties dataset.  The band number is appended to form one field
+name per shortwave band, so that for example 'TAU_AER_SW' reads TAU_AER_SW_1 through
+TAU_AER_SW_14.  Leave blank to leave the shortwave properties of the model's aerosols alone.
+If it is set, so must {{ hilight }}prescribed_aop_sw_tau_w{{ closehilight }} and
+{{ hilight }}prescribed_aop_sw_tau_w_g{{ closehilight }}.
+Default: none
+</entry>
+
+<entry id="prescribed_aop_sw_tau_w" type="char*32" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="" >
+Name, without the band number, of the shortwave extinction optical depth weighted by single
+scattering albedo (tau * w) in the prescribed aerosol optical properties dataset.  The band
+number is appended, as for {{ hilight }}prescribed_aop_sw_tau{{ closehilight }}.
+Default: none
+</entry>
+
+<entry id="prescribed_aop_sw_tau_w_g" type="char*32" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="" >
+Name, without the band number, of the shortwave extinction optical depth weighted by single
+scattering albedo and asymmetry parameter (tau * w * g) in the prescribed aerosol optical
+properties dataset.  The band number is appended, as for
+{{ hilight }}prescribed_aop_sw_tau{{ closehilight }}.
+Default: none
+</entry>
+
+<entry id="prescribed_aop_sw_tau_w_f" type="char*32" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="" >
+Name, without the band number, of the shortwave extinction optical depth weighted by single
+scattering albedo and forward scattered fraction (tau * w * f) in the prescribed aerosol
+optical properties dataset.  The band number is appended, as for
+{{ hilight }}prescribed_aop_sw_tau{{ closehilight }}.  This quantity is used by RRTMG; RRTMGP
+ignores it.
+
+This entry is optional.  Datasets often omit the field, in which case it is reconstructed as
+tau_w_f = tau_w_g**2 / tau_w, which follows from f = g*g, the relation the model's own optics
+use.  The reconstruction is exact for a single aerosol population sampled instantaneously, but
+for the sum over a mixture of populations, or for time averaged data, it underestimates tau_w_f
+by tau_w times the scattering weighted variance of g across the populations.  It is therefore a
+lower bound, and errs towards too little forward scattering.  Supply the field where the
+accuracy matters, in particular for a well mixed background aerosol.
+
+The reconstruction is valid only for absolute optical properties, and must not be used on a
+dataset holding the difference between two runs: tau_w_g/tau_w is then a ratio of two
+differences rather than an asymmetry parameter, so it is unbounded and cannot produce the
+negative tau_w_f a difference requires.  Reconstruct tau_w_f inside each run and difference the
+results instead, then set this entry.  A negative tau_w in the dataset is trapped at run time.
+Default: none, i.e. tau_w_f is reconstructed
+</entry>
+
+<entry id="prescribed_aop_type" type="char*32" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="CYCLICAL,SERIAL,INTERP_MISSING_MONTHS,FIXED" >
+Type of time interpolation for data in prescribed_aop files.
+Can be set to 'CYCLICAL', 'SERIAL', 'INTERP_MISSING_MONTHS', or 'FIXED'.
+Default: 'CYCLICAL'
+</entry>
+
+<entry id="prescribed_aop_cycle_yr" type="integer" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="" >
+The cycle year of the prescribed aerosol optical properties data
+if {{ hilight }}prescribed_aop_type{{ closehilight }} is 'CYCLICAL'.
+Format: YYYY
+Default: 0
+</entry>
+
+<entry id="prescribed_aop_fixed_ymd" type="integer" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="" >
+The date at which the prescribed aerosol optical properties data is fixed
+if {{ hilight }}prescribed_aop_type{{ closehilight }} is 'FIXED'.
+Format: YYYYMMDD
+Default: 0
+</entry>
+
+<entry id="prescribed_aop_fixed_tod" type="integer" category="cam_chem"
+       group="prescribed_aop_nl" valid_values="" >
+The time of day (seconds) corresponding to {{ hilight }}prescribed_aop_fixed_ymd{{ closehilight }}
+at which the prescribed aerosol optical properties data is fixed
+if {{ hilight }}prescribed_aop_type{{ closehilight }} is 'FIXED'.
+Default: 0 seconds
+</entry>
+
 <entry id="aerodep_flx_datapath" type="char*256" input_pathname="abs" category="cam_chem"
        group="aerodep_flx_nl" valid_values="" >
 Full pathname of the directory that contains the files specified in

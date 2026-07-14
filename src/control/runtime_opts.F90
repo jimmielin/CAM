@@ -72,6 +72,7 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    use aoa_tracers,         only: aoa_tracers_readnl
    use prescribed_ozone,    only: prescribed_ozone_readnl
    use prescribed_aero,     only: prescribed_aero_readnl
+   use prescribed_aop,      only: prescribed_aop_readnl
    use prescribed_ghg,      only: prescribed_ghg_readnl
    use aircraft_emit,       only: aircraft_emit_readnl
    use cospsimulator_intr,  only: cospsimulator_intr_readnl
@@ -180,6 +181,7 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    call aerodep_flx_readnl(nlfilename)
    call prescribed_ozone_readnl(nlfilename)
    call prescribed_aero_readnl(nlfilename)
+   call prescribed_aop_readnl(nlfilename)
    call prescribed_ghg_readnl(nlfilename)
    call co2_cycle_readnl(nlfilename)
    call aircraft_emit_readnl(nlfilename)

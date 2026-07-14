@@ -133,9 +133,18 @@ module tracer_data
      logical :: top_bndry = .false.
      logical :: top_layer = .false.
      logical :: stepTime = .false.  ! Do not interpolate in time, but use stepwise times
+     ! Data are already on the model's vertical grid, so use them layer by layer with no
+     ! vertical interpolation.  Requires the file's hyam/hybm to match the model's; this is
+     ! checked in trcdata_init.  Appropriate for layer quantities which are not mixing ratios
+     ! (e.g. optical depth), for which interpolating in pressure would not conserve the column.
+     logical :: no_vert_interp = .false.
   endtype trfile
 
   integer, public, parameter :: MAXTRCRS = 100
+
+  ! Tolerance for comparing a file's hybrid coefficients against the model's.  Grids generated
+  ! from the same definition agree to roundoff; genuinely different grids differ by far more.
+  real(r8), parameter :: hycoef_tol = 1.e-10_r8
 
   integer, parameter :: LONDIM = 1
   integer, parameter :: LATDIM = 2
@@ -169,6 +178,7 @@ contains
     use dycore,          only : dycore_is
     use horizontal_interpolate, only : xy_interp_init
     use spmd_utils,       only: mpicom, mstrid=>masterprocid, mpi_real8, mpi_integer
+    use hycoef,           only: model_hyam => hyam, model_hybm => hybm
 
     implicit none
 
@@ -451,6 +461,33 @@ contains
        end if
     endif
 
+    ! Data used layer by layer must be on the model's vertical grid.  Verify that here rather
+    ! than silently mapping the data onto the wrong layers.  hyam/hybm are only read above when
+    ! the file carries PS, so read them here if that has not already happened.
+    if (file%no_vert_interp) then
+
+       if (file%nlev /= pver) then
+          write(iulog,*) sub//': file has ',file%nlev,' levels, model has ',pver
+          call endrun(sub//': no_vert_interp requires the file to have the same number of levels as the model')
+       end if
+
+       if (.not. associated(file%hyam)) then
+          allocate( file%hyam(file%nlev), file%hybm(file%nlev), stat=astat )
+          if( astat /= 0 ) then
+             call endrun(sub//': failed to allocate file%hyam and file%hybm arrays')
+          end if
+          ierr = pio_inq_varid( file%curr_fileid, 'hyam', varid )
+          ierr = pio_get_var( file%curr_fileid, varid, file%hyam )
+          ierr = pio_inq_varid( file%curr_fileid, 'hybm', varid )
+          ierr = pio_get_var( file%curr_fileid, varid, file%hybm )
+       end if
+
+       if ( any(abs(file%hyam - model_hyam) > hycoef_tol) .or. &
+            any(abs(file%hybm - model_hybm) > hycoef_tol) ) then
+          call endrun(sub//': no_vert_interp requires the file hyam/hybm to match the model vertical grid')
+       end if
+
+    end if
 
     call pio_seterrorhandling(File%curr_fileid, PIO_BCAST_ERROR, oldmethod=err_handling)
 
@@ -576,7 +613,15 @@ contains
           enddo
        endif
 
+       ! The units attribute is optional.  Blank the buffer first, since pio fills only as many
+       ! characters as the attribute occupies, and blank it again if the variable carries no
+       ! units attribute at all, so that undefined characters cannot reach flds(f)%units.
+       data_units = ' '
        ierr = pio_get_att( file%curr_fileid, flds(f)%var_id, 'units', data_units)
+       if (ierr /= pio_noerr) then
+          data_units = ' '
+       end if
+
        flds(f)%units = trim(data_units(1:32))
 
     enddo flds_loop
@@ -1982,6 +2027,11 @@ contains
                    call vert_interp_mixrat(ncol,file%nlev,pver,state(c)%pint, &
                         datain, data_out(:,:), &
                         file%p0,ps,file%hyai,file%hybi,file%dist)
+                else if (file%no_vert_interp) then
+                   ! Data are on the model's vertical grid (checked in trcdata_init), so each
+                   ! input layer is used as is.  PS does not enter: a layer keeps its position
+                   ! in the hybrid coordinate, which leaves column totals unchanged.
+                   data_out(:ncol,:) = datain(:ncol,:)
                 else
                    call vert_interp(ncol, file%nlev, pin, state(c)%pmid, datain, data_out(:,:) )
                 endif
