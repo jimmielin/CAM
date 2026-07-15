@@ -2,7 +2,11 @@ module ndrop
 
 !---------------------------------------------------------------------------------
 ! Purpose:
-!   CAM Interface for droplet activation by modal aerosols
+!   Droplet activation and vertical mixing by modal (or bin) aerosols
+!   (dropmixnuc).  Portable science routines split from the CAM interface,
+!   which now lives in microp_aero.F90.  Aerosol access is polymorphic through
+!   aerosol_properties/aerosol_state; host physical constants are provided by
+!   ndrop_init; array sizing is by runtime ncol/pver.
 !
 ! ***N.B.*** This module is currently hardcoded to recognize only the modes that
 !            affect the climate calculation.  This is implemented by using list
@@ -10,19 +14,7 @@ module ndrop
 !---------------------------------------------------------------------------------
 
 use shr_kind_mod,     only: r8 => shr_kind_r8, shr_kind_cs
-use ppgrid,           only: pcols, pver
-use physconst,        only: pi, rhoh2o, mwh2o, r_universal, rh2o, &
-                            gravit, latvap, cpair, rair
-use constituents,     only: pcnst, cnst_get_ind
-use physics_types,    only: physics_state, physics_ptend, physics_ptend_init
-use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
-
-use phys_control,     only: phys_getopts
-use ref_pres,         only: top_lev => trop_cloud_top_lev
 use shr_spfn_mod,     only: erf => shr_spfn_erf
-use cam_history,      only: addfld, add_default, horiz_only, fieldname_len, outfld
-use cam_abortutils,   only: endrun
-use cam_logfile,      only: iulog
 
 use aerosol_properties_mod, only: aerosol_properties
 use aerosol_state_mod, only: aerosol_state, ptr2d_t
@@ -34,35 +26,32 @@ private
 save
 
 public ndrop_init, dropmixnuc
+public psat   ! needed by the CAM interface to size the ccn diagnostic
 
 ! mathematical constants
 real(r8), parameter :: zero     = 0._r8
 real(r8), parameter :: third    = 1._r8/3._r8
 real(r8), parameter :: twothird = 2._r8*third
 real(r8), parameter :: sq2      = sqrt(2._r8)
-real(r8), parameter :: sq2pi    = sqrt(2._r8*pi)
 real(r8), parameter :: surften  = 0.076_r8
 
 ! CCN diagnostic fields
 integer,  parameter :: psat=6    ! number of supersaturations to calc ccn concentration
 real(r8), parameter :: supersat(psat)= & ! supersaturation (%) to determine ccn concentration
                        (/ 0.02_r8, 0.05_r8, 0.1_r8, 0.2_r8, 0.5_r8, 1.0_r8 /)
-character(len=8) :: ccn_name(psat)= &
-                    (/'CCN1','CCN2','CCN3','CCN4','CCN5','CCN6'/)
 
-! indices in state and pbuf structures
-integer :: numliq_idx = -1
-integer :: kvh_idx    = -1
+! host physical constants (set by ndrop_init)
+real(r8) :: pi           ! pi
+real(r8) :: rhoh2o       ! density of liquid water (kg/m3)
+real(r8) :: mwh2o        ! molecular weight of water (kg/kmol)
+real(r8) :: r_universal  ! universal gas constant (J/K/kmol)
+real(r8) :: rh2o         ! water vapor gas constant (J/K/kg)
+real(r8) :: gravit       ! gravitational acceleration (m/s2)
+real(r8) :: latvap       ! latent heat of vaporization (J/kg)
+real(r8) :: cpair        ! specific heat of dry air (J/K/kg)
+real(r8) :: rair         ! dry air gas constant (J/K/kg)
 
-logical :: history_aerosol      ! Output the aerosol tendencies
-character(len=fieldname_len), allocatable :: fieldname(:)    ! names for drop nuc tendency output fields
-character(len=fieldname_len), allocatable :: fieldname_cw(:) ! names for drop nuc tendency output fields
-
-! Indices for aerosol species in the ptend%q array.
-integer, allocatable :: aer_cnst_idx(:,:)
-
-logical :: lq(pcnst) = .false. ! set flags true for constituents with non-zero tendencies
-                               ! in the ptend object
+real(r8) :: sq2pi        ! sqrt(2*pi), derived from host pi by ndrop_init
 
 integer :: nbin  ! number of bins
 
@@ -70,151 +59,100 @@ integer :: nbin  ! number of bins
 contains
 !===============================================================================
 
-subroutine ndrop_init(aero_props)
+subroutine ndrop_init(aero_props, pi_in, rhoh2o_in, mwh2o_in, r_universal_in, &
+                      rh2o_in, gravit_in, latvap_in, cpair_in, rair_in)
 
    class(aerosol_properties), intent(in) :: aero_props
 
-   integer :: l, m, mm
-   integer :: idxtmp = -1
-   character(len=32)   :: tmpname
-   character(len=32)   :: tmpname_cw
-   character(len=128)  :: long_name
-   character(len=8)    :: unit
-   logical :: history_amwg         ! output the variables used by the AMWG diag package
+   ! host physical constants
+   real(r8), intent(in) :: pi_in           ! pi
+   real(r8), intent(in) :: rhoh2o_in       ! density of liquid water (kg/m3)
+   real(r8), intent(in) :: mwh2o_in        ! molecular weight of water (kg/kmol)
+   real(r8), intent(in) :: r_universal_in  ! universal gas constant (J/K/kmol)
+   real(r8), intent(in) :: rh2o_in         ! water vapor gas constant (J/K/kg)
+   real(r8), intent(in) :: gravit_in       ! gravitational acceleration (m/s2)
+   real(r8), intent(in) :: latvap_in       ! latent heat of vaporization (J/kg)
+   real(r8), intent(in) :: cpair_in        ! specific heat of dry air (J/K/kg)
+   real(r8), intent(in) :: rair_in         ! dry air gas constant (J/K/kg)
 
    !-------------------------------------------------------------------------------
 
-   ! get indices into state%q and pbuf structures
-   call cnst_get_ind('NUMLIQ', numliq_idx)
+   pi          = pi_in
+   rhoh2o      = rhoh2o_in
+   mwh2o       = mwh2o_in
+   r_universal = r_universal_in
+   rh2o        = rh2o_in
+   gravit      = gravit_in
+   latvap      = latvap_in
+   cpair       = cpair_in
+   rair        = rair_in
 
-   kvh_idx = pbuf_get_index('kvh')
+   sq2pi = sqrt(2._r8*pi)
 
    call aero_activate_init(mwh2o, r_universal, rhoh2o, pi)
 
    nbin = aero_props%nbins()
-
-   allocate( &
-      aer_cnst_idx(aero_props%nbins(),0:maxval(aero_props%nmasses())), &
-      fieldname(aero_props%ncnst_tot()),                 &
-      fieldname_cw(aero_props%ncnst_tot())               )
-
-   ! Add dropmixnuc tendencies for all modal aerosol species
-
-   call phys_getopts(history_amwg_out = history_amwg, &
-                     history_aerosol_out = history_aerosol)
-
-
-   do m = 1, aero_props%nbins()
-      do l = 0, aero_props%nmasses(m)
-
-         mm = aero_props%indexer(m,l)
-
-         unit = 'kg/m2/s'
-         if (l == 0) then   ! number
-            unit = '#/m2/s'
-         end if
-
-         if (l == 0) then   ! number
-            call aero_props%num_names( m, tmpname, tmpname_cw)
-         else
-            call aero_props%mmr_names( m,l, tmpname, tmpname_cw)
-         end if
-
-         fieldname(mm)    = trim(tmpname) // '_mixnuc1'
-         fieldname_cw(mm) = trim(tmpname_cw) // '_mixnuc1'
-
-         ! To set tendencies in the ptend object need to get the constituent indices
-         ! for the prognostic species
-
-         call cnst_get_ind(tmpname, idxtmp, abort=.false.)
-         aer_cnst_idx(m,l) = idxtmp
-
-         if (idxtmp>0) then
-            lq(idxtmp) = .true.
-         end if
-
-         ! Add tendency fields to the history only when prognostic MAM is enabled.
-         long_name = trim(tmpname) // ' dropmixnuc mixnuc column tendency'
-         call addfld(fieldname(mm),    horiz_only, 'A', unit, long_name, sampled_on_subcycle=.true.)
-
-         long_name = trim(tmpname_cw) // ' dropmixnuc mixnuc column tendency'
-         call addfld(fieldname_cw(mm), horiz_only, 'A', unit, long_name, sampled_on_subcycle=.true.)
-
-         if (history_aerosol) then
-            call add_default(fieldname(mm), 1, ' ')
-            call add_default(fieldname_cw(mm), 1, ' ')
-         end if
-
-      end do
-   end do
-
-   call addfld('CCN1',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.02%', sampled_on_subcycle=.true.)
-   call addfld('CCN2',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.05%', sampled_on_subcycle=.true.)
-   call addfld('CCN3',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.1%',  sampled_on_subcycle=.true.)
-   call addfld('CCN4',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.2%',  sampled_on_subcycle=.true.)
-   call addfld('CCN5',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.5%',  sampled_on_subcycle=.true.)
-   call addfld('CCN6',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=1.0%',  sampled_on_subcycle=.true.)
-
-
-   call addfld('WTKE',     (/ 'lev' /), 'A', 'm/s', 'Standard deviation of updraft velocity', sampled_on_subcycle=.true.)
-   call addfld('NDROPMIX', (/ 'lev' /), 'A', '#/kg/s', 'Droplet number mixing', sampled_on_subcycle=.true.)
-   call addfld('NDROPSRC', (/ 'lev' /), 'A', '#/kg/s', 'Droplet number source', sampled_on_subcycle=.true.)
-   call addfld('NDROPSNK', (/ 'lev' /), 'A', '#/kg/s', 'Droplet number loss by microphysics', sampled_on_subcycle=.true.)
-   call addfld('NDROPCOL', horiz_only,  'A', '#/m2', 'Column droplet number', sampled_on_subcycle=.true.)
-
-   ! set the add_default fields
-   if (history_amwg) then
-      call add_default('CCN3', 1, ' ')
-      call add_default('CCN4', 1, ' ')
-   endif
 
 end subroutine ndrop_init
 
 !===============================================================================
 
 subroutine dropmixnuc( aero_props, aero_state, &
-   state, ptend, dtmicro, pbuf, wsub, wmixmin, &
-   cldn, cldo, cldliqf, tendnd, factnum)
+   ncol, pver, top_lev, dtmicro, &
+   temp, pmid, pint, pdel, rpdel, zm, kvh, ncldwtr, &
+   wsub, wmixmin, cldn, cldo, cldliqf, &
+   dotend, raertend_out, tendnd, factnum, &
+   wtke, nsource, ndropmix, ndropcol, &
+   ccn, coltend, coltend_cw, &
+   errmsg, errflg)
 
    ! vertical diffusion and nucleation of cloud droplets
    ! assume cloud presence controlled by cloud fraction
    ! doesn't distinguish between warm, cold clouds
 
    ! arguments
-   type(physics_state), target, intent(in)    :: state
-   type(physics_ptend),         intent(out)   :: ptend
-   real(r8),                    intent(in)    :: dtmicro     ! time step for microphysics (s)
-   real(r8),                    intent(in)    :: wmixmin     ! minimum turbulence vertical velocity (m/s)
-
-   type(physics_buffer_desc), pointer :: pbuf(:)
-
    class(aerosol_properties), intent(in) :: aero_props
    class(aerosol_state), intent(in) :: aero_state
 
-   ! arguments
-   real(r8), intent(in) :: wsub(pcols,pver)    ! subgrid vertical velocity
-   real(r8), intent(in) :: cldn(pcols,pver)    ! cloud fraction
-   real(r8), intent(in) :: cldo(pcols,pver)    ! cloud fraction on previous time step
-   real(r8), intent(in) :: cldliqf(pcols,pver) ! liquid cloud fraction (liquid / (liquid + ice))
+   integer,  intent(in)    :: ncol        ! number of columns
+   integer,  intent(in)    :: pver        ! number of vertical layers
+   integer,  intent(in)    :: top_lev     ! top level for cloud physics
+   real(r8), intent(in)    :: dtmicro     ! time step for microphysics (s)
+   real(r8), intent(in)    :: temp(:,:)   ! temperature (K)
+   real(r8), intent(in)    :: pmid(:,:)   ! mid-level pressure (Pa)
+   real(r8), intent(in)    :: pint(:,:)   ! pressure at layer interfaces (Pa)
+   real(r8), intent(in)    :: pdel(:,:)   ! pressure thickess of layer (Pa)
+   real(r8), intent(in)    :: rpdel(:,:)  ! inverse of pressure thickess of layer (/Pa)
+   real(r8), intent(in)    :: zm(:,:)     ! geopotential height of level (m)
+   real(r8), intent(in)    :: kvh(:,:)    ! vertical diffusivity (m2/s), interfaces
+   real(r8), intent(in)    :: ncldwtr(:,:)! droplet number concentration (#/kg)
+   real(r8), intent(in)    :: wsub(:,:)   ! subgrid vertical velocity
+   real(r8), intent(in)    :: wmixmin     ! minimum turbulence vertical velocity (m/s)
+   real(r8), intent(in)    :: cldn(:,:)   ! cloud fraction
+   real(r8), intent(in)    :: cldo(:,:)   ! cloud fraction on previous time step
+   real(r8), intent(in)    :: cldliqf(:,:)! liquid cloud fraction (liquid / (liquid + ice))
+   logical,  intent(in)    :: dotend(:)   ! (nele_tot) true for aerosol elements resolving to
+                                          ! advected constituents: tendency returned in raertend_out.
+                                          ! false elements are updated in place through the
+                                          ! aero_state interstitial pointers.
 
    ! output arguments
-   real(r8), intent(out) :: tendnd(pcols,pver) ! change in droplet number concentration (#/kg/s)
+   real(r8), intent(out) :: raertend_out(:,:,:) ! (ncol,pver,nele_tot) tendency of interstitial aerosol
+                                                ! mass, number mixing ratios, only where dotend is true
+   real(r8), intent(out) :: tendnd(:,:)   ! change in droplet number concentration (#/kg/s)
    real(r8), intent(out) :: factnum(:,:,:)     ! activation fraction for aerosol number
+   real(r8), intent(out) :: wtke(:,:)     ! turbulent vertical velocity at base of layer k (m/s)
+   real(r8), intent(out) :: nsource(:,:)  ! droplet number source (#/kg/s)
+   real(r8), intent(out) :: ndropmix(:,:) ! droplet number mixing (#/kg/s)
+   real(r8), intent(out) :: ndropcol(:)   ! column droplet number (#/m2)
+   real(r8), intent(out) :: ccn(:,:,:)    ! (ncol,pver,psat) number conc of aerosols activated at supersat (#/cm3)
+   real(r8), intent(out) :: coltend(:,:)  ! (ncol,nele_tot) column tendency for diagnostic output
+   real(r8), intent(out) :: coltend_cw(:,:) ! (ncol,nele_tot) column tendency
+   character(len=*), intent(out) :: errmsg
+   integer,          intent(out) :: errflg
    !--------------------Local storage-------------------------------------
 
-   integer  :: lchnk               ! chunk identifier
-   integer  :: ncol                ! number of columns
    integer  :: nele_tot            ! total number of aerosol elements
-
-   real(r8), pointer :: ncldwtr(:,:) ! droplet number concentration (#/kg)
-   real(r8), pointer :: temp(:,:)    ! temperature (K)
-   real(r8), pointer :: pmid(:,:)    ! mid-level pressure (Pa)
-   real(r8), pointer :: pint(:,:)    ! pressure at layer interfaces (Pa)
-   real(r8), pointer :: pdel(:,:)    ! pressure thickess of layer (Pa)
-   real(r8), pointer :: rpdel(:,:)   ! inverse of pressure thickess of layer (/Pa)
-   real(r8), pointer :: zm(:,:)      ! geopotential height of level (m)
-
-   real(r8), pointer :: kvh(:,:)     ! vertical diffusivity (m2/s)
 
    type(ptr2d_t), allocatable :: raer(:)     ! aerosol mass, number mixing ratios
    type(ptr2d_t), allocatable :: qqcw(:)
@@ -225,7 +163,6 @@ subroutine dropmixnuc( aero_props, aero_state, &
    integer  :: i, k, l, m, mm, n
    integer  :: km1, kp1
    integer  :: nnew, nsav, ntemp
-   integer  :: lptr
    integer  :: nsubmix, nsubmix_bnd
    integer, save :: count_submix(100)
    integer  :: phase ! phase of aerosol
@@ -233,23 +170,20 @@ subroutine dropmixnuc( aero_props, aero_state, &
    real(r8) :: arg
    real(r8) :: dtinv
 
-   character(len=512) :: errmsg   ! error handling for the portable activation kernel
-   integer            :: errflg
    real(r8) :: dtmin, tinv, dtt
-   real(r8) :: lcldn(pcols,pver)
-   real(r8) :: lcldo(pcols,pver)
+   real(r8) :: lcldn(ncol,pver)
+   real(r8) :: lcldo(ncol,pver)
 
    real(r8) :: zs(pver) ! inverse of distance between levels (m)
    real(r8) :: qcld(pver) ! cloud droplet number mixing ratio (#/kg)
    real(r8) :: qncld(pver)     ! droplet number nucleated on cloud boundaries
    real(r8) :: srcn(pver)       ! droplet source rate (/s)
-   real(r8) :: cs(pcols,pver)      ! air density (kg/m3)
+   real(r8) :: cs(ncol,pver)      ! air density (kg/m3)
    real(r8) :: csbot(pver)       ! air density at bottom (interface) of layer (kg/m3)
    real(r8) :: csbot_cscen(pver) ! csbot(i)/cs(i,k)
-   real(r8) :: dz(pcols,pver)      ! geometric thickness of layers (m)
+   real(r8) :: dz(ncol,pver)      ! geometric thickness of layers (m)
 
-   real(r8) :: wtke(pcols,pver)     ! turbulent vertical velocity at base of layer k (m/s)
-   real(r8) :: wtke_cen(pcols,pver) ! turbulent vertical velocity at center of layer k (m/s)
+   real(r8) :: wtke_cen(ncol,pver) ! turbulent vertical velocity at center of layer k (m/s)
    real(r8) :: wbar, wmix, wmin, wmax
 
    real(r8) :: zn(pver)   ! g/pdel (m2/g) for layer
@@ -269,9 +203,6 @@ subroutine dropmixnuc( aero_props, aero_state, &
    real(r8) :: alogarg
    real(r8) :: overlapp(pver), overlapm(pver) ! cloud overlap
 
-   real(r8) :: nsource(pcols,pver)            ! droplet number source (#/kg/s)
-   real(r8) :: ndropmix(pcols,pver)           ! droplet number mixing (#/kg/s)
-   real(r8) :: ndropcol(pcols)               ! column droplet number (#/m2)
    real(r8) :: cldo_tmp, cldn_tmp
    real(r8) :: tau_cld_regenerate
    real(r8) :: taumix_internal_pver_inv ! 1/(internal mixing time scale for k=pver) (1/s)
@@ -284,7 +215,7 @@ subroutine dropmixnuc( aero_props, aero_state, &
    real(r8), allocatable :: raercol_cw(:,:,:) ! same as raercol but for cloud-borne phase
 
 
-   real(r8) :: na(pcols,pver,nbin), va(pcols,pver,nbin), hy(pcols,pver,nbin)
+   real(r8) :: na(ncol,pver,nbin), va(ncol,pver,nbin), hy(ncol,pver,nbin)
    real(r8), allocatable :: naermod(:)  ! (1/m3)
    real(r8), allocatable :: hygro(:)    ! hygroscopicity of aerosol mode
    real(r8), allocatable :: vaerosol(:) ! interstit+activated aerosol volume conc (cm3/cm3)
@@ -302,27 +233,14 @@ subroutine dropmixnuc( aero_props, aero_state, &
    !           / [aero. number conc. in updraft, just below cloudbase (#/cm3)]
 
 
-   real(r8), allocatable :: coltend(:,:)       ! column tendency for diagnostic output
-   real(r8), allocatable :: coltend_cw(:,:)    ! column tendency
-   real(r8) :: ccn(pcols,pver,psat)    ! number conc of aerosols activated at supersat
-
    integer :: errnum
    character(len=shr_kind_cs) :: errstr
    !-------------------------------------------------------------------------------
 
-   lchnk = state%lchnk
-   ncol  = state%ncol
+   errmsg = ''
+   errflg = 0
+
    nele_tot  = aero_props%ncnst_tot()
-
-   ncldwtr  => state%q(:,:,numliq_idx)
-   temp     => state%t
-   pmid     => state%pmid
-   pint     => state%pint
-   pdel     => state%pdel
-   rpdel    => state%rpdel
-   zm       => state%zm
-
-   call pbuf_get_field(pbuf, kvh_idx, kvh)
 
    ! Create the liquid weighted cloud fractions that were passsed in
    ! before. This doesn't seem like the best variable, since the cloud could
@@ -334,14 +252,15 @@ subroutine dropmixnuc( aero_props, aero_state, &
 
    arg = 1.0_r8
    if (abs(0.8427_r8 - erf(arg))/0.8427_r8 > 0.001_r8) then
-      write(iulog,*) 'erf(1.0) = ',ERF(arg)
-      call endrun('dropmixnuc: Error function error')
+      write(errmsg,*) 'dropmixnuc: Error function error, erf(1.0) = ',ERF(arg)
+      errflg = 1
+      return
    endif
    arg = 0.0_r8
    if (erf(arg) /= 0.0_r8) then
-      write(iulog,*) 'erf(0.0) = ',erf(arg)
-      write(iulog,*) 'dropmixnuc: Error function error'
-      call endrun('dropmixnuc: Error function error')
+      write(errmsg,*) 'dropmixnuc: Error function error, erf(0.0) = ',erf(arg)
+      errflg = 1
+      return
    endif
 
    dtinv = 1._r8/dtmicro
@@ -353,8 +272,6 @@ subroutine dropmixnuc( aero_props, aero_state, &
       qqcw(nele_tot),              &
       raercol(pver,nele_tot,2),    &
       raercol_cw(pver,nele_tot,2), &
-      coltend(pcols,nele_tot),     &
-      coltend_cw(pcols,nele_tot),  &
       naermod(nbin),               &
       hygro(nbin),                 &
       vaerosol(nbin),              &
@@ -373,9 +290,7 @@ subroutine dropmixnuc( aero_props, aero_state, &
    ndropmix = 0._r8
    ndropcol = 0._r8
    tendnd = 0._r8
-
-   ! initialize aerosol tendencies
-   call physics_ptend_init(ptend, state%psetcols, 'ndrop', lq=lq)
+   raertend_out = 0._r8
 
    ! air density (kg/m3)
    cs(:ncol,:)  = pmid(:ncol,:)/(rair*temp(:ncol,:))
@@ -387,7 +302,9 @@ subroutine dropmixnuc( aero_props, aero_state, &
            m, cs, phase, na(:,:,m), va(:,:,m), &
            hy(:,:,m), errnum, errstr)
       if (errnum/=0) then
-         call endrun('dropmixnuc : '//trim(errstr))
+         errmsg = 'dropmixnuc : '//trim(errstr)
+         errflg = 1
+         return
       end if
    end do
 
@@ -541,7 +458,7 @@ subroutine dropmixnuc( aero_props, aero_state, &
                fluxm,flux_fullact(k),                          &
                pi, rhoh2o, rh2o, gravit, latvap, cpair, rair,  &
                errmsg, errflg)
-            if (errflg /= 0) call endrun(trim(errmsg))
+            if (errflg /= 0) return
 
             factnum(i,k,:) = fn
 
@@ -627,7 +544,7 @@ subroutine dropmixnuc( aero_props, aero_state, &
                   fluxm, flux_fullact(k),                        &
                   pi, rhoh2o, rh2o, gravit, latvap, cpair, rair, &
                   errmsg, errflg)
-               if (errflg /= 0) call endrun(trim(errmsg))
+               if (errflg /= 0) return
 
                factnum(i,k,:) = fn
 
@@ -832,7 +749,7 @@ subroutine dropmixnuc( aero_props, aero_state, &
          call explmix(  &
             qcld, srcn, ekkp, ekkm, overlapp,  &
             overlapm, qncld, zero, zero, pver, &
-            dtmix, .false.)
+            top_lev, dtmix, .false.)
 
          ! rce-comment
          !    the interstitial particle mixratio is different in clear/cloudy portions
@@ -856,12 +773,12 @@ subroutine dropmixnuc( aero_props, aero_state, &
             call explmix( &
                  raercol_cw(:,mm,nnew), source, ekkp, ekkm, overlapp, &
                  overlapm, raercol_cw(:,mm,nsav), zero, zero, pver,   &
-                 dtmix, .false.)
+                 top_lev, dtmix, .false.)
 
             call explmix( &
                  raercol(:,mm,nnew), source, ekkp, ekkm, overlapp,  &
                  overlapm, raercol(:,mm,nsav), zero, flxconv, pver, &
-                 dtmix, .true., raercol_cw(:,mm,nsav))
+                 top_lev, dtmix, .true., raercol_cw(:,mm,nsav))
 
             do l = 1,aero_props%nmasses(m)
                mm = aero_props%indexer(m,l)
@@ -878,12 +795,12 @@ subroutine dropmixnuc( aero_props, aero_state, &
                call explmix( &
                     raercol_cw(:,mm,nnew), source, ekkp, ekkm, overlapp, &
                     overlapm, raercol_cw(:,mm,nsav), zero, zero, pver,   &
-                    dtmix, .false.)
+                    top_lev, dtmix, .false.)
 
                call explmix( &
                     raercol(:,mm,nnew), source, ekkp, ekkm, overlapp,  &
                     overlapm, raercol(:,mm,nsav), zero, flxconv, pver, &
-                    dtmix, .true., raercol_cw(:,mm,nsav))
+                    top_lev, dtmix, .true., raercol_cw(:,mm,nsav))
 
             end do
          end do
@@ -923,7 +840,6 @@ subroutine dropmixnuc( aero_props, aero_state, &
          do l = 0, aero_props%nmasses(m)
 
             mm = aero_props%indexer(m,l)
-            lptr = aer_cnst_idx(m,l)
 
             raertend(top_lev:pver) = (raercol(top_lev:pver,mm,nnew) - raer(mm)%fld(i,top_lev:pver))*dtinv
             qqcwtend(top_lev:pver) = (raercol_cw(top_lev:pver,mm,nnew) - qqcw(mm)%fld(i,top_lev:pver))*dtinv
@@ -932,9 +848,9 @@ subroutine dropmixnuc( aero_props, aero_state, &
             coltend_cw(i,mm) = sum( pdel(i,:)*qqcwtend )/gravit
 
             ! check for advected aerosol constituents
-            if (lptr>0) then ! advected aerosol parts
-               ptend%q(i,:,lptr) = 0.0_r8
-               ptend%q(i,top_lev:pver,lptr) = raertend(top_lev:pver)         ! set tendencies for interstitial aerosol
+            if (dotend(mm)) then ! advected aerosol parts
+               raertend_out(i,:,mm) = 0.0_r8
+               raertend_out(i,top_lev:pver,mm) = raertend(top_lev:pver)      ! set tendencies for interstitial aerosol
             else
                raer(mm)%fld(i,:) = 0.0_r8
                raer(mm)%fld(i,top_lev:pver)  = raercol(top_lev:pver,mm,nnew) ! update non-advected interstitial aerosol (pbuf)
@@ -949,24 +865,8 @@ subroutine dropmixnuc( aero_props, aero_state, &
    end do  ! overall_main_i_loop
    ! end of main loop over i/longitude ....................................
 
-   call outfld('NDROPCOL', ndropcol, pcols, lchnk)
-   call outfld('NDROPSRC', nsource,  pcols, lchnk)
-   call outfld('NDROPMIX', ndropmix, pcols, lchnk)
-   call outfld('WTKE    ', wtke,     pcols, lchnk)
-
-   call ccncalc(aero_state, aero_props, state, cs, ccn)
-   do l = 1, psat
-      call outfld(ccn_name(l), ccn(1,1,l), pcols, lchnk)
-   enddo
-
-   ! do column tendencies
-   do m = 1, nbin
-      do l = 0,aero_props%nmasses(m)
-         mm = aero_props%indexer(m,l)
-         call outfld(fieldname(mm),    coltend(:,mm),    pcols, lchnk)
-         call outfld(fieldname_cw(mm), coltend_cw(:,mm), pcols, lchnk)
-      end do
-   end do
+   call ccncalc(aero_state, aero_props, ncol, pver, top_lev, temp, cs, ccn, errmsg, errflg)
+   if (errflg /= 0) return
 
    deallocate( &
       nact,       &
@@ -975,8 +875,6 @@ subroutine dropmixnuc( aero_props, aero_state, &
       qqcw,       &
       raercol,    &
       raercol_cw, &
-      coltend,    &
-      coltend_cw, &
       naermod,    &
       hygro,      &
       vaerosol,   &
@@ -990,13 +888,14 @@ end subroutine dropmixnuc
 !===============================================================================
 
 subroutine explmix( q, src, ekkp, ekkm, overlapp, overlapm, &
-   qold, surfrate, flxconv, pver, dt, is_unact, qactold )
+   qold, surfrate, flxconv, pver, top_lev, dt, is_unact, qactold )
 
    !  explicit integration of droplet/aerosol mixing
    !     with source due to activation/nucleation
 
 
    integer, intent(in) :: pver ! number of levels
+   integer, intent(in) :: top_lev ! top level for cloud physics
    real(r8), intent(out) :: q(pver) ! mixing ratio to be updated
    real(r8), intent(in) :: qold(pver) ! mixing ratio from previous time step
    real(r8), intent(in) :: src(pver) ! source due to activation/nucleation (/s)
@@ -1065,7 +964,7 @@ end subroutine explmix
 
 !===============================================================================
 
-subroutine ccncalc(aero_state, aero_props, state, cs, ccn)
+subroutine ccncalc(aero_state, aero_props, ncol, pver, top_lev, tair, cs, ccn, errmsg, errflg)
 
    ! calculates number concentration of aerosols activated as CCN at
    ! supersaturation supersat.
@@ -1078,28 +977,29 @@ subroutine ccncalc(aero_state, aero_props, state, cs, ccn)
    class(aerosol_state), intent(in) :: aero_state
    class(aerosol_properties), intent(in) :: aero_props
 
-   type(physics_state), target, intent(in)    :: state
-
-   real(r8), intent(in)  :: cs(pcols,pver)       ! air density (kg/m3)
-   real(r8), intent(out) :: ccn(pcols,pver,psat) ! number conc of aerosols activated at supersat (#/m3)
+   integer,  intent(in)  :: ncol        ! number of columns
+   integer,  intent(in)  :: pver        ! number of vertical layers
+   integer,  intent(in)  :: top_lev     ! top level for cloud physics
+   real(r8), intent(in)  :: tair(:,:)   ! air temperature (K)
+   real(r8), intent(in)  :: cs(:,:)     ! air density (kg/m3)
+   real(r8), intent(out) :: ccn(:,:,:)  ! (ncol,pver,psat) number conc of aerosols activated at supersat (#/m3)
+   character(len=*), intent(out) :: errmsg
+   integer,          intent(out) :: errflg
 
    ! local
 
-   integer :: ncol  ! number of columns
-   real(r8), pointer :: tair(:,:)     ! air temperature (K)
+   real(r8) naerosol(ncol,pver,nbin) ! interstit+activated aerosol number conc (/m3)
+   real(r8) vaerosol(ncol,pver,nbin) ! interstit+activated aerosol volume conc (m3/m3)
 
-   real(r8) naerosol(pcols,pver,nbin) ! interstit+activated aerosol number conc (/m3)
-   real(r8) vaerosol(pcols,pver,nbin) ! interstit+activated aerosol volume conc (m3/m3)
-
-   real(r8) amcube(pcols)
+   real(r8) amcube(ncol)
    real(r8), allocatable :: argfactor(:)
    real(r8) surften_coef
-   real(r8) a(pcols) ! surface tension parameter
-   real(r8) hygro(pcols,pver,nbin)  ! aerosol hygroscopicity
-   real(r8) sm(pcols)  ! critical supersaturation at mode radius
-   real(r8) arg(pcols)
+   real(r8) a(ncol) ! surface tension parameter
+   real(r8) hygro(ncol,pver,nbin)  ! aerosol hygroscopicity
+   real(r8) sm(ncol)  ! critical supersaturation at mode radius
+   real(r8) arg(ncol)
    integer l,m,i,k, astat
-   real(r8) smcoef(pcols)
+   real(r8) smcoef(ncol)
    integer phase ! phase of aerosol
 
    integer :: errnum
@@ -1111,12 +1011,14 @@ subroutine ccncalc(aero_state, aero_props, state, cs, ccn)
 
    !-------------------------------------------------------------------------------
 
-   ncol  = state%ncol
-   tair  => state%t
+   errmsg = ''
+   errflg = 0
 
    allocate( argfactor(nbin), stat=astat )
    if (astat/=0) then
-      call endrun('ndrop::ccncalc : not able to allocate argfactor')
+      errmsg = 'ndrop::ccncalc : not able to allocate argfactor'
+      errflg = 1
+      return
    end if
 
    surften_coef=2._r8*mwh2o*surften/(r_universal*rhoh2o)
@@ -1133,7 +1035,9 @@ subroutine ccncalc(aero_state, aero_props, state, cs, ccn)
            m, cs, phase, naerosol(:,:,m), vaerosol(:,:,m), &
            hygro(:,:,m), errnum, errstr)
       if (errnum/=0) then
-         call endrun('ccncalc : '//trim(errstr))
+         errmsg = 'ccncalc : '//trim(errstr)
+         errflg = 1
+         return
       end if
    end do
 
