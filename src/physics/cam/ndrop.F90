@@ -13,7 +13,7 @@ use shr_kind_mod,     only: r8 => shr_kind_r8, shr_kind_cs
 use ppgrid,           only: pcols, pver
 use physconst,        only: pi, rhoh2o, mwh2o, r_universal, rh2o, &
                             gravit, latvap, cpair, rair
-use constituents,     only: pcnst, cnst_get_ind, cnst_name, cnst_spec_class_gas, cnst_species_class
+use constituents,     only: pcnst, cnst_get_ind
 use physics_types,    only: physics_state, physics_ptend, physics_ptend_init
 use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
 
@@ -305,13 +305,6 @@ subroutine dropmixnuc( aero_props, aero_state, &
    real(r8), allocatable :: coltend(:,:)       ! column tendency for diagnostic output
    real(r8), allocatable :: coltend_cw(:,:)    ! column tendency
    real(r8) :: ccn(pcols,pver,psat)    ! number conc of aerosols activated at supersat
-
-   !for gas species turbulent mixing
-   real(r8), pointer :: rgas(:, :, :)
-   real(r8), allocatable :: rgascol(:, :, :)
-   real(r8), allocatable :: coltendgas(:)
-   real(r8) :: zerogas(pver)
-   character*200 fieldnamegas
 
    integer :: errnum
    character(len=shr_kind_cs) :: errstr
