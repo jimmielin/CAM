@@ -80,6 +80,8 @@ subroutine modal_aero_wateruptake_cam_init(pbuf2d)
    use physics_buffer,only: pbuf_set_field
    use infnan,       only : nan, assignment(=)
    use radiative_aerosol, only: rad_aer_get_info
+   use modal_aero_wateruptake, only: modal_aero_wateruptake_diag
+   use modal_aerosol_state_mod, only: modal_aerosol_state_register_water_uptake_diag
 
    use shr_const_mod, only: shr_const_pi
 
@@ -162,6 +164,12 @@ subroutine modal_aero_wateruptake_cam_init(pbuf2d)
    if (errflg_local /= 0) then
       call endrun('modal_aero_wateruptake_cam_init: ' // trim(errmsg_local))
    end if
+
+   ! Register the diagnostic-list water uptake recompute with the aerosol
+   ! interface (called by modal_aerosol_state%water_uptake for diagnostic
+   ! radiation lists; wired at init because the portable modal aerosol
+   ! schemes are not part of every build).
+   call modal_aerosol_state_register_water_uptake_diag(modal_aero_wateruptake_diag)
 
 end subroutine modal_aero_wateruptake_cam_init
 
