@@ -91,6 +91,7 @@ OPTIONS
      -macrophys <name>  Specify the macrophysics option [rk | park | clubb_sgs].
      -max_n_rad_cnst <n> Maximum number of constituents that are either radiatively
                         active, or in any single diagnostic list for the radiation.
+     -micm              Switch to build MICM chemistry solver library (MUSICA).
      -microphys <name>  Specify the microphysics option [mg1 | mg2 | mg3| rk | pumas].
      -model_top <name>  Specify the model_top option for cam7 [ lt | mt | ht | xt ].
      -nadv <n>          Set total number of advected species to <n>.
@@ -307,6 +308,7 @@ GetOptions(
     "waccmx"                    => \$opts{'waccmx'},
     "ext_co2_cool"              => \$opts{'ext_co2_cool'},
     "tuvx"                      => \$opts{'tuvx'},
+    "micm"                      => \$opts{'micm'},
 )  or usage();
 
 # Give usage message.
@@ -724,6 +726,12 @@ if (defined $opts{'tuvx'}) {
     $cfg_ref->set('tuvx', $opts{'tuvx'});
 }
 my $tuvx = $cfg_ref->get('tuvx');
+
+# MICM option
+if (defined $opts{'micm'}) {
+    $cfg_ref->set('micm', $opts{'micm'});
+}
+my $micm = $cfg_ref->get('micm');
 
 #-----------------------------------------------------------------------------------------------
 
@@ -1810,6 +1818,11 @@ if ($ext_co2_cool) {
 # TUV-X
 if ($tuvx) {
     $cfg_cppdefs .= ' -DTUVX';
+}
+
+# MICM
+if ($micm) {
+    $cfg_cppdefs .= ' -DMICM';
 }
 
 # PIO
