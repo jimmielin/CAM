@@ -212,3 +212,28 @@ url = https://github.com/NCAR/tuv-x.git
 fxtag = v0.14.3
 fxrequired = ToplevelRequired
 fxDONOTUSEurl = https://github.com/NCAR/tuv-x.git
+[submodule "libraries/musica"]
+	path = libraries/musica
+	url = https://github.com/NCAR/musica.git
+	fxtag = fcae0f4792c181672532759a5a94f34bf8e8ee97
+	fxrequired = ToplevelRequired
+[submodule "libraries/micm"]
+	path = libraries/micm
+	url = https://github.com/NCAR/micm.git
+	fxtag = bb57684a2047f0e58f30b199366294af879e8597
+	fxrequired = ToplevelRequired
+[submodule "libraries/mechanism-configuration"]
+	path = libraries/mechanism-configuration
+	url = https://github.com/NCAR/MechanismConfiguration.git
+	fxtag = fa06d8c6305172f62e6350ed5cd3a4cbfcd519ee
+	fxrequired = ToplevelRequired
+[submodule "libraries/yaml-cpp"]
+	path = libraries/yaml-cpp
+	url = https://github.com/jbeder/yaml-cpp.git
+	fxtag = 65c1c270dbe7eec37b2df2531d7497c4eea79aee
+	fxrequired = ToplevelRequired
+[submodule "libraries/fmt"]
+	path = libraries/fmt
+	url = https://github.com/fmtlib/fmt.git
+	fxtag = 407c905e45ad75fc29bf0f9bb7c5c2fd3475976f
+	fxrequired = ToplevelRequired
