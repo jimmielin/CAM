@@ -49,6 +49,7 @@ contains
     use mo_sulf,           only : sulf_inti
     use mo_photo,          only : photo_inti
     use mo_tuvx,           only : tuvx_init, tuvx_active
+    use mo_micm,           only : micm_init, micm_active
     use mo_drydep,         only : drydep_inti
     use mo_imp_sol,        only : imp_slv_inti
     use mo_exp_sol,        only : exp_sol_inti
@@ -206,6 +207,14 @@ contains
     if( tuvx_active ) then
       call tuvx_init( photon_file, electron_file, photo_max_zen, pbuf2d )
       if (masterproc) write(iulog,*) 'chemini: after tuvx_init on node ',iam
+    end if
+
+    !-----------------------------------------------------------------------
+    ! 	... initialize the MICM chemistry solver
+    !-----------------------------------------------------------------------
+    if( micm_active ) then
+      call micm_init()
+      if (masterproc) write(iulog,*) 'chemini: after micm_init on node ',iam
     end if
 
     !-----------------------------------------------------------------------
