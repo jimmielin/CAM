@@ -7977,6 +7977,42 @@ Switch to turn on TUV-X photolysis.
 Default: FALSE
 </entry>
 
+<entry id="micm_active" type="logical" category="chemistry"
+       group="micm_opts" valid_values="" >
+Switch to use the MICM chemistry solver in place of the built-in
+implicit/explicit gas-phase chemistry solvers.
+Default: FALSE
+</entry>
+
+<entry id="micm_config_path" type="char*256" input_pathname="abs" category="chemistry"
+       group="micm_opts" valid_values="" >
+Path of the MICM mechanism configuration matching the compiled chemistry
+mechanism: either the config.json file or the directory containing it.
+Default: NONE
+</entry>
+
+<entry id="micm_rxt_map_path" type="char*256" input_pathname="abs" category="chemistry"
+       group="micm_opts" valid_values="" >
+Filepath of the MICM reaction map companion file (reaction label and
+solution-species reactant count for each compiled reaction).
+Default: NONE
+</entry>
+
+<entry id="micm_solver_type" type="char*32" category="chemistry"
+       group="micm_opts" valid_values="rosenbrock,backward_euler,rosenbrock_standard,backward_euler_standard" >
+MICM solver: 'rosenbrock' or 'backward_euler' use the vector-ordered
+(SIMD-friendly) solvers; the '_standard' variants use standard data ordering
+with no grid-cell-count limit per solver state.
+Default: rosenbrock
+</entry>
+
+<entry id="micm_abort_on_nonconvergence" type="logical" category="chemistry"
+       group="micm_opts" valid_values="" >
+Abort the run if any MICM solve fails to converge. Set to FALSE to instead
+issue warnings and continue with the unconverged state.
+Default: TRUE
+</entry>
+
 <!-- Namelist read by seq_drydep_mod and shared by CAM and CLM -->
 
 <entry id="drydep_list" type="char*16(1000)" category="dry_deposition"

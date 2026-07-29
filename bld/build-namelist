@@ -759,6 +759,21 @@ if ($tuvx_active =~ /$TRUE/io) {
     }
 }
 
+# Check MICM configuration
+my $micm_active = $nl->get_value('micm_active');
+if ($micm_active =~ /$TRUE/io) {
+    my $micm_config = $cfg->get('micm');
+    if (!$micm_config) {
+	die "$ProgName - ERROR: must use -micm CAM configure flag \n";
+    }
+    unless (defined $nl->get_value('micm_config_path')) {
+	die "$ProgName - ERROR: micm_config_path must be set when micm_active is true \n";
+    }
+    unless (defined $nl->get_value('micm_rxt_map_path')) {
+	die "$ProgName - ERROR: micm_rxt_map_path must be set when micm_active is true \n";
+    }
+}
+
 # Solar irradiance
 
 # First check that solar_const and solar_irrad_data_file are not both defined
