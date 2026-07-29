@@ -101,7 +101,9 @@ def parse_chem_mech(path):
 
 
 def parse_reaction(line):
-    """Parse one reaction line into (tag_or_None, reactants, products)."""
+    """Parse one reaction line into (tag_or_None, reactants, products,
+    rate_params). rate_params is the list of numeric rate coefficients
+    after ';' ([] for user-defined rates)."""
     tag = None
     if line.startswith('['):
         close = line.index(']')
@@ -112,10 +114,10 @@ def parse_reaction(line):
         line = line[close + 1:].strip()
     if '->' not in line:
         raise ValueError(f'not a reaction line: {line}')
-    # rate coefficients after ';' are not needed (rates are injected)
-    eqn = line.split(';')[0]
+    eqn, _, rate = line.partition(';')
+    rate_params = [float(p) for p in rate.split(',') if p.strip()]
     lhs, _, rhs = eqn.partition('->')
-    return tag, parse_side(lhs), parse_side(rhs)
+    return tag, parse_side(lhs), parse_side(rhs), rate_params
 
 
 def parse_side(side):
@@ -134,6 +136,70 @@ def parse_side(side):
         name = m.group(2).strip('{}')  # {X} marks non-transported bookkeeping
         out.append((coeff, name))
     return out
+
+
+def build_reactants(sol_reactants):
+    """Reactant dict with integer qty for repeated reactants."""
+    counts = {}
+    for coeff, name in sol_reactants:
+        counts[name] = counts.get(name, 0) + int(round(coeff))
+    return {name: ({'qty': qty} if qty != 1 else {})
+            for name, qty in counts.items()}
+
+
+def build_products(sol_products):
+    """Product dict with yields."""
+    counts = {}
+    for coeff, name in sol_products:
+        counts[name] = counts.get(name, 0.0) + coeff
+    return {name: ({'yield': yld} if yld != 1.0 else {})
+            for name, yld in counts.items()}
+
+
+def native_entry(label, is_photo, n_sol, other_fixed, rate_params,
+                 sol_reactants, sol_products):
+    """Return a native-rate-law reaction entry, or None if the reaction
+    must stay rate-injected.
+
+    Coefficients are copied verbatim from chem_mech.in: the v0 parser takes
+    them in CAM's cm3/molecule/s convention and converts internally. CAM's
+    (300/T)**B Troe exponents become MICM's (T/300)**k0_B with the sign
+    negated; the Troe third body M is implicit in MICM.
+    """
+    if is_photo:
+        if n_sol == 1 and not other_fixed:
+            return {
+                'type': 'PHOTOLYSIS',
+                'MUSICA name': label,
+                'reactants': build_reactants(sol_reactants),
+                'products': build_products(sol_products),
+            }
+        return None
+    if not rate_params or n_sol == 0 or (other_fixed - {'M'}):
+        return None
+    if len(rate_params) == 5:
+        k0_a, k0_b, kinf_a, kinf_b, f = rate_params
+        return {
+            'type': 'TROE',
+            'k0_A': k0_a, 'k0_B': -k0_b,
+            'kinf_A': kinf_a, 'kinf_B': -kinf_b,
+            'Fc': f,
+            'reactants': build_reactants(sol_reactants),
+            'products': build_products(sol_products),
+        }
+    if 'M' in other_fixed:
+        return None  # non-Troe M dependence stays injected
+    if len(rate_params) in (1, 2):
+        entry = {
+            'type': 'ARRHENIUS',
+            'A': rate_params[0],
+            'reactants': build_reactants(sol_reactants),
+            'products': build_products(sol_products),
+        }
+        if len(rate_params) == 2:
+            entry['C'] = rate_params[1]
+        return entry
+    return None
 
 
 def cross_validate(pp_dir, solution, all_reactions, ext_forcing):
@@ -174,10 +240,13 @@ def cross_validate(pp_dir, solution, all_reactions, ext_forcing):
 
 
 def main():
-    if len(sys.argv) < 2:
+    args = [a for a in sys.argv[1:] if a != '--native']
+    native = '--native' in sys.argv[1:]
+    if not args:
         sys.exit(__doc__)
-    pp_dir = sys.argv[1].rstrip('/')
-    out_dir = sys.argv[2] if len(sys.argv) > 2 else os.path.join(pp_dir, 'micm')
+    pp_dir = args[0].rstrip('/')
+    out_dir = args[1] if len(args) > 1 else \
+        os.path.join(pp_dir, 'micm_native' if native else 'micm')
     mech_name = os.path.basename(pp_dir)
 
     solution, fixed, photolysis, reactions, ext_forcing = \
@@ -185,8 +254,9 @@ def main():
     solution_set = set(solution)
 
     # global reaction index order: photolysis block first, then reactions
-    all_reactions = [(tag, r, p) for (tag, r, p) in photolysis] + reactions
+    all_reactions = photolysis + reactions
     cross_validate(pp_dir, solution, all_reactions, ext_forcing)
+    fixed_set = set(fixed)
 
     species_json = {'camp-data': []}
     for name in solution:
@@ -203,16 +273,37 @@ def main():
     # each); a reaction with no solution reactants AND no solution products
     # is invisible to the solved system and maps to the no-op name NONE.
     rxt_map = []
-    for idx, (tag, reactants, products) in enumerate(all_reactions, start=1):
+    n_native = 0
+    for idx, (tag, reactants, products, rate_params) in enumerate(all_reactions, start=1):
         label = tag if tag else f'rxn{idx}'
         if re.search(r'[,\s]', label):
             # mo_micm's list-directed map read cannot represent these
             raise ValueError(f'reaction label contains comma/whitespace: {label!r}')
+        is_photo = idx <= len(photolysis)
         sol_reactants = [(c, s) for (c, s) in reactants if s in solution_set]
         sol_products = [(c, s) for (c, s) in products if s in solution_set]
         n_sol = int(round(sum(c for (c, s) in sol_reactants)))
         if abs(n_sol - sum(c for (c, s) in sol_reactants)) > 1e-9:
             raise ValueError(f'non-integer reactant count in reaction {label}')
+
+        if native:
+            # Native mode: express the rate law with MICM primitives where
+            # cleanly possible; everything else falls through to the
+            # injected forms below. Invariant reactants other than the
+            # Troe third body (M) disqualify a reaction: MICM would need
+            # them as species, but adjrxt folds them into the injected
+            # rate, so those reactions stay injected.
+            other = {s for (c, s) in reactants if s in fixed_set}
+            entry = native_entry(label, is_photo, n_sol, other, rate_params,
+                                 sol_reactants, sol_products)
+            if entry is not None:
+                mech_reactions.append(entry)
+                if entry['type'] == 'PHOTOLYSIS':
+                    rxt_map.append((idx, 1, f'PHOTO.{label}', 1.0))
+                else:
+                    n_native += 1
+                    rxt_map.append((idx, n_sol, 'NATIVE', 1.0))
+                continue
 
         if n_sol == 0:
             if not sol_products:
@@ -230,19 +321,9 @@ def main():
             entry = {
                 'type': 'USER_DEFINED',
                 'MUSICA name': label,
-                'reactants': {},
-                'products': {},
+                'reactants': build_reactants(sol_reactants),
+                'products': build_products(sol_products),
             }
-            rcounts = {}
-            for coeff, name in sol_reactants:
-                rcounts[name] = rcounts.get(name, 0) + int(round(coeff))
-            for name, qty in rcounts.items():
-                entry['reactants'][name] = {'qty': qty} if qty != 1 else {}
-            pcounts = {}
-            for coeff, name in sol_products:
-                pcounts[name] = pcounts.get(name, 0.0) + coeff
-            for name, yld in pcounts.items():
-                entry['products'][name] = {'yield': yld} if yld != 1.0 else {}
             mech_reactions.append(entry)
             rxt_map.append((idx, n_sol, f'USER.{label}', 1.0))
 
@@ -287,12 +368,13 @@ def main():
         for idx, n_sol, name, yld in rxt_map:
             f.write(f'{idx} {n_sol} {name} {yld}\n')
 
-    n_rxt_slots = len(mech_reactions) - len(solution) - len(ext_forcing)
+    n_rxt_slots = len(mech_reactions) - len(solution) - len(ext_forcing) - n_native
     print(f'{mech_name}: {len(all_reactions)} reactions '
-          f'({len(photolysis)} photolysis), {len(solution)} solution species, '
+          f'({len(photolysis)} photolysis, {n_native} native rate laws), '
+          f'{len(solution)} solution species, '
           f'{len(fixed)} invariants, {len(ext_forcing)} external forcings')
-    print(f'rate parameters: {n_rxt_slots} reaction + {len(solution)} loss '
-          f'+ {len(ext_forcing)} emission = {len(mech_reactions)}')
+    print(f'rate parameters: {n_rxt_slots} injected reaction + {len(solution)} loss '
+          f'+ {len(ext_forcing)} emission = {len(mech_reactions) - n_native}')
     print(f'wrote {out_dir}/{{config,species,reactions}}.json and rxt_map.txt')
 
 

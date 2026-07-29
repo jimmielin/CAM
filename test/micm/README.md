@@ -65,3 +65,31 @@ The test fails (verified) when the reaction map is corrupted, e.g.:
   H2O2 mismatches
 - unknown rate parameter name: init aborts
 - header count mismatch: init aborts
+
+# Strategy A vs B equivalence harness (harness_ab_t1s1.F90)
+
+Validates the `--native` generator mode for `trop_strat_mam5_t1s1`:
+compiles the real generated t1s1 rate code (chem_mods, mo_sim_dat,
+mo_setrxt, mo_adjrxt, mo_phtadj, mo_jpl, mo_tracname) to produce CAM-truth
+post-adjrxt rate constants, then solves identical initial states through
+mo_micm with the all-injected config (`micm/`) and the native-rate-law
+config (`micm_native/`, 368 Arrhenius/Troe/photolysis primitives). The
+pass criterion is per-cell tendency agreement at a small step (canonical
+`delt = 1e-4 s`), which isolates the rate representation from
+stiff-trajectory sensitivity.
+
+Build: as above, but with `cam_stubs_ab.F90` (no chem_mods/mo_tracname
+stubs) plus the real t1s1 files listed above, then
+
+```
+./harness_ab_t1s1 A.nml B.nml <pp>/micm/rxt_map.txt 1.e-4
+```
+
+where A.nml/B.nml are micm_opts namelists pointing at `micm/` and
+`micm_native/` respectively (`micm_abort_on_nonconvergence = .false.`).
+Verified results: clean configs agree to 2.75e-7 in concentrations with
+all tendencies within 1e-3; a +10% perturbation of a single native
+Arrhenius coefficient produces a 1.1e-1 tendency divergence (FAIL);
+365/368 native coefficients independently match MUSICA's own v0 TS1
+configuration (the 3 differences are newer C3H7O2 JPL constants in CAM's
+current mechanism).

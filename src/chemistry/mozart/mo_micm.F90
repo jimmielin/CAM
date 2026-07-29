@@ -77,9 +77,11 @@ module mo_micm
    ! Reactions map through injection entries read from the reaction map
    ! companion file: usually one entry per reaction, but a reaction with no
    ! solution-species reactants maps to one EMISSION slot per solution
-   ! product (each with its stoichiometric yield), and a reaction invisible
-   ! to the solved system (no solution reactants or products) has a no-op
-   ! entry with no rate parameter.
+   ! product (each with its stoichiometric yield). No-op entries carry no
+   ! rate parameter: NONE marks a reaction invisible to the solved system
+   ! (no solution reactants or products), NATIVE one whose rate law is
+   ! evaluated natively by MICM from the mechanism configuration
+   ! (generator --native mode) rather than injected.
    integer, allocatable :: map_spc(:)  ! (gas_pcnst) MICM species variable index
    integer :: n_entries = 0            ! number of injection entries
    integer,  allocatable :: ent_rxt(:)   ! (n_entries) CAM reaction index
@@ -254,7 +256,7 @@ contains
             call endrun(subname//': error parsing reaction map entry')
          end if
          covered(ent_rxt(ie)) = .true.
-         if (trim(param_name) == 'NONE') then
+         if (trim(param_name) == 'NONE' .or. trim(param_name) == 'NATIVE') then
             ent_param(ie) = -1
          else
             ent_param(ie) = state%rate_parameters_ordering%index(trim(param_name), error)
