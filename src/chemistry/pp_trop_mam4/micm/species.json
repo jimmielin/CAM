@@ -1,0 +1,134 @@
+{
+  "camp-data": [
+    {
+      "name": "bc_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "bc_a4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "DMS",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "dst_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "dst_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "dst_a3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "H2O2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "H2SO4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ncl_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ncl_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ncl_a3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "num_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "num_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "num_a3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "num_a4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "pom_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "pom_a4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "SO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "so4_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "so4_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "so4_a3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "soa_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "soa_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "SOAE",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "SOAG",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "H2O",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    }
+  ]
+}
