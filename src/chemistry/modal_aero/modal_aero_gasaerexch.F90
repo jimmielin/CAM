@@ -91,7 +91,7 @@ subroutine modal_aero_gasaerexch_sub(                            &
                         q,                  qqcw,                &
                         dqdt_other,         dqqcwdt_other,       &
                         dgncur_a,           dgncur_awet,         &
-                        sulfeq         )
+                        sulfeq,   use_uptk_scale,   uptk_scale )
 
 ! !USES:
 use modal_aero_data,   only:  alnsg_amode,lmassptr_amode,cnst_name_cw
@@ -139,6 +139,12 @@ implicit none
    real(r8), intent(in)    :: dgncur_a(pcols,pver,ntot_amode)
    real(r8), intent(in)    :: dgncur_awet(pcols,pver,ntot_amode)
    real(r8), pointer       :: sulfeq(:,:,:)
+   logical,  intent(in)    :: use_uptk_scale       ! apply uptk_scale to the H2SO4 uptake rates
+   real(r8), intent(in)    :: uptk_scale(pcols,pver,ntot_amode)
+                                                   ! per-mode factor on the H2SO4 uptake rate. Dust
+                                                   ! heterogeneous chemistry uses it to remove the dust
+                                                   ! surface from this condensation sink (dust takes up
+                                                   ! H2SO4 separately); NH3 and SOA uptake are not scaled.
 
                                  ! dry & wet geo. mean dia. (m) of number distrib.
 
@@ -216,6 +222,7 @@ implicit none
    real (r8) :: tmp_so4g_avg, tmp_so4g_bgn, tmp_so4g_equ
    real (r8) :: uptkrate(ntot_amode,pcols,pver)
    real (r8) :: uptkratebb(ntot_amode)
+   real (r8) :: uptkratebb_so4(ntot_amode)   ! uptkratebb for H2SO4, scaled by uptk_scale when use_uptk_scale
    real (r8) :: uptkrate_soa(ntot_amode,nsoa)
                 ! gas-to-aerosol mass transfer rates (1/s)
    real (r8) :: vol_core, vol_shell
@@ -403,8 +410,13 @@ implicit none
          sum_uprt_soa = 0.0_r8
          do n = 1, ntot_amode
             uptkratebb(n) = uptkrate(n,i,k)
+            if (use_uptk_scale) then
+               uptkratebb_so4(n) = uptkratebb(n)*uptk_scale(i,k,n)
+            else
+               uptkratebb_so4(n) = uptkratebb(n)
+            end if
             if (ido_so4a(n) > 0) then
-               fgain_so4(n) = uptkratebb(n)
+               fgain_so4(n) = uptkratebb_so4(n)
                sum_uprt_so4 = sum_uprt_so4 + fgain_so4(n)
                if (ido_so4a(n) == 1) then
                   qold_so4(n) = q(i,k,lptr_so4_a_amode(n)-loffset)
@@ -528,7 +540,7 @@ implicit none
             tmp_pxt = 0.0_r8
             do n = 1, ntot_amode
                if (ido_so4a(n) <= 0) cycle
-               tmp_pxt = tmp_pxt + uptkratebb(n)*sulfeq(i,k,n)
+               tmp_pxt = tmp_pxt + uptkratebb_so4(n)*sulfeq(i,k,n)
             end do
             tmp_pxt = max( 0.0_r8, tmp_pxt*deltatxx )  ! sum over modes of uptake_rate*sulfeq*deltat
             tmp_so4g_bgn = q(i,k,l_so4g)
@@ -551,7 +563,7 @@ implicit none
                else
                   tmp_so4a_bgn = 0.0_r8
                end if
-               tmp_so4a_end = tmp_so4a_bgn + deltatxx*uptkratebb(n)*(tmp_so4g_avg-sulfeq(i,k,n))
+               tmp_so4a_end = tmp_so4a_bgn + deltatxx*uptkratebb_so4(n)*(tmp_so4g_avg-sulfeq(i,k,n))
                tmp_so4a_end = max( 0.0_r8, tmp_so4a_end )
                dqdt_so4(n) = (tmp_so4a_end - tmp_so4a_bgn)/deltatxx
                sum_dqdt_so4 = sum_dqdt_so4 + dqdt_so4(n)

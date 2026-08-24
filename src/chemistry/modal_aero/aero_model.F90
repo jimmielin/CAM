@@ -1107,6 +1107,9 @@ contains
     real(r8), pointer :: fldcw(:,:)
     real(r8), pointer :: sulfeq(:,:,:)
 
+    logical  :: use_uptk_scale                     ! scale the H2SO4 uptake rates in gasaerexch
+    real(r8) :: uptk_scale(pcols,pver,ntot_amode)  ! per-mode H2SO4 uptake-rate scale factor
+
     real(r8) :: qqcw(ncol,pver,ncnst_tot)
 
     integer :: mm
@@ -1240,6 +1243,11 @@ contains
        nullify( sulfeq )
     endif
 
+    ! per-mode scaling of the H2SO4 uptake rates is used by dust heterogeneous chemistry
+    ! to exclude the dust surface from condensation; not active here
+    use_uptk_scale = .false.
+    uptk_scale(:,:,:) = 1._r8
+
     call modal_aero_gasaerexch_sub(            &
          lchnk,    ncol,     nstep,            &
          loffset,            delt,             &
@@ -1248,7 +1256,7 @@ contains
          vmr,                vmrcw,            &
          dvmrdt,             dvmrcwdt,         &
          dgnum,              dgnumwet,         &
-         sulfeq     )
+         sulfeq,   use_uptk_scale, uptk_scale )
 
     if (ndx_h2so4 > 0) then
        del_h2so4_aeruptk(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4) - del_h2so4_aeruptk(1:ncol,:)
