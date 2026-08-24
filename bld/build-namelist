@@ -3910,6 +3910,10 @@ if ($chem =~ /_mam/) {
     # all strat SAD is sulfate aerosol (see sad_strat_calc/sulfate_sad_calc).
     add_default($nl, 'sad_strat_spec_types',
        'val'=>"'sulfate','s-organic','p-organic','black-c','ammonium'");
+    # dust SAD for heterogeneous reactions on mineral dust; separate from
+    # sad_chem_spec_types so the standard heterogeneous rates are unchanged.
+    add_default($nl, 'sad_dust_spec_types',
+       'val'=>"'dust'");
 }
 if ($carma ne 'none' and $chem !~ /_mam/) {
     add_default($nl, 'sad_chem_spec_types',
@@ -3918,6 +3922,8 @@ if ($carma ne 'none' and $chem !~ /_mam/) {
     # all strat SAD is sulfate aerosol (see sad_strat_calc/sulfate_sad_calc).
     add_default($nl, 'sad_strat_spec_types',
        'val'=>"'sulfate','s-organic','p-organic','black-c','ammonium'");
+    add_default($nl, 'sad_dust_spec_types',
+       'val'=>"'dust'");
 }
 if ($aer_model eq 'bam' and $prescribed_aero_model eq 'none') {
     add_default($nl, 'sad_chem_spec_types',

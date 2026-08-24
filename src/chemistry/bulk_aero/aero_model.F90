@@ -66,6 +66,7 @@ module aero_model
 
   integer, parameter :: max_sad_spec = 16
   character(len=32) :: sad_chem_spec_types(max_sad_spec) = ' '
+  character(len=32) :: sad_dust_spec_types(max_sad_spec) = ' '
 
   ! sfc/dm_aer slots reserved beyond the bulk aerosol bins for
   ! supplemental_surf_area_dens (offline sulfate, nitrate, secondary
@@ -96,7 +97,7 @@ contains
 
     namelist /aerosol_nl/ aer_wetdep_list, aer_drydep_list
     namelist /aerosol_nl/ aer_sol_facti, aer_sol_factb, aer_scav_coef
-    namelist /aerosol_nl/ sad_chem_spec_types
+    namelist /aerosol_nl/ sad_chem_spec_types, sad_dust_spec_types
 
     !-----------------------------------------------------------------------------
     aer_sol_facti = nan
@@ -123,6 +124,7 @@ contains
     call mpibcast(aer_wetdep_list, len(aer_wetdep_list(1))*pcnst, mpichar, 0, mpicom)
     call mpibcast(aer_drydep_list, len(aer_drydep_list(1))*pcnst, mpichar, 0, mpicom)
     call mpibcast(sad_chem_spec_types,len(sad_chem_spec_types(1))*max_sad_spec,mpichar, 0, mpicom)
+    call mpibcast(sad_dust_spec_types,len(sad_dust_spec_types(1))*max_sad_spec,mpichar, 0, mpicom)
     call mpibcast(aer_sol_facti, pcnst, mpir8, 0, mpicom)
     call mpibcast(aer_sol_factb, pcnst, mpir8, 0, mpicom)
     call mpibcast(aer_scav_coef, pcnst, mpir8, 0, mpicom)
@@ -729,7 +731,7 @@ contains
   !-------------------------------------------------------------------------
   subroutine aero_model_surfarea( &
                   state, relhum, pmid, temp, ltrop, &
-                  sfc, dm_aer, sad_total, reff_trop, sad_ssa )
+                  sfc, dm_aer, sad_total, reff_trop, sad_ssa, sfc_dust )
 
     use mo_constants, only : pi, r2d
 
@@ -745,11 +747,14 @@ contains
     real(r8), intent(inout) :: sad_total(:,:)
     real(r8), intent(out)   :: reff_trop(:,:)
     real(r8), intent(out)   :: sad_ssa(:,:)
+    real(r8), optional, intent(out) :: sfc_dust(:,:,:) ! per-bin SAD of the sad_dust_spec_types species (cm2/cm3)
 
     ! local vars
     integer :: i,k, lchnk, ncol
     integer :: beglev(pcols)
     integer :: endlev(pcols)
+    real(r8) :: sad_dust(pcols,pver)
+    real(r8) :: reff_dust(pcols,pver)
 
     class(aerosol_state), pointer :: aero_state
 
@@ -782,6 +787,16 @@ contains
 
     call aero_state%surf_area_dens(aero_props, sad_chem_spec_types, ncol, pver, beglev, endlev, &
          relhum, pmid, temp, pi, sad_total, reff_trop, sfc, dm_aer)
+
+    ! surface area of the dust-type species only, for heterogeneous reactions on mineral dust;
+    ! kept separate from sad_chem_spec_types so the standard aerosol heterogeneous rates are unchanged
+    if (present(sfc_dust)) then
+       sfc_dust = 0._r8
+       if (len_trim(sad_dust_spec_types(1))>0) then
+          call aero_state%surf_area_dens(aero_props, sad_dust_spec_types, ncol, pver, beglev, endlev, &
+               relhum, pmid, temp, pi, sad_dust, reff_dust, sfc_dust)
+       end if
+    end if
 
     ! surfaces of aerosols the rad_climate list cannot provide
     ! (offline sulfate, ammonium nitrate, secondary organics)
