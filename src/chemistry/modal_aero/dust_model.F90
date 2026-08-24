@@ -34,6 +34,8 @@ module dust_model
 
   real(r8)          :: dust_emis_fact = 0._r8     ! tuning parameter for dust emissions
   character(len=cl) :: soil_erod_file = 'none'    ! full pathname for soil erodibility dataset
+  character(len=cl) :: dust_calcite_file = 'none' ! full pathname for the calcite mass fraction dataset
+                                                  ! (dust heterogeneous chemistry); 'none' = no calcite speciation
 
   logical :: dust_active = .false.
 
@@ -54,7 +56,7 @@ module dust_model
     integer :: unitn, ierr
     character(len=*), parameter :: subname = 'dust_readnl'
 
-    namelist /dust_nl/ dust_emis_fact, soil_erod_file
+    namelist /dust_nl/ dust_emis_fact, soil_erod_file, dust_calcite_file
 
     !-----------------------------------------------------------------------------
 
@@ -80,6 +82,10 @@ module dust_model
     if (ierr/=mpi_success) then
        call endrun(subname//' MPI_BCAST ERROR: dust_emis_fact')
     end if
+    call mpi_bcast(dust_calcite_file, len(dust_calcite_file), mpi_character, masterprocid, mpicom, ierr)
+    if (ierr/=mpi_success) then
+       call endrun(subname//' MPI_BCAST ERROR: dust_calcite_file')
+    end if
 
     call shr_dust_emis_readnl(mpicom, 'drv_flds_in')
 
@@ -96,6 +102,9 @@ module dust_model
           write(iulog,*) subname,': soil_erod_file = ',trim(soil_erod_file)
           write(iulog,*) subname,': dust_emis_fact = ',dust_emis_fact
        end if
+       if (dust_calcite_file /= 'none') then
+          write(iulog,*) subname,': dust_calcite_file = ',trim(dust_calcite_file)
+       end if
     end if
 
   end subroutine dust_readnl
@@ -104,6 +113,7 @@ module dust_model
   !=============================================================================
   subroutine dust_init()
     use soil_erod_mod, only: soil_erod_init
+    use dust_calcite_mod, only: dust_calcite_init
     use constituents,  only: cnst_get_ind
     use aerosol_instances_mod, only: aerosol_instances_get_props, aerosol_instances_get_num_models
     use aerosol_properties_mod, only: aerosol_properties
@@ -174,6 +184,10 @@ module dust_model
 
     if (is_zender_soil_erod_from_atm()) then
        call  soil_erod_init( dust_emis_fact, soil_erod_file )
+    end if
+
+    if (dust_calcite_file /= 'none') then
+       call dust_calcite_init( dust_calcite_file )
     end if
 
     call dust_set_params( dust_nbin, dust_dmt_grd, dust_dmt_vwr, dust_stk_crc )
