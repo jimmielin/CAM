@@ -953,7 +953,11 @@ contains
           end do
           sad(i,k) = sum(sad_mode(i,k,:))
           vol(i,k) = sum(vol_mode(i,k,:))
-          reff(i,k) = 3._r8*vol(i,k)/sad(i,k)
+          ! leave reff at zero where the listed species carry no mass (e.g. a dust-only
+          ! list in a dust-free cell) instead of evaluating 0/0
+          if (sad(i,k) > 0._r8) then
+             reff(i,k) = 3._r8*vol(i,k)/sad(i,k)
+          end if
 
        enddo
     enddo
