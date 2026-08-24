@@ -1004,7 +1004,10 @@ if ($aer_model eq 'mam' ) {
                         'soa'=>'s-organic',
                         'bc' =>'black-c',
                         'dst'=>'dust',
-                        'ncl'=>'seasalt' );
+                        'ncl'=>'seasalt',
+                        'co3'=>'calcite',
+                        'cs4'=>'ca-sulfate',
+                        'cn3'=>'ca-nitrate' );
 
   if ($aero_modes eq '3mode' ) {
     # MAM rad_climate settings.  The externally mixed quantities in the modal aerosol
@@ -1044,9 +1047,11 @@ if ($aer_model eq 'mam' ) {
     @mode_num      = qw(num_a1 num_a2 num_a3 num_a4);
     @mode_num_cw   = qw(num_c1 num_c2 num_c3 num_c4);
 
-    %modal_groups = ( 'accum'  => [qw(so4 pom soa bc dst ncl)],
+    # co3/cs4/cn3 (calcite and its acid-displacement products) join a mode only
+    # when the mechanism carries them (dust heterogeneous chemistry mechanisms).
+    %modal_groups = ( 'accum'  => [qw(so4 pom soa bc dst ncl co3 cs4 cn3)],
                       'aitken' => [qw(so4 soa ncl dst)],
-                      'coarse' => [qw(dst ncl so4)],
+                      'coarse' => [qw(dst ncl so4 co3 cs4 cn3)],
                       'primary_carbon' => [qw(pom bc)] );
 
     @mode_num_src  = qw(A A A A);

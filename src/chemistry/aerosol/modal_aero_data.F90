@@ -935,6 +935,9 @@
                 bc_ndx = bc_ndx+1
                 lptr2_bc_a_amode(m,bc_ndx)  = lmassa
                 lptr2_bc_cw_amode(m,bc_ndx) = lmassc
+             case('co3','cs4','cn3')
+                ! calcite and its acid-displacement products (CaSO4, Ca(NO3)2) are located
+                ! by species type through aerosol_properties; no legacy pointer is kept
              case default
                 call endrun( trim(msg) )
              end select
