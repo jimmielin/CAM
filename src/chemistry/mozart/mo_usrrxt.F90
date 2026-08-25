@@ -37,6 +37,15 @@ module mo_usrrxt
   integer :: usr_N2D_O2_ndx
   integer :: usr_N2D_e_ndx
 
+  ! oxidant uptake on mineral dust (dust heterogeneous chemistry)
+  integer :: usr_N2O5_dust_ndx
+  integer :: usr_NO3_dust_ndx
+  integer :: usr_OH_dust_ndx
+  integer :: usr_HO2_dust_ndx
+  integer :: usr_H2O2_dust_ndx
+  integer :: usr_O3_dust_ndx
+  integer :: usr_CH2O_dust_ndx
+
   integer :: tag_NO2_NO3_ndx
   integer :: tag_NO2_OH_ndx
   integer :: tag_NO2_HO2_ndx
@@ -302,6 +311,7 @@ module mo_usrrxt
   logical, protected :: has_ice_trp_rxts
   logical :: has_het_ss_rxts
   logical :: has_ss_ixoy_rxts
+  logical :: has_dust_rxts
   logical :: has_aerosols
 
   real(r8), parameter :: t0     = 300._r8                ! K
@@ -360,6 +370,14 @@ contains
     usr_DMS_OH_ndx       = get_rxt_ndx( 'usr_DMS_OH' )
     usr_HO2_aer_ndx      = get_rxt_ndx( 'usr_HO2_aer' )
     usr_GLYOXAL_aer_ndx  = get_rxt_ndx( 'usr_GLYOXAL_aer' )
+ !
+    usr_N2O5_dust_ndx    = get_rxt_ndx( 'usr_N2O5_dust' )
+    usr_NO3_dust_ndx     = get_rxt_ndx( 'usr_NO3_dust' )
+    usr_OH_dust_ndx      = get_rxt_ndx( 'usr_OH_dust' )
+    usr_HO2_dust_ndx     = get_rxt_ndx( 'usr_HO2_dust' )
+    usr_H2O2_dust_ndx    = get_rxt_ndx( 'usr_H2O2_dust' )
+    usr_O3_dust_ndx      = get_rxt_ndx( 'usr_O3_dust' )
+    usr_CH2O_dust_ndx    = get_rxt_ndx( 'usr_CH2O_dust' )
  !
     tag_NO2_NO3_ndx      = get_rxt_ndx( 'tag_NO2_NO3' )
     tag_NO2_OH_ndx       = get_rxt_ndx( 'tag_NO2_OH' )
@@ -606,6 +624,10 @@ contains
 
     has_ss_ixoy_rxts = ss_ixoy_2_ndx  > 0  .or.  ss_ixoy_3_ndx  > 0  .or.  ss_ixoy_4_ndx  > 0
 
+    has_dust_rxts    = usr_N2O5_dust_ndx > 0 .or. usr_NO3_dust_ndx  > 0 .or. usr_OH_dust_ndx > 0 .or. &
+                       usr_HO2_dust_ndx  > 0 .or. usr_H2O2_dust_ndx > 0 .or. usr_O3_dust_ndx > 0 .or. &
+                       usr_CH2O_dust_ndx > 0
+
     has_ice_trp_rxts = ice_trp_cl_1_ndx > 0  .or.  ice_trp_br_1_ndx > 0  .or.  ice_trp_i_1_ndx  > 0  .or. &
                        ice_trp_i_2_ndx  > 0  .or.  ice_trp_i_3_ndx  > 0  .or.  ice_trp_i_4_ndx  > 0  .or. &
                        ice_trp_hbr_5_ndx > 0 .or.  ice_trp_hbr_6_ndx > 0 .or.  &
@@ -773,6 +795,7 @@ contains
        write(iulog,*) 'usrrxt_inti: has_het_ss_rxts : ',has_het_ss_rxts
        write(iulog,*) 'usrrxt_inti: has_ice_trp_rxts : ',has_ice_trp_rxts
        write(iulog,*) 'usrrxt_inti: has_ss_ixoy_rxts : ',has_ss_ixoy_rxts
+       write(iulog,*) 'usrrxt_inti: has_dust_rxts : ',has_dust_rxts
 
     end if
 
@@ -858,6 +881,14 @@ contains
     real(r8), parameter :: gamma_no2  = 8.0e-6_r8       ! Liu et al., Environ.Sci.&Tech, 53, 3517, 2019 doi:10.1021/acs.est.8b06367
     real(r8), parameter :: gamma_no3  = 0.002_r8        ! JPL19
     real(r8), parameter :: gamma_glyoxal  = 2.0e-4_r8   !  Washenfelder et al, JGR, 2011
+! uptake on mineral dust (Tang et al., Chem. Rev., 2017; Fairlie et al., ACP, 2010; Bauer et al., JGR, 2004)
+    real(r8), parameter :: gamma_n2o5_dust = 0.02_r8
+    real(r8), parameter :: gamma_no3_dust  = 0.018_r8
+    real(r8), parameter :: gamma_oh_dust   = 0.02_r8
+    real(r8), parameter :: gamma_ho2_dust  = 0.031_r8
+    real(r8), parameter :: gamma_h2o2_dust = 1.e-3_r8
+    real(r8), parameter :: gamma_o3_dust   = 4.5e-6_r8
+    real(r8), parameter :: gamma_ch2o_dust = 1.e-5_r8
 !TS1 species
     real(r8), parameter :: gamma_isopnita  = 0.005_r8        ! from Fisher et al., ACP, 2016
     real(r8), parameter :: gamma_isopnitb  = 0.005_r8        !
@@ -913,6 +944,7 @@ contains
     real(r8) ::  kinf_m(ncol)
     real(r8) ::  o2(ncol)
     real(r8) ::  c_n2o5, c_ho2, c_no2, c_no3, c_glyoxal
+    real(r8) ::  c_oh, c_h2o2, c_o3, c_ch2o       ! for the uptake on mineral dust
 !TS1 species
     real(r8) ::  c_isopnita, c_isopnitb, c_onitr, c_honitr, c_terpnit, c_nterpooh
     real(r8) ::  c_nc4cho, c_nc4ch2oh
@@ -1049,9 +1081,11 @@ contains
     real(r8), parameter  :: pH            =  4.5e+00_r8
 
     real(r8), pointer :: sfc(:), dm_aer(:)
+    real(r8), pointer :: sfc_dust(:)              ! per-bin surface area density of the dust-type species
     integer :: ntot_amode, nbins, naero
 
     real(r8), pointer :: sfc_array(:,:,:), dm_array(:,:,:)
+    real(r8), pointer :: sfc_dust_array(:,:,:)
  !TS2
     real(r8) ::  aterm(ncol)
     real(r8) ::  natom
@@ -1101,18 +1135,27 @@ contains
                 dm_array (pcols,pver,naero+n_supplemental_sad) )
     endif
 
+    allocate(sfc_dust_array(pcols,pver,size(sfc_array,3)))
+
     sfc_array(:,:,:) = 0._r8
     dm_array (:,:,:) = 0._r8
+    sfc_dust_array(:,:,:) = 0._r8
     sad_trop (:,:)   = 0._r8
     reff_trop(:,:)   = 0._r8
     sad_sslt     (:,:) = 0._r8
     sad_sslt_eff (:,:) = 0._r8
 
-    if( usr_NO2_aer_ndx > 0 .or. usr_NO3_aer_ndx > 0 .or. usr_N2O5_aer_ndx > 0 .or. usr_HO2_aer_ndx > 0 ) then
+    if( usr_NO2_aer_ndx > 0 .or. usr_NO3_aer_ndx > 0 .or. usr_N2O5_aer_ndx > 0 .or. usr_HO2_aer_ndx > 0 &
+        .or. has_dust_rxts ) then
 
 ! sad_trop should be set outside of usrrxt ??
        if( carma_hetchem_feedback ) then
           sad_trop(:ncol,:pver)=strato_sad(:ncol,:pver)
+       else if( has_dust_rxts ) then
+          ! also the surface area of the dust-type species, for the uptake reactions on dust
+          call aero_model_surfarea( &
+               state, relhum, pmid, temp, tropchemlev, &
+               sfc_array, dm_array, sad_trop, reff_trop, sad_sslt, sfc_dust=sfc_dust_array )
        else
           call aero_model_surfarea( &
                state, relhum, pmid, temp, tropchemlev, &
@@ -1969,12 +2012,13 @@ contains
 !
        if( usr_NO2_aer_ndx > 0 .or. usr_N2O5_HCL_ndx > 0 .or. usr_NO3_aer_ndx > 0 .or. usr_N2O5_aer_ndx > 0 .or. usr_HO2_aer_ndx > 0  &
          .or. usr_GLYOXAL_aer_ndx > 0 &
-         .or. has_het_ss_rxts .or. has_ice_trp_rxts .or. has_ss_ixoy_rxts ) then
+         .or. has_het_ss_rxts .or. has_ice_trp_rxts .or. has_ss_ixoy_rxts .or. has_dust_rxts ) then
 
           long_loop : do i = 1,ncol
 
              sfc    => sfc_array(i,k,:)
              dm_aer => dm_array(i,k,:)
+             sfc_dust => sfc_dust_array(i,k,:)
 
              press_lev   = pmid(i,k) / 100._r8   !hPa
 
@@ -2014,6 +2058,10 @@ contains
              c_no3  = 1.85e3_r8 * sqrt_t(i)         ! mean molecular speed of no3
              c_no2  = 2.15e3_r8 * sqrt_t(i)         ! mean molecular speed of no2
              c_ho2  = 2.53e3_r8 * sqrt_t(i)         ! mean molecular speed of ho2
+             c_oh   = 3.53e3_r8 * sqrt_t(i)         ! mean molecular speed of oh
+             c_h2o2 = 2.49e3_r8 * sqrt_t(i)         ! mean molecular speed of h2o2
+             c_o3   = 2.10e3_r8 * sqrt_t(i)         ! mean molecular speed of o3
+             c_ch2o = 2.65e3_r8 * sqrt_t(i)         ! mean molecular speed of ch2o
              c_glyoxal = 1.455e4_r8 * sqrt_t_58(i)  ! mean molecular speed of ho2
              c_isopnita = 1.20e3_r8 * sqrt_t(i)         ! mean molecular speed of isopnita
              c_isopnitb = 1.20e3_r8 * sqrt_t(i)         ! mean molecular speed of isopnitb
@@ -2127,6 +2175,32 @@ contains
              !-------------------------------------------------------------------------
              if( usr_HO2_aer_ndx > 0 ) then
                 rxt(i,k,usr_HO2_aer_ndx) = hetrxtrate( sfc, dm_aer, dg, c_ho2, gamma_ho2 )
+             end if
+             !-------------------------------------------------------------------------
+             !  ... oxidant uptake on mineral dust (dust heterogeneous chemistry), on the
+             !      surface area of the dust-type species only:
+             !      n2o5 -> 2 hno3, no3 -> hno3, oh, ho2, h2o2, o3 and ch2o loss
+             !-------------------------------------------------------------------------
+             if( usr_N2O5_dust_ndx > 0 ) then
+                rxt(i,k,usr_N2O5_dust_ndx) = hetrxtrate( sfc_dust, dm_aer, dg, c_n2o5, gamma_n2o5_dust )
+             end if
+             if( usr_NO3_dust_ndx > 0 ) then
+                rxt(i,k,usr_NO3_dust_ndx) = hetrxtrate( sfc_dust, dm_aer, dg, c_no3, gamma_no3_dust )
+             end if
+             if( usr_OH_dust_ndx > 0 ) then
+                rxt(i,k,usr_OH_dust_ndx) = hetrxtrate( sfc_dust, dm_aer, dg, c_oh, gamma_oh_dust )
+             end if
+             if( usr_HO2_dust_ndx > 0 ) then
+                rxt(i,k,usr_HO2_dust_ndx) = hetrxtrate( sfc_dust, dm_aer, dg, c_ho2, gamma_ho2_dust )
+             end if
+             if( usr_H2O2_dust_ndx > 0 ) then
+                rxt(i,k,usr_H2O2_dust_ndx) = hetrxtrate( sfc_dust, dm_aer, dg, c_h2o2, gamma_h2o2_dust )
+             end if
+             if( usr_O3_dust_ndx > 0 ) then
+                rxt(i,k,usr_O3_dust_ndx) = hetrxtrate( sfc_dust, dm_aer, dg, c_o3, gamma_o3_dust )
+             end if
+             if( usr_CH2O_dust_ndx > 0 ) then
+                rxt(i,k,usr_CH2O_dust_ndx) = hetrxtrate( sfc_dust, dm_aer, dg, c_ch2o, gamma_ch2o_dust )
              end if
              !-------------------------------------------------------------------------
              !  ... glyoxal ->  soag1  (on sulfate, nh4no3, oc2, soa)
@@ -3097,7 +3171,7 @@ contains
       end do
 !
 
-      deallocate( sfc_array, dm_array )
+      deallocate( sfc_array, dm_array, sfc_dust_array )
 
   end subroutine usrrxt
 
