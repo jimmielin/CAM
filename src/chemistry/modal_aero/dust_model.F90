@@ -20,10 +20,18 @@ module dust_model
   public :: dust_readnl
   public :: dust_init
   public :: dust_active
+  public :: dust_calcite_names
+  public :: dust_calcite_indices
 
   integer, protected :: dust_nbin != 2
   integer, protected :: dust_nnum != 2
   character(len=6), protected, allocatable :: dust_names(:)
+
+  ! calcite (CaCO3) tracer of each dust bin, for dust heterogeneous chemistry: the calcite
+  ! mass fraction of the emitted dust is emitted into it instead of the dust tracer
+  character(len=6), protected, allocatable :: dust_calcite_names(:)   ! blank where the bin has none
+  integer, protected, allocatable :: dust_calcite_indices(:)          ! constituent index, 0 where none
+  logical :: dust_calcite_active = .false.
 
   real(r8), allocatable :: dust_dmt_grd(:)
   real(r8), allocatable :: dust_emis_sclfctr(:)
@@ -121,14 +129,18 @@ module dust_model
 
     integer :: l, m, mm, ndx, nspec, iaermod
     character(len=32) :: spec_name
+    character(len=32) :: spec_type
     integer, parameter :: mymodes(7) = (/ 2, 1, 3, 4, 5, 6, 7 /) ! tricky order ...
     class(aerosol_properties), pointer :: aero_props_modal
+    integer :: dust_modes(ndst)   ! aerosol mode of each dust bin
 
     dust_nbin = ndst
     dust_nnum = ndst
 
     allocate( dust_names(2*ndst) )
     allocate( dust_indices(2*ndst) )
+    allocate( dust_calcite_names(ndst) )
+    allocate( dust_calcite_indices(ndst) )
     allocate( dust_dmt_grd(ndst+1) )
     allocate( dust_emis_sclfctr(ndst) )
     allocate( dust_dmt_vwr(ndst) )
@@ -175,12 +187,31 @@ module dust_model
              dust_names(ndst+ndx) = 'num_'//spec_name(5:)
              call cnst_get_ind(dust_names(     ndx), dust_indices(     ndx))
              call cnst_get_ind(dust_names(ndst+ndx), dust_indices(ndst+ndx))
+             dust_modes(ndx) = m
           endif
        enddo
     enddo
 
     dust_active = any(dust_indices(:) > 0)
     if (.not.dust_active) return
+
+    ! calcite tracer of each dust bin, found by species type in the bin's mode
+    dust_calcite_names(:) = ' '
+    dust_calcite_indices(:) = 0
+    do ndx = 1, ndst
+       m = dust_modes(ndx)
+       do l = 1, aero_props_modal%nspecies(m)
+          call aero_props_modal%get(m, l, spectype=spec_type, specname=spec_name)
+          if (spec_type == 'calcite') then
+             dust_calcite_names(ndx) = spec_name
+             call cnst_get_ind(dust_calcite_names(ndx), dust_calcite_indices(ndx))
+          end if
+       end do
+    end do
+    dust_calcite_active = any(dust_calcite_indices(:) > 0)
+    if (dust_calcite_active .and. dust_calcite_file == 'none') then
+       call endrun('dust_init: calcite tracers are present but dust_calcite_file is not set')
+    end if
 
     if (is_zender_soil_erod_from_atm()) then
        call  soil_erod_init( dust_emis_fact, soil_erod_file )
@@ -199,6 +230,7 @@ module dust_model
   subroutine dust_emis( ncol, lchnk, dust_flux_in, cflx, soil_erod )
     use soil_erod_mod, only : soil_erod_fact
     use soil_erod_mod, only : soil_erodibility
+    use dust_calcite_mod, only : dust_calcite_frac
     use mo_constants,  only : dust_density
     use physconst,     only : pi
 
@@ -209,8 +241,9 @@ module dust_model
     real(r8), intent(out)   :: soil_erod(:)
 
   ! local vars
-    integer :: i, m, idst, inum
+    integer :: i, m, idst, inum, ical
     real(r8) :: x_mton
+    real(r8) :: frac_cal   ! calcite mass fraction of the emitted dust
     real(r8),parameter :: soil_erod_threshold = 0.1_r8
 
     ! set dust emissions
@@ -244,6 +277,22 @@ module dust_model
              cflx(i,inum) = cflx(i,idst)*x_mton
           enddo
        enddo col_loop2
+    end if
+
+    ! emit the calcite mass fraction of the dust into the calcite tracer of each bin that
+    ! has one; the number fluxes above are from the total mass, so they are unchanged
+    if (dust_calcite_active) then
+       do i = 1,ncol
+          frac_cal = dust_calcite_frac(i,lchnk)
+          do m = 1,dust_nbin
+             ical = dust_calcite_indices(m)
+             if (ical > 0) then
+                idst = dust_indices(m)
+                cflx(i,ical) = cflx(i,idst)*frac_cal
+                cflx(i,idst) = cflx(i,idst)*(1._r8 - frac_cal)
+             end if
+          enddo
+       enddo
     end if
 
   end subroutine dust_emis

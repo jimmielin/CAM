@@ -209,6 +209,7 @@ contains
     use modal_aero_data, only: modal_aero_data_init
     use radiative_aerosol,only: rad_aer_get_info
     use dust_model,      only: dust_init, dust_names, dust_active, dust_nbin, dust_nnum
+    use dust_model,      only: dust_calcite_names, dust_calcite_indices
     use seasalt_model,   only: seasalt_init, seasalt_names, seasalt_active,seasalt_nbin
     use aer_drydep_mod,  only: inidrydep
     use aero_wetdep_cam, only: aero_wetdep_init
@@ -359,6 +360,17 @@ contains
           if (history_aerosol.or.history_chemistry) then
              call add_default (dummy, 1, ' ')
           endif
+       enddo
+
+       ! calcite emitted as part of the dust (dust heterogeneous chemistry)
+       do m = 1, dust_nbin
+          if (dust_calcite_indices(m) > 0) then
+             dummy = trim(dust_calcite_names(m)) // 'SF'
+             call addfld (dummy,horiz_only, 'A','kg/m2/s',trim(dust_calcite_names(m))//' calcite dust surface emission')
+             if (history_aerosol.or.history_chemistry) then
+                call add_default (dummy, 1, ' ')
+             endif
+          end if
        enddo
 
        dummy = 'DSTSFMBL'
@@ -1570,6 +1582,7 @@ contains
   subroutine aero_model_emissions( state, cam_in )
     use seasalt_model, only: seasalt_emis, seasalt_names, seasalt_indices, seasalt_active,seasalt_nbin
     use dust_model,    only: dust_emis, dust_names, dust_indices, dust_active,dust_nbin, dust_nnum
+    use dust_model,    only: dust_calcite_names, dust_calcite_indices
     use physics_types, only: physics_state
 
     ! Arguments:
@@ -1599,6 +1612,14 @@ contains
           mm = dust_indices(m)
           if (m<=dust_nbin) sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,mm)
           call outfld(trim(dust_names(m))//'SF',cam_in%cflx(:,mm),pcols, lchnk)
+       enddo
+       ! calcite emitted as part of the dust is included in the mobilization flux
+       do m=1,dust_nbin
+          mm = dust_calcite_indices(m)
+          if (mm > 0) then
+             sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,mm)
+             call outfld(trim(dust_calcite_names(m))//'SF',cam_in%cflx(:,mm),pcols, lchnk)
+          end if
        enddo
        call outfld('DSTSFMBL',sflx(:),pcols,lchnk)
        call outfld('LND_MBL',soil_erod_tmp(:),pcols, lchnk )
