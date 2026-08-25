@@ -141,6 +141,8 @@ module dust_model
     allocate( dust_indices(2*ndst) )
     allocate( dust_calcite_names(ndst) )
     allocate( dust_calcite_indices(ndst) )
+    dust_calcite_names(:) = ' '
+    dust_calcite_indices(:) = 0
     allocate( dust_dmt_grd(ndst+1) )
     allocate( dust_emis_sclfctr(ndst) )
     allocate( dust_dmt_vwr(ndst) )
@@ -196,8 +198,6 @@ module dust_model
     if (.not.dust_active) return
 
     ! calcite tracer of each dust bin, found by species type in the bin's mode
-    dust_calcite_names(:) = ' '
-    dust_calcite_indices(:) = 0
     do ndx = 1, ndst
        m = dust_modes(ndx)
        do l = 1, aero_props_modal%nspecies(m)

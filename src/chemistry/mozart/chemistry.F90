@@ -847,11 +847,12 @@ end function chem_is_active
 
     pure logical function aero_has_emis(spcname)
       use seasalt_model, only: seasalt_names
-      use dust_model, only: dust_names
+      use dust_model, only: dust_names, dust_calcite_names
 
       character(len=*),intent(in) :: spcname
 
-      aero_has_emis = any(seasalt_names(:) == spcname).or.any(dust_names(:) == spcname)
+      aero_has_emis = any(seasalt_names(:) == spcname).or.any(dust_names(:) == spcname) &
+                      .or.any(dust_calcite_names(:) == spcname)
 
     end function aero_has_emis
 
