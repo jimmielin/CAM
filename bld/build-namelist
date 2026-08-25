@@ -3879,6 +3879,12 @@ if ($nl->get_value('do_tms') =~ /$TRUE/io) {
         add_default($nl, 'dust_emis_fact');
     }
 }
+
+# Calcite mass fraction of emitted dust, for dust heterogeneous chemistry
+if ($chem =~ /_dustchem/) {
+    add_default($nl, 'dust_calcite_file');
+}
+
 if (chem_has_species($cfg, 'NO')) {
     # set scaling of lightning NOx production
     add_default($nl, 'lght_no_prd_factor' );
@@ -3904,6 +3910,12 @@ if ($chem =~ /_mam(\d)/) {
 }
 
 # SAD process participation spec_types
+if ($chem =~ /_dustchem/) {
+    # dust heterogeneous chemistry: calcite and its acid-displacement products
+    # are part of the dust surface for the uptake reactions on dust
+    add_default($nl, 'sad_dust_spec_types',
+       'val'=>"'dust','calcite','ca-sulfate','ca-nitrate'");
+}
 if ($chem =~ /_mam/) {
     add_default($nl, 'sad_chem_spec_types',
        'val'=>"'sulfate','s-organic','p-organic','black-c','ammonium'");

@@ -869,6 +869,7 @@
 <gw_prndl                 waccm_phys="1">0.5d0  </gw_prndl>
 <gw_prndl     chem="geoschem_mam4">0.5d0  </gw_prndl>
 <gw_prndl     chem="trop_strat_mam4_vbs">0.5d0  </gw_prndl>
+<gw_prndl     chem="trop_strat_mam4_vbs_dustchem">0.5d0  </gw_prndl>
 <gw_prndl     chem="trop_strat_mam4_vbsext">0.5d0  </gw_prndl>
 <gw_prndl     chem="trop_strat_mam5_t1s1">0.5d0  </gw_prndl>
 <gw_prndl     chem="trop_strat_mam5_vbsext">0.5d0  </gw_prndl>
@@ -880,6 +881,7 @@
 <gw_oro_south_fac         model_top="ht">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac chem="geoschem_mam4">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac chem="trop_strat_mam4_vbs">2.d0   </gw_oro_south_fac>
+<gw_oro_south_fac chem="trop_strat_mam4_vbs_dustchem">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac chem="trop_strat_mam4_vbsext">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac chem="trop_strat_mam4_slh">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac chem="trop_strat_mam5_slh">2.d0   </gw_oro_south_fac>
@@ -893,6 +895,7 @@
 <gw_lndscl_sgh            model_top="ht">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh chem="geoschem_mam4">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh chem="trop_strat_mam4_vbs">.false.</gw_lndscl_sgh>
+<gw_lndscl_sgh chem="trop_strat_mam4_vbs_dustchem">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh chem="trop_strat_mam4_vbsext">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh chem="trop_strat_mam4_slh">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh chem="trop_strat_mam5_slh">.false.</gw_lndscl_sgh>
@@ -905,6 +908,7 @@
 <gw_apply_tndmax phys="cam7"              >.false.</gw_apply_tndmax>
 <gw_apply_tndmax            waccm_phys="1">.false.</gw_apply_tndmax>
 <gw_apply_tndmax chem="trop_strat_mam4_vbs">.false.</gw_apply_tndmax>
+<gw_apply_tndmax chem="trop_strat_mam4_vbs_dustchem">.false.</gw_apply_tndmax>
 <gw_apply_tndmax chem="trop_strat_mam4_vbsext">.false.</gw_apply_tndmax>
 <gw_apply_tndmax chem="trop_strat_mam4_slh">.false.</gw_apply_tndmax>
 <gw_apply_tndmax chem="trop_strat_mam5_slh">.false.</gw_apply_tndmax>
@@ -2122,6 +2126,9 @@
 <soil_erod_file phys="cam5"  >atm/cam/dst/dst_source2x2_cam5.4_c150327.nc</soil_erod_file>
 <soil_erod_file phys="cam4"  >atm/cam/dst/dst_source2x2tuned-cam4-06132012.nc</soil_erod_file>
 <soil_erod_file phys="cam4" hgrid="0.9x1.25">atm/cam/dst/dst_source1x1tuned-cam4-06202012.nc</soil_erod_file>
+
+<!-- Calcite mass fraction of emitted dust (EMIT mineralogy), for dust heterogeneous chemistry -->
+<dust_calcite_file chem="trop_strat_mam4_vbs_dustchem">atm/cam/dst/EMIT_caco3_frac-09x125_c260824.nc</dust_calcite_file>
 
 <!-- nitrogen deposition to surface models -->
 <stream_ndep_mesh_filename>share/meshes/fv0.9x1.25_141008_polemod_ESMFmesh.nc</stream_ndep_mesh_filename>
