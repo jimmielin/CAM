@@ -90,7 +90,7 @@ derecho/intel/aux_cam:
   DIFF SMS_D_Ln9.f19_f19_mg17.QPC2000climo.derecho_intel.cam-outfrq3s_usecase
   - updates to IC file and AOA tracers
 
-derecho/nvhpc/aux_cam:
+derecho/nvhpc/aux_cam: All PASS
 
 izumi/nag/aux_cam:
   FAIL ERC_D_Ln9.f10_f10_mt232.FHIST_C5.izumi_nag.cam-outfrq3s_subcol
