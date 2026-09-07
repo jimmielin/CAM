@@ -634,7 +634,7 @@ if ($dyn_pkg eq 'fv3' and $spmd eq 'OFF') {
 }
 
 if ($dyn_pkg eq 'se' and $smp eq 'ON') {
-    die "CAM configure: ERROR: The SE dycore does not currently work with threading on. $eol";
+    warn "CAM configure: WARNING: Threading in the SE dycore is only tested for vertical & tracer threads at this time. $eol";
 }
 
 if ($print>=2) { print "Dynamics package: $dyn_pkg$eol"; }
