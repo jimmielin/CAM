@@ -3,18 +3,18 @@
 Tag name: cam6_4_201
 Originator(s): fvitt
 Date: 7 Sep 2026
-One-line Summary: Age of air tracer updates
+One-line Summary: Age of air tracers updates
 Github PR URL: https://github.com/ESCOMP/CAM/pull/1668
 
 Purpose of changes (include the issue number and title text for each relevant GitHub issue):
 
- Make following updates to age-of-air diagnostic tracer (#1654)
+ Make following updates to age-of-air diagnostic tracers (#1654)
  - register tracers as having dry mixing ratio types
  - initialize lower boundary AOA1 via IC file values when age-of-air
    tracers are found in IC file
+ - enforce zero mass mixing ratio upper boundary for AOA1
  - abort run if age-of-air tracers are not found in IC file when
    aoa_read_from_ic_file=.TRUE. and not found in IC file
- - enforce zero mass mixing ratio upper boundary for AOA1
  - initialize AOA1 to zero mass mixing ratio when not initialized from IC file
 
 Describe any changes made to build system: N/A
