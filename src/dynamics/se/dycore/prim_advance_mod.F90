@@ -4,7 +4,7 @@ module prim_advance_mod
   use perf_mod,       only: t_startf, t_stopf, t_adj_detailf !, t_barrierf _EXTERNAL
   use cam_abortutils, only: endrun
   use parallel_mod,   only: parallel_t, HME_BNDRY_P2P!,HME_BNDRY_A2A
-  use thread_mod ,    only: horz_num_threads, vert_num_threads, omp_set_nested
+  use thread_mod ,    only: horz_num_threads, vert_num_threads, omp_set_max_active_levels
 
   implicit none
   private
@@ -110,7 +110,7 @@ contains
     !                 (K&G 2nd order method has CFL=4. tiny CFL improvement not worth 2nd order)
     !
 
-    call omp_set_nested(.true.)
+    call omp_set_max_active_levels(2)
 
     ! default weights for computing mean dynamics fluxes
     eta_ave_w = 1._r8/qsplit
@@ -262,7 +262,7 @@ contains
     end do
     tevolve=tevolve+dt
 
-    call omp_set_nested(.false.)
+    call omp_set_max_active_levels(1)
 
   end subroutine prim_advance_exp
 
@@ -672,7 +672,7 @@ contains
 
       call tot_energy_dyn(elem,fvm,nets,nete,nt,qn0,'dCH')
       do ie=nets,nete
-        !$omp parallel do num_threads(vert_num_threads), private(k,i,j,v1,v2,heating)
+        !$omp parallel do num_threads(vert_num_threads), private(k,i,j,v1,v2,v1new,v2new,heating)
         do k=sponge_del4_lev+2,nlev
           !
           ! only do "frictional heating" away from sponge
@@ -945,7 +945,7 @@ contains
           !
           ! no frictional heating for artificial sponge
           !
-          !$omp parallel do num_threads(vert_num_threads) private(k,i,j,v1,v2,v1new,v2new)
+          !$omp parallel do num_threads(vert_num_threads) private(k,i,j,v1,v2,v1new,v2new,heating)
           do k=1,ksponge_end
             !OMP_COLLAPSE_SIMD
             !DIR_VECTOR_ALIGNED

@@ -11,7 +11,7 @@ module prim_driver_mod
 
   use element_mod,            only: element_t, timelevels, allocate_element_desc
   use thread_mod ,            only: horz_num_threads, vert_num_threads, tracer_num_threads
-  use thread_mod ,            only: omp_set_nested
+  use thread_mod ,            only: omp_set_max_active_levels
   use perf_mod,               only: t_startf, t_stopf
   use prim_init,              only: gp, fvm_corners, fvm_points
 
@@ -547,7 +547,7 @@ contains
       else
         region_num_threads = tracer_num_threads
       end if
-      call omp_set_nested(.true.)
+      call omp_set_max_active_levels(2)
       !$OMP PARALLEL NUM_THREADS(region_num_threads), DEFAULT(SHARED), PRIVATE(hybridnew)
       if (use_cslam) then
         hybridnew = config_thread_region(hybrid,'serial')
@@ -556,7 +556,7 @@ contains
       end if
       call Prim_Advec_Tracers_remap(elem, deriv,hvcoord,hybridnew,dt_q,tl,nets,nete)
       !$OMP END PARALLEL
-      call omp_set_nested(.false.)
+      call omp_set_max_active_levels(1)
       call t_stopf('prim_advec_tracers_remap')
     end if
    if (use_cslam) then

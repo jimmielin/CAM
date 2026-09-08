@@ -7,7 +7,8 @@ module thread_mod
        omp_get_max_threads, &
        omp_get_num_threads, &
        omp_get_nested,      &
-       omp_set_nested
+       omp_set_nested,      &
+       omp_set_max_active_levels
 #endif
   use cam_logfile,            only: iulog
   use spmd_utils,             only: masterproc
@@ -25,6 +26,7 @@ module thread_mod
   public :: omp_get_num_threads
   public :: omp_get_nested
   public :: omp_set_nested
+  public :: omp_set_max_active_levels
   public :: initomp
 contains
 
@@ -60,6 +62,10 @@ contains
   subroutine omp_set_nested(flag)
     logical :: flag
   end subroutine omp_set_nested
+
+  subroutine omp_set_max_active_levels(level)
+    integer :: level
+  end subroutine omp_set_max_active_levels
 
   subroutine initomp
     max_num_threads = 1
