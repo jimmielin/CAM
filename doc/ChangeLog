@@ -1,3 +1,72 @@
+
+===============================================================
+
+Tag name: cam6_4_202
+Originator(s): briandobbins, jimmielin, cacraigucar
+Date: Sept 10, 2026
+One-line Summary: CAM threading issue for SE dycore and other modules, plus bring in conv_water from atmos_phys
+Github PR URL: https://github.com/ESCOMP/CAM/pull/1674
+
+Purpose of changes (include the issue number and title text for each relevant GitHub issue):
+ - Broken threading (vertical/tracer) in CAM: https://github.com/ESCOMP/CAM/issues/1650
+ - Port conv_water (for radiation) to CCPP and move to atmos_phys
+
+Describe any changes made to build system: N/A
+
+Describe any changes made to the namelist: N/A
+
+List any changes to the defaults for the boundary datasets: N/A
+
+Describe any substantial timing or memory changes: N/A
+
+Code reviewed by: cacraigucar, jimmielin
+
+List all files eliminated: N/A
+
+List all files added and what they do: N/A
+
+List all existing files that have been modified, and describe the changes:
+M       .gitmodules
+M       src/atmos_phys
+          - Update atmos_phys external
+
+M       bld/configure
+          - eliminate threading with SE dycore stopping on configure
+          - add cloud_water directory in atmos_phys
+
+M       src/dynamics/se/dycore/fvm_consistent_se_cslam.F90
+M       src/dynamics/se/dycore/prim_advance_mod.F90
+M       src/dynamics/se/dycore/prim_advection_mod.F90
+M       src/dynamics/se/dycore/prim_driver_mod.F90
+M       src/dynamics/se/dycore/thread_mod.F90
+M       src/dynamics/se/dycore/vertremap_mod.F90
+M       src/physics/cam/gw_drag_cam.F90
+M       src/physics/rrtmgp/radiation.F90
+          - changes for SE dycore threading
+
+M       src/physics/cam/conv_water.F90
+M       src/physics/cam/rk_stratiform_cam.F90
+           - changes for conv_water_4rad
+
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+derecho/intel/aux_cam: all BFB
+  SMS_D_Ln9_P1536x1.ne0CONUSne30x8_ne0CONUSne30x8_mt12.FCHIST.derecho_intel.cam-outfrq9s (Overall: FAIL)
+    - intermittent failure in CTSM code (lnd_set_decomp_and_domain.F90)  - It happened to work this time
+
+derecho/nvhpc/aux_cam: all BFB
+
+izumi/nag/aux_cam: all BFB
+  FAIL ERC_D_Ln9.f10_f10_mt232.FHIST_C5.izumi_nag.cam-outfrq3s_subcol
+  - pre-existing failure -- see https://github.com/ESCOMP/CAM/issues/1514
+
+izumi/gnu/aux_cam: all BFB
+
+===============================================================
 ===============================================================
 
 Tag name: cam6_4_201
