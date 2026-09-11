@@ -82,6 +82,7 @@ module aero_model
   integer, parameter :: max_sad_spec = 16
   character(len=32) :: sad_chem_spec_types(max_sad_spec) = ' '
   character(len=32) :: sad_strat_spec_types(max_sad_spec) = ' '
+  character(len=32) :: sad_dust_spec_types(max_sad_spec) = ' '
 
   ! sfc/dm_aer slots mo_usrrxt must reserve beyond the aerosol bins; all CARMA
   ! surfaces come from the aerosol representation, so no extra slots are needed
@@ -112,7 +113,7 @@ contains
 
     ! Namelist variables
     namelist /aerosol_nl/ sol_facti_cloud_borne, sol_factb_interstitial, sol_factic_interstitial, &
-       sad_chem_spec_types, sad_strat_spec_types
+       sad_chem_spec_types, sad_strat_spec_types, sad_dust_spec_types
 
     !-----------------------------------------------------------------------------
 
@@ -138,6 +139,7 @@ contains
     call mpibcast(sol_factic_interstitial, 1,                       mpir8,   0, mpicom)
     call mpibcast(sad_chem_spec_types,    len(sad_chem_spec_types(1))*max_sad_spec,    mpichar, 0, mpicom)
     call mpibcast(sad_strat_spec_types,   len(sad_strat_spec_types(1))*max_sad_spec,   mpichar, 0, mpicom)
+    call mpibcast(sad_dust_spec_types,    len(sad_dust_spec_types(1))*max_sad_spec,    mpichar, 0, mpicom)
 #endif
 
     call aero_wetdep_readnl(nlfile)
@@ -383,6 +385,12 @@ contains
              write(iulog,*) '  ', trim(sad_strat_spec_types(l))
           end if
        end do
+       write(iulog,*) 'SAD dust spec_types:'
+       do l = 1, max_sad_spec
+          if (len_trim(sad_dust_spec_types(l)) > 0) then
+             write(iulog,*) '  ', trim(sad_dust_spec_types(l))
+          end if
+       end do
     end if
 
   end subroutine aero_model_init
@@ -428,7 +436,7 @@ contains
   !-------------------------------------------------------------------------
   subroutine aero_model_surfarea( &
                   state, relhum, pmid, temp, ltrop, &
-                  sfc, dm_aer, sad_trop, reff_trop, sad_ssa )
+                  sfc, dm_aer, sad_trop, reff_trop, sad_ssa, sfc_dust )
 
     use mo_constants, only : pi
 
@@ -444,12 +452,15 @@ contains
     real(r8), intent(inout) :: sad_trop(:,:)  ! aerosol surface area density (cm2/cm3), zeroed above the tropopause
     real(r8), intent(out)   :: reff_trop(:,:) ! aerosol effective radius (cm), zeroed above the tropopause
     real(r8), intent(out)   :: sad_ssa(:,:)
+    real(r8), optional, intent(out) :: sfc_dust(:,:,:) ! per-bin SAD of the sad_dust_spec_types species (cm2/cm3)
 
     ! local vars
     integer :: beglev(pcols)
     integer :: endlev(pcols)
 
     integer :: lchnk, ncol
+    real(r8) :: sad_dust(pcols,pver)
+    real(r8) :: reff_dust(pcols,pver)
 
     class(aerosol_state), pointer :: aero_state
 
@@ -462,6 +473,16 @@ contains
     aero_state => aerosol_instances_get_state(iaermod_, 0, lchnk)
     call aero_state%surf_area_dens(aero_props, sad_chem_spec_types, ncol, pver, beglev, endlev, &
          relhum, pmid, temp, pi, sad_trop, reff_trop, sfc, dm_aer )
+
+    ! surface area of the dust-type species only, for heterogeneous reactions on mineral dust;
+    ! kept separate from sad_chem_spec_types so the standard aerosol heterogeneous rates are unchanged
+    if (present(sfc_dust)) then
+       sfc_dust = 0._r8
+       if (len_trim(sad_dust_spec_types(1))>0) then
+          call aero_state%surf_area_dens(aero_props, sad_dust_spec_types, ncol, pver, beglev, endlev, &
+               relhum, pmid, temp, pi, sad_dust, reff_dust, sfc_dust )
+       end if
+    end if
 
   end subroutine aero_model_surfarea
 

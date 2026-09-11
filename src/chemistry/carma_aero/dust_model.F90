@@ -10,11 +10,15 @@ module dust_model
   private
 
   public :: dust_names
+  public :: dust_calcite_names
   public :: dust_nbin
 
   integer, parameter :: dust_nbin = 4
 
   character(len=6), parameter :: dust_names(dust_nbin) &
        = (/'NULL01', 'NULL02', 'NULL03', 'NULL04'/)
+
+  ! no calcite tracers: dust heterogeneous chemistry is only available with modal aerosols
+  character(len=6), parameter :: dust_calcite_names(dust_nbin) = ' '
 
 end module dust_model

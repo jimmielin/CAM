@@ -13,6 +13,7 @@ module dust_model
 
   public :: dust_active
   public :: dust_names
+  public :: dust_calcite_names
   public :: dust_nbin
   public :: dust_indices
   public :: dust_emis
@@ -28,6 +29,9 @@ module dust_model
 
   character(len=6), parameter :: dust_names(dust_nbin) &
        = (/'DST01 ', 'DST02 ', 'DST03 ', 'DST04 '/)
+
+  ! no calcite tracers: dust heterogeneous chemistry is only available with modal aerosols
+  character(len=6), parameter :: dust_calcite_names(dust_nbin) = ' '
 
   real(r8), parameter :: dust_dmt_grd(dust_nbin+1) &
        = (/ 0.1e-6_r8, 1.0e-6_r8, 2.5e-6_r8, 5.0e-6_r8, 10.0e-6_r8 /)

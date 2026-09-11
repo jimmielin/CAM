@@ -24,14 +24,17 @@ module radiative_aerosol_definitions
   ! not just in radiative_aerosol.
   !===========================
   integer, public, parameter :: num_mode_types = 9
-  integer, public, parameter :: num_spec_types = 8
+  integer, public, parameter :: num_spec_types = 11
   character(len=14), public, parameter :: mode_type_names(num_mode_types) = (/ &
      'accum         ', 'aitken        ', 'primary_carbon', 'fine_seasalt  ', &
      'fine_dust     ', 'coarse        ', 'coarse_seasalt', 'coarse_dust   ', &
      'coarse_strat  '  /)
-  character(len=9),  public, parameter :: spec_type_names(num_spec_types) = (/ &
-     'sulfate  ', 'ammonium ', 'nitrate  ', 'p-organic', &
-     's-organic', 'black-c  ', 'seasalt  ', 'dust     '/)
+  ! calcite (CaCO3) and its acid-displacement products CaSO4 and Ca(NO3)2 are the
+  ! speciated dust types of dust heterogeneous chemistry
+  character(len=10), public, parameter :: spec_type_names(num_spec_types) = (/ &
+     'sulfate   ', 'ammonium  ', 'nitrate   ', 'p-organic ', &
+     's-organic ', 'black-c   ', 'seasalt   ', 'dust      ', &
+     'calcite   ', 'ca-sulfate', 'ca-nitrate'/)
 
   integer, public, parameter :: num_bin_morphs  = 2
   character(len=8), public, parameter :: bin_morph_names(num_bin_morphs) = &

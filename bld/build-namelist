@@ -1004,7 +1004,10 @@ if ($aer_model eq 'mam' ) {
                         'soa'=>'s-organic',
                         'bc' =>'black-c',
                         'dst'=>'dust',
-                        'ncl'=>'seasalt' );
+                        'ncl'=>'seasalt',
+                        'co3'=>'calcite',
+                        'cs4'=>'ca-sulfate',
+                        'cn3'=>'ca-nitrate' );
 
   if ($aero_modes eq '3mode' ) {
     # MAM rad_climate settings.  The externally mixed quantities in the modal aerosol
@@ -1044,9 +1047,11 @@ if ($aer_model eq 'mam' ) {
     @mode_num      = qw(num_a1 num_a2 num_a3 num_a4);
     @mode_num_cw   = qw(num_c1 num_c2 num_c3 num_c4);
 
-    %modal_groups = ( 'accum'  => [qw(so4 pom soa bc dst ncl)],
+    # co3/cs4/cn3 (calcite and its acid-displacement products) join a mode only
+    # when the mechanism carries them (dust heterogeneous chemistry mechanisms).
+    %modal_groups = ( 'accum'  => [qw(so4 pom soa bc dst ncl co3 cs4 cn3)],
                       'aitken' => [qw(so4 soa ncl dst)],
-                      'coarse' => [qw(dst ncl so4)],
+                      'coarse' => [qw(dst ncl so4 co3 cs4 cn3)],
                       'primary_carbon' => [qw(pom bc)] );
 
     @mode_num_src  = qw(A A A A);
@@ -1065,9 +1070,11 @@ if ($aer_model eq 'mam' ) {
     @mode_num      = qw(num_a1 num_a2 num_a3 num_a4 num_a5);
     @mode_num_cw   = qw(num_c1 num_c2 num_c3 num_c4 num_c5);
 
-    %modal_groups = ( 'accum'  => [qw(so4 pom soa bc dst ncl)],
+    # co3/cs4/cn3 (calcite and its acid-displacement products) join a mode only
+    # when the mechanism carries them (dust heterogeneous chemistry mechanisms).
+    %modal_groups = ( 'accum'  => [qw(so4 pom soa bc dst ncl co3 cs4 cn3)],
                       'aitken' => [qw(so4 soa ncl dst)],
-                      'coarse' => [qw(dst ncl so4)],
+                      'coarse' => [qw(dst ncl so4 co3 cs4 cn3)],
                       'primary_carbon' => [qw(pom bc)],
                       'coarse_strat' => [qw(so4)] );
 
@@ -3874,6 +3881,12 @@ if ($nl->get_value('do_tms') =~ /$TRUE/io) {
         add_default($nl, 'dust_emis_fact');
     }
 }
+
+# Calcite mass fraction of emitted dust, for dust heterogeneous chemistry
+if ($chem =~ /_dustchem/) {
+    add_default($nl, 'dust_calcite_file');
+}
+
 if (chem_has_species($cfg, 'NO')) {
     # set scaling of lightning NOx production
     add_default($nl, 'lght_no_prd_factor' );
@@ -3899,6 +3912,12 @@ if ($chem =~ /_mam(\d)/) {
 }
 
 # SAD process participation spec_types
+if ($chem =~ /_dustchem/) {
+    # dust heterogeneous chemistry: calcite and its acid-displacement products
+    # are part of the dust surface for the uptake reactions on dust
+    add_default($nl, 'sad_dust_spec_types',
+       'val'=>"'dust','calcite','ca-sulfate','ca-nitrate'");
+}
 if ($chem =~ /_mam/) {
     add_default($nl, 'sad_chem_spec_types',
        'val'=>"'sulfate','s-organic','p-organic','black-c','ammonium'");
@@ -3910,6 +3929,10 @@ if ($chem =~ /_mam/) {
     # all strat SAD is sulfate aerosol (see sad_strat_calc/sulfate_sad_calc).
     add_default($nl, 'sad_strat_spec_types',
        'val'=>"'sulfate','s-organic','p-organic','black-c','ammonium'");
+    # dust SAD for heterogeneous reactions on mineral dust; separate from
+    # sad_chem_spec_types so the standard heterogeneous rates are unchanged.
+    add_default($nl, 'sad_dust_spec_types',
+       'val'=>"'dust'");
 }
 if ($carma ne 'none' and $chem !~ /_mam/) {
     add_default($nl, 'sad_chem_spec_types',
@@ -3918,6 +3941,8 @@ if ($carma ne 'none' and $chem !~ /_mam/) {
     # all strat SAD is sulfate aerosol (see sad_strat_calc/sulfate_sad_calc).
     add_default($nl, 'sad_strat_spec_types',
        'val'=>"'sulfate','s-organic','p-organic','black-c','ammonium'");
+    add_default($nl, 'sad_dust_spec_types',
+       'val'=>"'dust'");
 }
 if ($aer_model eq 'bam' and $prescribed_aero_model eq 'none') {
     add_default($nl, 'sad_chem_spec_types',

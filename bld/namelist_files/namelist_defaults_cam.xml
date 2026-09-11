@@ -134,8 +134,10 @@
 <ncdata hgrid="0.9x1.25" nlev="32"                 >atm/cam/inic/fv/cami-mam3_0000-01-01_0.9x1.25_L32_c141031.nc</ncdata>
 <ncdata hgrid="0.9x1.25" nlev="32" aquaplanet="1"  >atm/cam/inic/fv/aqua_0006-01-01_0.9x1.25_L32_c161020.nc</ncdata>
 <ncdata hgrid="0.9x1.25" nlev="32" chem="trop_strat_mam4_vbs">atm/cam/inic/fv/f.e22.FC2010climo.f09_f09_mg17.cam6_2_022.001.cam.i.0016-01-01-00000_c200610.nc</ncdata>
+<ncdata hgrid="0.9x1.25" nlev="32" chem="trop_strat_mam4_vbs_dustchem">atm/cam/inic/fv/f.e22.FC2010climo.f09_f09_mg17.cam6_2_022.001.cam.i.0016-01-01-00000_c200610.nc</ncdata>
 <ncdata hgrid="0.9x1.25" nlev="32" chem="trop_strat_mam4_ts2">atm/cam/inic/fv/f.e22.FC2010climo.f09_f09_mg17.cam6_2_022.001.cam.i.0016-01-01-00000_c200610.nc</ncdata>
 <ncdata hgrid="0.9x1.25" nlev="32" chem="trop_strat_mam5_t1s1">atm/cam/inic/fv/f.e22.FC2010climo.f09_f09_mg17.cam6_2_022.001.cam.i.0016-01-01-00000_c200610.nc</ncdata>
+<ncdata hgrid="0.9x1.25" nlev="32" chem="trop_strat_mam5_t1s1_dustchem">atm/cam/inic/fv/f.e22.FC2010climo.f09_f09_mg17.cam6_2_022.001.cam.i.0016-01-01-00000_c200610.nc</ncdata>
 <ncdata hgrid="0.9x1.25" nlev="32" chem="trop_strat_mam5_t2s1">atm/cam/inic/fv/f.e22.FC2010climo.f09_f09_mg17.cam6_2_022.001.cam.i.0016-01-01-00000_c200610.nc</ncdata>
 <ncdata hgrid="0.9x1.25" nlev="66"                 >atm/waccm/ic/cami_2000-02-01_0.9x1.25_L66_c040928.nc</ncdata>
 <ncdata hgrid="0.9x1.25" nlev="70"                 >atm/waccm/ic/FWT2000_f09_spinup01.cam.i.0001-01-02-00000_c160315.nc</ncdata>
@@ -198,11 +200,16 @@
 <ncdata hgrid="ne30np4"  nlev="32"  aquaplanet="1" >atm/cam/inic/se/ape_cam6_ne30np4_L32_c170509.nc</ncdata>
 <ncdata hgrid="ne30np4"  nlev="32" chem="trop_strat_mam4_vbs">atm/cam/inic/se/f.e22.FC2010climo.ne30_ne30_mg17.cam6_2_032.001.cam.i.0006-01-01-00000_c200623.nc</ncdata>
 <ncdata hgrid="ne30np4"  nlev="32" chem="trop_strat_mam4_vbs" npg="3">atm/cam/inic/se/f.e22.FC2010climo.ne30pg3_ne30pg3_mg17.cam6_2_032.001.cam.i.0007-01-01-00000_c200623.nc</ncdata>
+<ncdata hgrid="ne30np4"  nlev="32" chem="trop_strat_mam4_vbs_dustchem">atm/cam/inic/se/f.e22.FC2010climo.ne30_ne30_mg17.cam6_2_032.001.cam.i.0006-01-01-00000_c200623.nc</ncdata>
+<ncdata hgrid="ne30np4"  nlev="32" chem="trop_strat_mam4_vbs_dustchem" npg="3">atm/cam/inic/se/f.e22.FC2010climo.ne30pg3_ne30pg3_mg17.cam6_2_032.001.cam.i.0007-01-01-00000_c200623.nc</ncdata>
 <ncdata hgrid="ne30np4"  nlev="32" chem="trop_strat_mam5_t1s1">atm/cam/inic/se/f.e22.FC2010climo.ne30_ne30_mg17.cam6_2_032.001.cam.i.0006-01-01-00000_c200623.nc</ncdata>
+<ncdata hgrid="ne30np4"  nlev="32" chem="trop_strat_mam5_t1s1_dustchem">atm/cam/inic/se/f.e22.FC2010climo.ne30_ne30_mg17.cam6_2_032.001.cam.i.0006-01-01-00000_c200623.nc</ncdata>
 <ncdata hgrid="ne30np4"  nlev="32" chem="trop_strat_mam5_t1s1" npg="3">atm/cam/inic/se/f.e22.FC2010climo.ne30pg3_ne30pg3_mg17.cam6_2_032.001.cam.i.0007-01-01-00000_c200623.nc</ncdata>
+<ncdata hgrid="ne30np4"  nlev="32" chem="trop_strat_mam5_t1s1_dustchem" npg="3">atm/cam/inic/se/f.e22.FC2010climo.ne30pg3_ne30pg3_mg17.cam6_2_032.001.cam.i.0007-01-01-00000_c200623.nc</ncdata>
 <ncdata hgrid="ne30np4"  nlev="32" chem="trop_strat_mam4_ts2">atm/cam/inic/se/f.e22.FC2010climo.ne30_ne30_mg17.cam6_2_032.001.cam.i.0006-01-01-00000_c200623.nc</ncdata>
 <ncdata hgrid="ne30np4"  nlev="32" chem="trop_strat_mam5_t2s1">atm/cam/inic/se/f.e22.FC2010climo.ne30_ne30_mg17.cam6_2_032.001.cam.i.0006-01-01-00000_c200623.nc</ncdata>
 <ncdata hgrid="ne30np4"  nlev="58" chem="trop_strat_mam5_t1s1">atm/cam/inic/se/f.e22.FCnudged.ne30_ne30_mg17.release-cesm2.2.0_spinup.2010_2020.001.cam.i.2011-01-01-00000_L58_c220310.nc</ncdata>
+<ncdata hgrid="ne30np4"  nlev="58" chem="trop_strat_mam5_t1s1_dustchem">atm/cam/inic/se/f.e22.FCnudged.ne30_ne30_mg17.release-cesm2.2.0_spinup.2010_2020.001.cam.i.2011-01-01-00000_L58_c220310.nc</ncdata>
 <ncdata hgrid="ne30np4"  nlev="58"                 >atm/cam/inic/se/FLT_L58_ne30pg3_IC_c220623.nc</ncdata>
 <ncdata hgrid="ne30np4"  nlev="70" waccm_phys="1"  >atm/waccm/ic/FW2000.ne30pg3_ne30pg3_nlev70_c230906.nc</ncdata>
 <ncdata hgrid="ne30np4"  nlev="93"                           >atm/cam/inic/se/c153_ne30pg3_FMTHIST_x02.cam.i.1990-01-01-00000_c240618.nc</ncdata>
@@ -503,6 +510,10 @@
 <mam_ncl  rad="rrtmg">atm/cam/physprops/ssam_rrtmg_c100508.nc</mam_ncl>
 <mam_dst  rad="rrtmg">atm/cam/physprops/dust_aeronet_rrtmg_c141106.nc</mam_dst>
 <mam_nh4  rad="rrtmg">atm/cam/physprops/sulfate_rrtmg_c080918.nc</mam_nh4>
+<!-- dust heterogeneous chemistry: calcite (co3) and CaSO4 (cs4) use dust properties, Ca(NO3)2 (cn3) sulfate-like -->
+<mam_co3  rad="rrtmg">atm/cam/physprops/dust_aeronet_rrtmg_c141106.nc</mam_co3>
+<mam_cs4  rad="rrtmg">atm/cam/physprops/dust_aeronet_rrtmg_c141106.nc</mam_cs4>
+<mam_cn3  rad="rrtmg">atm/cam/physprops/sulfate_rrtmg_c080918.nc</mam_cn3>
 
 <!-- Modal aerosol properties for RRTMGP -->
 <mam_so4  rad="rrtmgp">atm/cam/physprops/sulfate_rrtmg_c080918.nc</mam_so4>
@@ -513,6 +524,9 @@
 <mam_ncl  rad="rrtmgp">atm/cam/physprops/ssam_rrtmg_c100508.nc</mam_ncl>
 <mam_dst  rad="rrtmgp">atm/cam/physprops/dust_aeronet_rrtmg_c141106.nc</mam_dst>
 <mam_nh4  rad="rrtmgp">atm/cam/physprops/sulfate_rrtmg_c080918.nc</mam_nh4>
+<mam_co3  rad="rrtmgp">atm/cam/physprops/dust_aeronet_rrtmg_c141106.nc</mam_co3>
+<mam_cs4  rad="rrtmgp">atm/cam/physprops/dust_aeronet_rrtmg_c141106.nc</mam_cs4>
+<mam_cn3  rad="rrtmgp">atm/cam/physprops/sulfate_rrtmg_c080918.nc</mam_cn3>
 
 <!-- Eruptive volcanic aerosols  -->
 <VOLC_MMR                        rad="camrt">atm/cam/physprops/volc_camRT_byradius_sigma1.6_c130724.nc</VOLC_MMR>
@@ -836,6 +850,7 @@
 <effgw_beres_dp waccm_phys="1" hgrid="ne30np4"                >0.5D0</effgw_beres_dp>
 <effgw_beres_dp chem="geoschem_mam4" hgrid="0.9x1.25"         >0.5D0</effgw_beres_dp>
 <effgw_beres_dp chem="trop_strat_mam5_t1s1" hgrid="0.9x1.25"   >0.5D0</effgw_beres_dp>
+<effgw_beres_dp chem="trop_strat_mam5_t1s1_dustchem" hgrid="0.9x1.25"   >0.5D0</effgw_beres_dp>
 <effgw_beres_dp chem="trop_strat_mam5_vbsext" hgrid="0.9x1.25">0.5D0</effgw_beres_dp>
 <effgw_beres_dp chem="trop_strat_mam5_slh" hgrid="0.9x1.25"   >0.5D0</effgw_beres_dp>
 <effgw_beres_dp carma="trop_strat_soa1" hgrid="0.9x1.25"      >0.5D0</effgw_beres_dp>
@@ -862,8 +877,10 @@
 <gw_prndl                 waccm_phys="1">0.5d0  </gw_prndl>
 <gw_prndl     chem="geoschem_mam4">0.5d0  </gw_prndl>
 <gw_prndl     chem="trop_strat_mam4_vbs">0.5d0  </gw_prndl>
+<gw_prndl     chem="trop_strat_mam4_vbs_dustchem">0.5d0  </gw_prndl>
 <gw_prndl     chem="trop_strat_mam4_vbsext">0.5d0  </gw_prndl>
 <gw_prndl     chem="trop_strat_mam5_t1s1">0.5d0  </gw_prndl>
+<gw_prndl     chem="trop_strat_mam5_t1s1_dustchem">0.5d0  </gw_prndl>
 <gw_prndl     chem="trop_strat_mam5_vbsext">0.5d0  </gw_prndl>
 <gw_prndl     chem="trop_strat_mam4_slh">0.5d0  </gw_prndl>
 <gw_prndl     chem="trop_strat_mam5_slh">0.5d0  </gw_prndl>
@@ -873,10 +890,12 @@
 <gw_oro_south_fac         model_top="ht">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac chem="geoschem_mam4">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac chem="trop_strat_mam4_vbs">2.d0   </gw_oro_south_fac>
+<gw_oro_south_fac chem="trop_strat_mam4_vbs_dustchem">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac chem="trop_strat_mam4_vbsext">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac chem="trop_strat_mam4_slh">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac chem="trop_strat_mam5_slh">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac chem="trop_strat_mam5_t1s1">2.d0   </gw_oro_south_fac>
+<gw_oro_south_fac chem="trop_strat_mam5_t1s1_dustchem">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac chem="trop_strat_mam5_vbsext">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac carma="trop_strat_soa1">2.D0</gw_oro_south_fac>
 <gw_oro_south_fac carma="trop_strat_soa5">2.D0</gw_oro_south_fac>
@@ -886,10 +905,12 @@
 <gw_lndscl_sgh            model_top="ht">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh chem="geoschem_mam4">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh chem="trop_strat_mam4_vbs">.false.</gw_lndscl_sgh>
+<gw_lndscl_sgh chem="trop_strat_mam4_vbs_dustchem">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh chem="trop_strat_mam4_vbsext">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh chem="trop_strat_mam4_slh">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh chem="trop_strat_mam5_slh">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh chem="trop_strat_mam5_t1s1">.false.</gw_lndscl_sgh>
+<gw_lndscl_sgh chem="trop_strat_mam5_t1s1_dustchem">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh chem="trop_strat_mam5_vbsext">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh carma="trop_strat_soa1">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh carma="trop_strat_soa5">.false.</gw_lndscl_sgh>
@@ -898,10 +919,12 @@
 <gw_apply_tndmax phys="cam7"              >.false.</gw_apply_tndmax>
 <gw_apply_tndmax            waccm_phys="1">.false.</gw_apply_tndmax>
 <gw_apply_tndmax chem="trop_strat_mam4_vbs">.false.</gw_apply_tndmax>
+<gw_apply_tndmax chem="trop_strat_mam4_vbs_dustchem">.false.</gw_apply_tndmax>
 <gw_apply_tndmax chem="trop_strat_mam4_vbsext">.false.</gw_apply_tndmax>
 <gw_apply_tndmax chem="trop_strat_mam4_slh">.false.</gw_apply_tndmax>
 <gw_apply_tndmax chem="trop_strat_mam5_slh">.false.</gw_apply_tndmax>
 <gw_apply_tndmax chem="trop_strat_mam5_t1s1">.false.</gw_apply_tndmax>
+<gw_apply_tndmax chem="trop_strat_mam5_t1s1_dustchem">.false.</gw_apply_tndmax>
 <gw_apply_tndmax chem="trop_strat_mam5_vbsext">.false.</gw_apply_tndmax>
 <gw_apply_tndmax carma="trop_strat_soa1">.false.</gw_apply_tndmax>
 <gw_apply_tndmax carma="trop_strat_soa5">.false.</gw_apply_tndmax>
@@ -2115,6 +2138,10 @@
 <soil_erod_file phys="cam5"  >atm/cam/dst/dst_source2x2_cam5.4_c150327.nc</soil_erod_file>
 <soil_erod_file phys="cam4"  >atm/cam/dst/dst_source2x2tuned-cam4-06132012.nc</soil_erod_file>
 <soil_erod_file phys="cam4" hgrid="0.9x1.25">atm/cam/dst/dst_source1x1tuned-cam4-06202012.nc</soil_erod_file>
+
+<!-- Calcite mass fraction of emitted dust (EMIT mineralogy), for dust heterogeneous chemistry -->
+<dust_calcite_file chem="trop_strat_mam4_vbs_dustchem">atm/cam/dst/EMIT_caco3_frac-09x125_c260824.nc</dust_calcite_file>
+<dust_calcite_file chem="trop_strat_mam5_t1s1_dustchem">atm/cam/dst/EMIT_caco3_frac-09x125_c260824.nc</dust_calcite_file>
 
 <!-- nitrogen deposition to surface models -->
 <stream_ndep_mesh_filename>share/meshes/fv0.9x1.25_141008_polemod_ESMFmesh.nc</stream_ndep_mesh_filename>

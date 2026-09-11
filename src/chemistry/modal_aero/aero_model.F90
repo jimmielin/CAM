@@ -29,6 +29,7 @@ module aero_model
 
   use modal_aero_wateruptake, only: modal_strat_sulfate
   use mo_setsox,              only: setsox, has_sox
+  use dust_hetchem,           only: has_dust_hetchem
   use aerosol_properties_mod, only: aerosol_properties
   use aerosol_state_mod, only: aerosol_state
   use aerosol_instances_mod, only: aerosol_instances_get_props, &
@@ -97,6 +98,12 @@ module aero_model
   character(len=32) :: sad_chem_spec_types(max_sad_spec) = ' '
   character(len=32) :: sad_seasalt_spec_types(max_sad_spec) = ' '
   character(len=32) :: sad_strat_spec_types(max_sad_spec) = ' '
+  character(len=32) :: sad_dust_spec_types(max_sad_spec) = ' '
+
+  ! for dust heterogeneous chemistry (dust_hetchem)
+  character(len=32), allocatable :: sad_all_spec_types(:)  ! every species type of the aerosol model
+  integer, allocatable :: dh_spc_ndx(:)                    ! chemistry indices of the species it changes
+  character(len=fieldname_len), allocatable :: sad_dust_name(:), diam_dust_name(:)
 
   ! sfc/dm_aer slots mo_usrrxt must reserve beyond the aerosol bins; all modal
   ! surfaces come from the aerosol representation, so no extra slots are needed
@@ -144,7 +151,7 @@ contains
     character(len=16) :: aer_drydep_list(pcnst) = ' '
 
     namelist /aerosol_nl/ aer_drydep_list, modal_strat_sulfate, modal_accum_coarse_exch, seasalt_emis_scale, &
-       sad_chem_spec_types, sad_seasalt_spec_types, sad_strat_spec_types
+       sad_chem_spec_types, sad_seasalt_spec_types, sad_strat_spec_types, sad_dust_spec_types
 
     !-----------------------------------------------------------------------------
 
@@ -172,6 +179,7 @@ contains
     call mpibcast(sad_chem_spec_types,    len(sad_chem_spec_types(1))*max_sad_spec,    mpichar, 0, mpicom)
     call mpibcast(sad_seasalt_spec_types, len(sad_seasalt_spec_types(1))*max_sad_spec, mpichar, 0, mpicom)
     call mpibcast(sad_strat_spec_types,  len(sad_strat_spec_types(1))*max_sad_spec,   mpichar, 0, mpicom)
+    call mpibcast(sad_dust_spec_types,   len(sad_dust_spec_types(1))*max_sad_spec,    mpichar, 0, mpicom)
 #endif
 
     drydep_list = aer_drydep_list
@@ -201,6 +209,7 @@ contains
     use modal_aero_data, only: modal_aero_data_init
     use radiative_aerosol,only: rad_aer_get_info
     use dust_model,      only: dust_init, dust_names, dust_active, dust_nbin, dust_nnum
+    use dust_model,      only: dust_calcite_names, dust_calcite_indices
     use seasalt_model,   only: seasalt_init, seasalt_names, seasalt_active,seasalt_nbin
     use aer_drydep_mod,  only: inidrydep
     use aero_wetdep_cam, only: aero_wetdep_init
@@ -248,6 +257,9 @@ contains
 
     ! aqueous chem initialization
     call sox_inti(aero_props)
+
+    ! dust heterogeneous chemistry initialization
+    call dust_hetchem_cam_init()
 
     do m = 1,aero_props%nbins()
        do l = 0,aero_props%nspecies(m)
@@ -348,6 +360,17 @@ contains
           if (history_aerosol.or.history_chemistry) then
              call add_default (dummy, 1, ' ')
           endif
+       enddo
+
+       ! calcite emitted as part of the dust (dust heterogeneous chemistry)
+       do m = 1, dust_nbin
+          if (dust_calcite_indices(m) > 0) then
+             dummy = trim(dust_calcite_names(m)) // 'SF'
+             call addfld (dummy,horiz_only, 'A','kg/m2/s',trim(dust_calcite_names(m))//' calcite dust surface emission')
+             if (history_aerosol.or.history_chemistry) then
+                call add_default (dummy, 1, ' ')
+             endif
+          end if
        enddo
 
        dummy = 'DSTSFMBL'
@@ -560,6 +583,12 @@ contains
              write(iulog,*) '  ', trim(sad_strat_spec_types(l))
           end if
        end do
+       write(iulog,*) 'SAD dust spec_types:'
+       do l = 1, max_sad_spec
+          if (len_trim(sad_dust_spec_types(l)) > 0) then
+             write(iulog,*) '  ', trim(sad_dust_spec_types(l))
+          end if
+       end do
     end if
 
     if (has_sox) then
@@ -589,6 +618,35 @@ contains
           call add_default ('XPH_LWC', 1, ' ')
           call add_default ('AQSO4_H2O2', 1, ' ')
           call add_default ('AQSO4_O3', 1, ' ')
+       endif
+    endif
+
+    if (has_dust_hetchem) then
+       call addfld( 'SAD_DUST', (/ 'lev' /), 'A', 'cm2/cm3', 'dust surface area density for heterogeneous chemistry' )
+       call addfld( 'GAMMA_SO2_DUST',  (/ 'lev' /), 'A', '1', 'SO2 uptake coefficient on dust' )
+       call addfld( 'GAMMA_HNO3_DUST', (/ 'lev' /), 'A', '1', 'HNO3 uptake coefficient on dust' )
+       do m = 1, aero_props%nbins()
+          call addfld( sad_dust_name(m),  (/ 'lev' /), 'A', 'cm2/cm3', &
+                       'dust surface area density for heterogeneous chemistry, mode '//trim(aero_props%bin_name(m)) )
+          call addfld( diam_dust_name(m), (/ 'lev' /), 'A', 'cm', &
+                       'dust effective diameter for heterogeneous chemistry, mode '//trim(aero_props%bin_name(m)) )
+       end do
+       do n = 1, size(dh_spc_ndx)
+          call addfld( 'DH_'//trim(solsym(dh_spc_ndx(n))), horiz_only, 'A', 'kg/m2/s', &
+                       trim(solsym(dh_spc_ndx(n)))//' dust heterogeneous chemistry' )
+       end do
+
+       if ( history_aerosol ) then
+          call add_default( 'SAD_DUST', 1, ' ' )
+          call add_default( 'GAMMA_SO2_DUST', 1, ' ' )
+          call add_default( 'GAMMA_HNO3_DUST', 1, ' ' )
+          do m = 1, aero_props%nbins()
+             call add_default( sad_dust_name(m), 1, ' ' )
+             call add_default( diam_dust_name(m), 1, ' ' )
+          end do
+          do n = 1, size(dh_spc_ndx)
+             call add_default( 'DH_'//trim(solsym(dh_spc_ndx(n))), 1, ' ' )
+          end do
        endif
     endif
 
@@ -929,7 +987,7 @@ contains
   !-------------------------------------------------------------------------
   subroutine aero_model_surfarea( &
                   state, relhum, pmid, temp, ltrop, &
-                  sfc, dm_aer, sad_trop, reff_trop, sad_ssa )
+                  sfc, dm_aer, sad_trop, reff_trop, sad_ssa, sfc_dust )
 
     use mo_constants, only : pi
 
@@ -945,12 +1003,15 @@ contains
     real(r8), intent(inout) :: sad_trop(:,:)
     real(r8), intent(out)   :: reff_trop(:,:)
     real(r8), intent(out)   :: sad_ssa(:,:)
+    real(r8), optional, intent(out) :: sfc_dust(:,:,:) ! per-bin SAD of the sad_dust_spec_types species (cm2/cm3)
 
     ! local vars
     integer :: beglev(pcols)
     integer :: endlev(pcols)
     integer :: lchnk, ncol
     real(r8) :: reff_ssa(pcols,pver)
+    real(r8) :: sad_dust(pcols,pver)
+    real(r8) :: reff_dust(pcols,pver)
 
     class(aerosol_state), pointer :: aero_state
 
@@ -971,6 +1032,16 @@ contains
 
     call aero_state%surf_area_dens(aero_props, sad_chem_spec_types, ncol, pver, beglev, endlev, &
          relhum, pmid, temp, pi, sad_trop, reff_trop, sfc, dm_aer )
+
+    ! surface area of the dust-type species only, for heterogeneous reactions on mineral dust;
+    ! kept separate from sad_chem_spec_types so the standard aerosol heterogeneous rates are unchanged
+    if (present(sfc_dust)) then
+       sfc_dust = 0._r8
+       if (len_trim(sad_dust_spec_types(1))>0) then
+          call aero_state%surf_area_dens(aero_props, sad_dust_spec_types, ncol, pver, beglev, endlev, &
+               relhum, pmid, temp, pi, sad_dust, reff_dust, sfc_dust )
+       end if
+    end if
 
   end subroutine aero_model_surfarea
 
@@ -1085,6 +1156,9 @@ contains
     real(r8) ::  nh3_beg(ncol,pver)
     real(r8), pointer :: fldcw(:,:)
     real(r8), pointer :: sulfeq(:,:,:)
+
+    logical  :: use_uptk_scale                     ! scale the H2SO4 uptake rates in gasaerexch
+    real(r8) :: uptk_scale(pcols,pver,ntot_amode)  ! per-mode H2SO4 uptake-rate scale factor
 
     real(r8) :: qqcw(ncol,pver,ncnst_tot)
 
@@ -1219,6 +1293,18 @@ contains
        nullify( sulfeq )
     endif
 
+    use_uptk_scale = .false.
+    uptk_scale(:,:,:) = 1._r8
+
+    ! dust heterogeneous chemistry: uptake of SO2, HNO3 and H2SO4 on calcite-bearing dust,
+    ! and the per-mode scale that removes the dust surface from the H2SO4 condensation
+    ! below. Inside the del_h2so4_aeruptk bracket so that the H2SO4 taken up on dust
+    ! counts as aerosol uptake for nucleation.
+    if (has_dust_hetchem) then
+       call dust_hetchem_cam_run( aero_state, ncol, lchnk, troplev, delt, tfld, pmid, pdel, mbar, relhum, &
+                                  vmr, use_uptk_scale, uptk_scale )
+    end if
+
     call modal_aero_gasaerexch_sub(            &
          lchnk,    ncol,     nstep,            &
          loffset,            delt,             &
@@ -1227,7 +1313,7 @@ contains
          vmr,                vmrcw,            &
          dvmrdt,             dvmrcwdt,         &
          dgnum,              dgnumwet,         &
-         sulfeq     )
+         sulfeq,   use_uptk_scale, uptk_scale )
 
     if (ndx_h2so4 > 0) then
        del_h2so4_aeruptk(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4) - del_h2so4_aeruptk(1:ncol,:)
@@ -1282,10 +1368,221 @@ contains
   end subroutine aero_model_gasaerexch
 
   !=============================================================================
+  ! dust heterogeneous chemistry: resolves the chemistry indices of the calcite,
+  ! CaSO4, Ca(NO3)2 and sulfate tracers of each bin by species type, and the list
+  ! of every species type of the aerosol model
+  !=============================================================================
+  subroutine dust_hetchem_cam_init()
+    use mo_chem_utls,       only: get_spc_ndx
+    use dust_hetchem,       only: dust_hetchem_init
+    use aerosol_spec_utils, only: spec_type_in_list
+
+    integer :: nbins, m, l, n_all, n_dh
+    integer, allocatable :: id_cal(:), id_cs4(:), id_cn3(:), id_so4(:)
+    integer, allocatable :: ndx_tmp(:)
+    integer :: id_so2, id_hno3, id_h2so4
+    character(len=32) :: spectype
+    character(len=32) :: name_a, name_c
+    character(len=512) :: errmsg
+    integer :: errflg
+
+    nbins = aero_props%nbins()
+
+    allocate( id_cal(nbins), id_cs4(nbins), id_cn3(nbins), id_so4(nbins) )
+    id_cal(:) = -1
+    id_cs4(:) = -1
+    id_cn3(:) = -1
+    id_so4(:) = -1
+
+    n_all = 0
+    do m = 1, nbins
+       n_all = n_all + aero_props%nspecies(m)
+    end do
+    allocate( sad_all_spec_types(n_all) )
+    sad_all_spec_types(:) = ' '
+    n_all = 0
+
+    do m = 1, nbins
+       do l = 1, aero_props%nspecies(m)
+          call aero_props%get(m, l, spectype=spectype)
+          call aero_props%mmr_names(m, l, name_a, name_c)
+          select case (trim(spectype))
+          case ('calcite')
+             id_cal(m) = get_spc_ndx( name_a )
+          case ('ca-sulfate')
+             id_cs4(m) = get_spc_ndx( name_a )
+          case ('ca-nitrate')
+             id_cn3(m) = get_spc_ndx( name_a )
+          case ('sulfate')
+             id_so4(m) = get_spc_ndx( name_a )
+          end select
+          if (.not. spec_type_in_list(spectype, sad_all_spec_types)) then
+             n_all = n_all + 1
+             sad_all_spec_types(n_all) = spectype
+          end if
+       end do
+    end do
+
+    id_so2   = get_spc_ndx( 'SO2' )
+    id_hno3  = get_spc_ndx( 'HNO3' )
+    id_h2so4 = get_spc_ndx( 'H2SO4' )
+
+    call dust_hetchem_init( nbins, id_cal, id_cs4, id_cn3, id_so4, id_so2, id_hno3, id_h2so4, errmsg, errflg )
+    if (errflg /= 0) then
+       call endrun('dust_hetchem_cam_init: '//trim(errmsg))
+    end if
+
+    if (masterproc) then
+       write(iulog,*) 'dust_hetchem_cam_init: has_dust_hetchem = ', has_dust_hetchem
+    end if
+
+    if (has_dust_hetchem) then
+       ! a blank dust SAD type list would leave the chemistry silently inert
+       if (len_trim(sad_dust_spec_types(1)) == 0) then
+          call endrun('dust_hetchem_cam_init: sad_dust_spec_types must be set for dust heterogeneous chemistry')
+       end if
+
+       ! the species dust_hetchem changes, for the DH_ column tendency diagnostics
+       allocate( ndx_tmp(3+4*nbins) )
+       ndx_tmp(1) = id_so2
+       ndx_tmp(2) = id_hno3
+       ndx_tmp(3) = id_h2so4
+       n_dh = 3
+       do m = 1, nbins
+          if (id_cal(m) > 0 .and. id_cs4(m) > 0 .and. id_cn3(m) > 0) then
+             ndx_tmp(n_dh+1) = id_cal(m)
+             ndx_tmp(n_dh+2) = id_cs4(m)
+             ndx_tmp(n_dh+3) = id_cn3(m)
+             n_dh = n_dh + 3
+             if (id_so4(m) > 0) then
+                n_dh = n_dh + 1
+                ndx_tmp(n_dh) = id_so4(m)
+             end if
+          end if
+       end do
+       allocate( dh_spc_ndx(n_dh) )
+       dh_spc_ndx(:) = ndx_tmp(1:n_dh)
+       deallocate( ndx_tmp )
+
+       allocate( sad_dust_name(nbins), diam_dust_name(nbins) )
+       do m = 1, nbins
+          write(sad_dust_name(m),  fmt='(a,i1)') 'SAD_DUST_a', m
+          write(diam_dust_name(m), fmt='(a,i1)') 'DIAM_DUST_a', m
+       end do
+    end if
+
+    deallocate( id_cal, id_cs4, id_cn3, id_so4 )
+
+  end subroutine dust_hetchem_cam_init
+
+  !=============================================================================
+  ! dust heterogeneous chemistry on the chemistry vmr array, and the per-mode H2SO4
+  ! uptake-rate scale that removes the dust surface from the gas-aerosol
+  ! condensation that follows
+  !=============================================================================
+  subroutine dust_hetchem_cam_run( aero_state, ncol, lchnk, troplev, delt, tfld, pmid, pdel, mbar, relhum, &
+                                   vmr, use_uptk_scale, uptk_scale )
+    use mo_constants, only: pi
+    use dust_hetchem, only: dust_hetchem_run
+
+    class(aerosol_state), intent(in) :: aero_state
+    integer,  intent(in) :: ncol
+    integer,  intent(in) :: lchnk
+    integer,  intent(in) :: troplev(:)
+    real(r8), intent(in) :: delt                  ! time step (s)
+    real(r8), intent(in) :: tfld(:,:)             ! temperature (K)
+    real(r8), intent(in) :: pmid(:,:)             ! pressure (Pa)
+    real(r8), intent(in) :: pdel(:,:)             ! pressure thickness (Pa)
+    real(r8), intent(in) :: mbar(:,:)             ! mean wet atmospheric mass (amu)
+    real(r8), intent(in) :: relhum(:,:)           ! relative humidity (fraction)
+    real(r8), intent(inout) :: vmr(:,:,:)         ! chemistry species (vmr)
+    logical,  intent(out)   :: use_uptk_scale
+    real(r8), intent(inout) :: uptk_scale(:,:,:)  ! per-mode H2SO4 uptake-rate scale (pcols,pver,ntot_amode), set over :ncol
+
+    integer  :: nbins, i, k, m, n
+    integer  :: beglev(ncol), endlev(ncol)
+    real(r8) :: sad_dust(ncol,pver), reff_dust(ncol,pver)
+    real(r8) :: sad_all(ncol,pver), reff_all(ncol,pver)
+    real(r8), allocatable :: sfc_dust(:,:,:)      ! dust surface area density per bin (cm2/cm3)
+    real(r8), allocatable :: sfc_all(:,:,:)       ! surface area density of all species per bin (cm2/cm3)
+    real(r8), allocatable :: dm_aer(:,:,:)        ! wet diameter per bin (cm)
+    real(r8), allocatable :: deff(:,:,:)          ! effective diameter per bin (cm)
+    real(r8) :: gamma_so2(ncol,pver), gamma_hno3(ncol,pver)
+    real(r8) :: vmr_beg(ncol,pver,size(dh_spc_ndx)) ! the species changed, before the call
+    real(r8) :: wrk(ncol)
+    character(len=512) :: errmsg
+    integer :: errflg
+
+    nbins = aero_props%nbins()
+    allocate( sfc_dust(ncol,pver,nbins), sfc_all(ncol,pver,nbins), dm_aer(ncol,pver,nbins), deff(ncol,pver,nbins) )
+
+    beglev(:) = troplev(:ncol)+1
+    endlev(:) = pver
+
+    ! per-bin surface area density of the dust-type species and of all species, troposphere only
+    call aero_state%surf_area_dens(aero_props, sad_dust_spec_types, ncol, pver, beglev, endlev, &
+         relhum, pmid, tfld, pi, sad_dust, reff_dust, sfc_dust, dm_aer )
+    call aero_state%surf_area_dens(aero_props, sad_all_spec_types, ncol, pver, beglev, endlev, &
+         relhum, pmid, tfld, pi, sad_all, reff_all, sfc_all )
+
+    ! effective diameter 2*(3*vol/sad) of a lognormal mode, a property of the mode rather
+    ! than of its dust fraction
+    do m = 1, nbins
+       deff(:,:,m) = dm_aer(:,:,m) * exp(2.5_r8*aero_props%alogsig(m)**2)
+    end do
+
+    ! remove the dust surface from the H2SO4 condensation in modal_aero_gasaerexch_sub, dust
+    ! takes up H2SO4 below instead. The scale stays 1 where a mode has no surface, which
+    ! includes the stratosphere.
+    use_uptk_scale = .true.
+    do m = 1, nbins
+       do k = 1, pver
+          do i = 1, ncol
+             if (sfc_all(i,k,m) > 0._r8) then
+                uptk_scale(i,k,m) = 1._r8 - sfc_dust(i,k,m)/sfc_all(i,k,m)
+             end if
+          end do
+       end do
+    end do
+
+    do n = 1, size(dh_spc_ndx)
+       vmr_beg(:,:,n) = vmr(:ncol,:,dh_spc_ndx(n))
+    end do
+
+    call dust_hetchem_run( ncol, pver, delt, beglev, endlev, tfld(:ncol,:), relhum(:ncol,:), &
+                           sfc_dust, deff, vmr(:ncol,:,:), gamma_so2, gamma_hno3, errmsg, errflg )
+    if (errflg /= 0) then
+       call endrun('dust_hetchem_cam_run: '//trim(errmsg))
+    end if
+
+    call outfld( 'SAD_DUST',        sad_dust,   ncol, lchnk )
+    call outfld( 'GAMMA_SO2_DUST',  gamma_so2,  ncol, lchnk )
+    call outfld( 'GAMMA_HNO3_DUST', gamma_hno3, ncol, lchnk )
+    do m = 1, nbins
+       call outfld( sad_dust_name(m),  sfc_dust(:,:,m), ncol, lchnk )
+       call outfld( diam_dust_name(m), deff(:,:,m),     ncol, lchnk )
+    end do
+
+    ! column tendencies of the species changed (kg/m2/s), as the AQ_ diagnostics
+    do n = 1, size(dh_spc_ndx)
+       m = dh_spc_ndx(n)
+       wrk(:) = 0._r8
+       do k = 1, pver
+          wrk(:) = wrk(:) + (vmr(:ncol,k,m) - vmr_beg(:,k,n))/delt * adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit
+       end do
+       call outfld( 'DH_'//trim(solsym(m)), wrk, ncol, lchnk )
+    end do
+
+    deallocate( sfc_dust, sfc_all, dm_aer, deff )
+
+  end subroutine dust_hetchem_cam_run
+
+  !=============================================================================
   !=============================================================================
   subroutine aero_model_emissions( state, cam_in )
     use seasalt_model, only: seasalt_emis, seasalt_names, seasalt_indices, seasalt_active,seasalt_nbin
     use dust_model,    only: dust_emis, dust_names, dust_indices, dust_active,dust_nbin, dust_nnum
+    use dust_model,    only: dust_calcite_names, dust_calcite_indices
     use physics_types, only: physics_state
 
     ! Arguments:
@@ -1315,6 +1612,14 @@ contains
           mm = dust_indices(m)
           if (m<=dust_nbin) sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,mm)
           call outfld(trim(dust_names(m))//'SF',cam_in%cflx(:,mm),pcols, lchnk)
+       enddo
+       ! calcite emitted as part of the dust is included in the mobilization flux
+       do m=1,dust_nbin
+          mm = dust_calcite_indices(m)
+          if (mm > 0) then
+             sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,mm)
+             call outfld(trim(dust_calcite_names(m))//'SF',cam_in%cflx(:,mm),pcols, lchnk)
+          end if
        enddo
        call outfld('DSTSFMBL',sflx(:),pcols,lchnk)
        call outfld('LND_MBL',soil_erod_tmp(:),pcols, lchnk )

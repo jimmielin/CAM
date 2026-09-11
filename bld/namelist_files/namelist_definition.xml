@@ -6821,6 +6821,16 @@ bit-for-bit consistency with prior hardcoded behavior.
 Default: 'sulfate','s-organic','p-organic','black-c','ammonium'
 </entry>
 
+<entry id="sad_dust_spec_types" type="char*32(16)" category="cam_chem"
+       group="aerosol_nl" valid_values="" >
+Species types contributing to the mineral dust surface area density (SAD)
+used for heterogeneous reactions on dust. Computed separately from the
+chemistry SAD (sad_chem_spec_types) so that it does not alter the rates of
+the standard aerosol heterogeneous reactions; only reactions that explicitly
+request the dust SAD use it.
+Default: 'dust' (MAM, CARMA); UNSET (bulk)
+</entry>
+
 <entry id="aer_sol_facti" type="real(1000)" category="cam_chem"
        group="aerosol_nl" valid_values="" >
 In-cloud solubility factor used in BULK aerosol wet removal
@@ -7672,6 +7682,15 @@ Default: set by build-namelist.
        group="dust_nl" valid_values="" >
 Full pathname of boundary dataset for soil erodibility factors.
 Default: set by build-namelist.
+</entry>
+
+<entry id="dust_calcite_file" type="char*256" input_pathname="abs" category="cam_chem"
+       group="dust_nl" valid_values="" >
+Full pathname of the dataset giving the calcite (CaCO3) mass fraction of
+emitted dust on a lat-lon grid (variable caco3_mass_frac). When set, dust
+emissions into the calcite-carrying modes are speciated into calcite for
+dust heterogeneous chemistry. Modal aerosols only.
+Default: none (no calcite speciation)
 </entry>
 
 <entry id="srf_emis_specifier" type="char*256(1000)" category="cam_chem"
