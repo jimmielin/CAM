@@ -88,3 +88,18 @@ contains
     end do
   end subroutine find_group_name
 end module namelist_utils
+
+module phys_grid
+  use shr_kind_mod, only: r8 => shr_kind_r8
+  implicit none
+contains
+  ! Column coordinates for diagnostics only; the harnesses have no grid.
+  real(r8) function get_rlat_p(lcid, col)
+    integer, intent(in) :: lcid, col
+    get_rlat_p = 0._r8
+  end function get_rlat_p
+  real(r8) function get_rlon_p(lcid, col)
+    integer, intent(in) :: lcid, col
+    get_rlon_p = 0._r8
+  end function get_rlon_p
+end module phys_grid

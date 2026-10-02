@@ -31,6 +31,9 @@ module mo_micm
    use chem_mods,      only : gas_pcnst, rxntot, extcnt
 #ifdef MICM
    use iso_fortran_env, only : real64
+   use ieee_arithmetic, only : ieee_is_finite
+   use phys_grid,       only : get_rlat_p, get_rlon_p
+   use mo_tracname,     only : solsym
    use musica_micm,  only : micm_t, solver_stats_t
    use musica_micm,  only : Rosenbrock, RosenbrockStandardOrder, &
                             BackwardEuler, BackwardEulerStandardOrder
@@ -92,6 +95,15 @@ module mo_micm
    integer, allocatable :: map_ext(:)  ! (extcnt)    rate parameter index of EMIS.ext_<species>
 
    real(r8) :: molec_cm3_to_mol_m3 = 0._r8 ! molecules cm-3 -> mol m-3
+
+   ! Negative concentrations are clipped to zero on input and output, as imp_sol does inside its Newton iteration.
+   ! Rosenbrock solvers do not preserve positivity, and a negative reactant turns a loss term into growth.
+   ! Clips deeper than neg_log_threshold (the generated configs' absolute tolerance) are logged,
+   ! at most neg_log_budget lines per task so routine undershoot cannot flood the log.
+   real(r8), parameter :: neg_log_threshold = 1.e-12_r8 ! mol m-3
+   integer :: neg_log_budget = 50
+
+   real(r8), parameter :: rad2deg = 180._r8 / 3.14159265358979323846_r8
 #endif
 
 !================================================================================================
@@ -167,7 +179,6 @@ contains
    !-----------------------------------------------------------------------
    subroutine micm_init( )
 #ifdef MICM
-      use mo_tracname, only : solsym
       use chem_mods,   only : extfrc_lst
       use physconst,   only : avogad ! molecules kmole-1
 
@@ -340,8 +351,12 @@ contains
       type(solver_stats_t) :: stats
       type(state_t), pointer :: thread_state
       real(r8) :: cair(ncol,pver) ! molar air density (mol m-3)
+      real(r8) :: conc            ! concentration (mol m-3)
       integer  :: ncells, nblocks, nvalid, offset, iblk, icell, cellg
       integer  :: i, k, m, ie, ibase
+      ! Clipping tallies for this chunk: [1] input, [2] output; worst = most negative concentration.
+      integer  :: nneg(2), worst_i(2), worst_k(2), worst_m(2)
+      real(r8) :: worst_conc(2), worst_vmr0(2)
       integer  :: cell_str_c, var_str_c ! concentration strides
       integer  :: cell_str_p, var_str_p ! rate parameter strides
       character(len=*), parameter :: subname = 'micm_solve'
@@ -353,6 +368,8 @@ contains
       var_str_p  = thread_state%rate_parameters_strides%variable
 
       cair(:,:) = xhnm(:,:) * molec_cm3_to_mol_m3
+      nneg(:) = 0
+      worst_conc(:) = 0._r8
 
       ! Cells are flattened column-fastest, matching the storage order of
       ! the (ncol,pver) arrays, and solved in blocks of state_size cells.
@@ -372,8 +389,12 @@ contains
             thread_state%conditions(icell)%air_density = cair(i,k)
             ibase = 1 + (icell-1)*cell_str_c
             do m = 1, gas_pcnst
-               thread_state%concentrations(ibase + (map_spc(m)-1)*var_str_c) = &
-                  vmr(i,k,m) * cair(i,k)
+               conc = vmr(i,k,m) * cair(i,k)
+               if (conc < 0._r8) then
+                  call tally_neg(1, conc, vmr(i,k,m), i, k, m)
+                  conc = 0._r8
+               end if
+               thread_state%concentrations(ibase + (map_spc(m)-1)*var_str_c) = conc
             end do
             ibase = 1 + (icell-1)*cell_str_p
             do ie = 1, n_entries
@@ -428,13 +449,70 @@ contains
             k = (cellg-1)/ncol + 1
             ibase = 1 + (icell-1)*cell_str_c
             do m = 1, gas_pcnst
-               vmr(i,k,m) = thread_state%concentrations(ibase + (map_spc(m)-1)*var_str_c) &
-                            / cair(i,k)
+               conc = thread_state%concentrations(ibase + (map_spc(m)-1)*var_str_c)
+               ! MICM flags NaN/Inf only through its error norm, so check what is handed back to CAM.
+               ! Any value above unit mixing ratio is unphysical for a solution species.
+               if (.not. ieee_is_finite(conc) .or. conc > cair(i,k)) then
+                  write(iulog,*) subname, ': unphysical MICM output ', trim(solsym(m)), ' = ', conc, &
+                     ' mol m-3 (vmr before solve ', vmr(i,k,m), ') at lat ', get_rlat_p(lchnk,i)*rad2deg, &
+                     ' lon ', get_rlon_p(lchnk,i)*rad2deg, ' k ', k, ' T ', tfld(i,k), ' p ', pmid(i,k), &
+                     ' solver state ', solver_state%get_char_array()
+                  call endrun(subname//': unphysical MICM output concentration for '//trim(solsym(m)))
+               end if
+               if (conc < 0._r8) then
+                  call tally_neg(2, conc, vmr(i,k,m), i, k, m)
+                  conc = 0._r8
+               end if
+               vmr(i,k,m) = conc / cair(i,k)
             end do
          end do
       end do
+
+      call log_neg()
 #else
       call endrun('micm_solve: use -micm configure CAM option to build the MICM library')
+#endif
+
+#ifdef MICM
+   contains
+
+      ! Records a clipped negative concentration in tally n (1 = input, 2 = output).
+      subroutine tally_neg(n, c, vmr_before, ic, kc, mc)
+         integer,  intent(in) :: n, ic, kc, mc
+         real(r8), intent(in) :: c, vmr_before
+
+         nneg(n) = nneg(n) + 1
+         if (c < worst_conc(n)) then
+            worst_conc(n) = c
+            worst_vmr0(n) = vmr_before
+            worst_i(n) = ic
+            worst_k(n) = kc
+            worst_m(n) = mc
+         end if
+      end subroutine tally_neg
+
+      ! Logs one line per tally for this chunk if its worst clip exceeds neg_log_threshold.
+      subroutine log_neg()
+         character(len=6), parameter :: label(2) = (/ 'input ', 'output' /)
+         integer :: n
+
+         do n = 1, 2
+            if (worst_conc(n) >= -neg_log_threshold) cycle
+            !$omp critical (micm_neg_log)
+            if (neg_log_budget > 0) then
+               neg_log_budget = neg_log_budget - 1
+               write(iulog,*) subname, ': clipped ', nneg(n), ' negative ', trim(label(n)), &
+                  ' concentrations in chunk ', lchnk, '; worst ', trim(solsym(worst_m(n))), ' = ', &
+                  worst_conc(n), ' mol m-3 (vmr before solve ', worst_vmr0(n), ') at lat ', &
+                  get_rlat_p(lchnk,worst_i(n))*rad2deg, ' lon ', get_rlon_p(lchnk,worst_i(n))*rad2deg, &
+                  ' k ', worst_k(n), ' T ', tfld(worst_i(n),worst_k(n)), ' p ', pmid(worst_i(n),worst_k(n))
+               if (neg_log_budget == 0) then
+                  write(iulog,*) subname, ': further negative-clipping messages suppressed on this task'
+               end if
+            end if
+            !$omp end critical (micm_neg_log)
+         end do
+      end subroutine log_neg
 #endif
    end subroutine micm_solve
 
