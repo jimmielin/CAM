@@ -24,7 +24,7 @@ module mo_micm
    use shr_kind_mod,   only : r8 => shr_kind_r8, cl => shr_kind_cl
    use spmd_utils,     only : is_main_task => masterproc
    use spmd_utils,     only : main_task_id => masterprocid
-   use spmd_utils,     only : mpicom, mpi_character, mpi_logical, mpi_success
+   use spmd_utils,     only : mpicom, mpi_character, mpi_logical, mpi_real8, mpi_success
    use cam_abortutils, only : endrun
    use cam_logfile,    only : iulog
    use ppgrid,         only : pver, pcols
@@ -35,6 +35,7 @@ module mo_micm
    use phys_grid,       only : get_rlat_p, get_rlon_p
    use mo_tracname,     only : solsym
    use musica_micm,  only : micm_t, solver_stats_t
+   use musica_micm,  only : rosenbrock_solver_parameters_t, backward_euler_solver_parameters_t
    use musica_micm,  only : Rosenbrock, RosenbrockStandardOrder, &
                             BackwardEuler, BackwardEulerStandardOrder
    use musica_state, only : state_t
@@ -56,6 +57,10 @@ module mo_micm
    character(len=cl) :: micm_rxt_map_path = 'NONE' ! absolute path to reaction map companion file
    character(len=32) :: micm_solver_type = 'rosenbrock'
    logical :: micm_abort_on_nonconvergence = .true.
+   ! Defaults match imp_sol's relative convergence criterion (rel_err)
+   ! and an absolute floor of ~0.006 molecules cm-3, the order of GEOS-Chem's KPP ATOL.
+   real(r8) :: micm_rel_tol = 1.e-3_r8  ! solver relative tolerance
+   real(r8) :: micm_abs_tol = 1.e-20_r8 ! solver absolute tolerance for every species (mol m-3)
 
 #ifdef MICM
    type(micm_t), pointer :: micm => null()
@@ -98,7 +103,7 @@ module mo_micm
 
    ! Negative concentrations are clipped to zero on input and output, as imp_sol does inside its Newton iteration.
    ! Rosenbrock solvers do not preserve positivity, and a negative reactant turns a loss term into growth.
-   ! Clips deeper than neg_log_threshold (the generated configs' absolute tolerance) are logged,
+   ! Clips deeper than neg_log_threshold (~6e5 molecules cm-3, far beyond solver noise) are logged,
    ! at most neg_log_budget lines per task so routine undershoot cannot flood the log.
    real(r8), parameter :: neg_log_threshold = 1.e-12_r8 ! mol m-3
    integer :: neg_log_budget = 50
@@ -123,7 +128,8 @@ contains
       character(len=*), parameter :: subname = 'micm_readnl'
 
       namelist /micm_opts/ micm_active, micm_config_path, micm_rxt_map_path, &
-                           micm_solver_type, micm_abort_on_nonconvergence
+                           micm_solver_type, micm_abort_on_nonconvergence, &
+                           micm_rel_tol, micm_abs_tol
 
       if (is_main_task) then
          open( newunit=unitn, file=trim(nlfile), status='old' )
@@ -147,8 +153,15 @@ contains
       if (ierr /= mpi_success) call endrun(subname//': mpi_bcast error : micm_solver_type')
       call mpi_bcast(micm_abort_on_nonconvergence, 1,          mpi_logical,   main_task_id, mpicom, ierr)
       if (ierr /= mpi_success) call endrun(subname//': mpi_bcast error : micm_abort_on_nonconvergence')
+      call mpi_bcast(micm_rel_tol, 1,                          mpi_real8,     main_task_id, mpicom, ierr)
+      if (ierr /= mpi_success) call endrun(subname//': mpi_bcast error : micm_rel_tol')
+      call mpi_bcast(micm_abs_tol, 1,                          mpi_real8,     main_task_id, mpicom, ierr)
+      if (ierr /= mpi_success) call endrun(subname//': mpi_bcast error : micm_abs_tol')
 
 #ifdef MICM
+      if (micm_active .and. (micm_rel_tol <= 0._r8 .or. micm_abs_tol <= 0._r8)) then
+         call endrun(subname // ' : micm_rel_tol and micm_abs_tol must be positive')
+      end if
       if (micm_active .and. micm_config_path == 'NONE') then
          call endrun(subname // ' : must set micm_config_path when MICM is active')
       end if
@@ -162,6 +175,8 @@ contains
          write(iulog,*) 'micm_readnl: micm_rxt_map_path = ', trim(micm_rxt_map_path)
          write(iulog,*) 'micm_readnl: micm_solver_type = ', trim(micm_solver_type)
          write(iulog,*) 'micm_readnl: micm_abort_on_nonconvergence = ', micm_abort_on_nonconvergence
+         write(iulog,*) 'micm_readnl: micm_rel_tol = ', micm_rel_tol
+         write(iulog,*) 'micm_readnl: micm_abs_tol = ', micm_abs_tol, ' mol m-3'
       end if
 #else
       if (micm_active .or. micm_config_path /= 'NONE') then
@@ -184,6 +199,8 @@ contains
 
       type(state_t), pointer :: state
       type(error_t)          :: error
+      type(rosenbrock_solver_parameters_t)     :: ros_params
+      type(backward_euler_solver_parameters_t) :: be_params
       integer                :: solver_id, max_cells, m, ie, unitn, ierr
       integer                :: nrxt_file, nspc_file, next_file, nparam_expected
       logical                :: covered(rxntot)
@@ -304,6 +321,24 @@ contains
       end if
 
       deallocate(state)
+
+      ! MUSICA drops the per-species "absolute tolerance" of v0 configurations when building the MICM system,
+      ! which silently leaves MICM's default of 1e-3 mol m-3 (~24 ppm at the surface) on every species.
+      ! Set the tolerances through the solver parameters instead; they apply only to states created afterwards.
+      ! A uniform value makes the MICM species ordering of the array irrelevant.
+      select case (solver_id)
+      case (Rosenbrock, RosenbrockStandardOrder)
+         ros_params%relative_tolerance = micm_rel_tol
+         allocate(ros_params%absolute_tolerances(gas_pcnst))
+         ros_params%absolute_tolerances(:) = micm_abs_tol
+         call micm%set_rosenbrock_solver_parameters(ros_params, error)
+      case default
+         be_params%relative_tolerance = micm_rel_tol
+         allocate(be_params%absolute_tolerances(gas_pcnst))
+         be_params%absolute_tolerances(:) = micm_abs_tol
+         call micm%set_backward_euler_solver_parameters(be_params, error)
+      end select
+      call check_micm_error(error, subname//': setting MICM solver tolerances')
 
       allocate(states(max_threads()))
       do m = 1, size(states)
@@ -451,13 +486,14 @@ contains
             do m = 1, gas_pcnst
                conc = thread_state%concentrations(ibase + (map_spc(m)-1)*var_str_c)
                ! MICM flags NaN/Inf only through its error norm, so check what is handed back to CAM.
-               ! Any value above unit mixing ratio is unphysical for a solution species.
-               if (.not. ieee_is_finite(conc) .or. conc > cair(i,k)) then
-                  write(iulog,*) subname, ': unphysical MICM output ', trim(solsym(m)), ' = ', conc, &
+               ! There is no upper bound: aerosol number species (num_a*) carry particles per mole of air,
+               ! so their "mixing ratios" legitimately far exceed 1.
+               if (.not. ieee_is_finite(conc)) then
+                  write(iulog,*) subname, ': non-finite MICM output ', trim(solsym(m)), ' = ', conc, &
                      ' mol m-3 (vmr before solve ', vmr(i,k,m), ') at lat ', get_rlat_p(lchnk,i)*rad2deg, &
                      ' lon ', get_rlon_p(lchnk,i)*rad2deg, ' k ', k, ' T ', tfld(i,k), ' p ', pmid(i,k), &
                      ' solver state ', solver_state%get_char_array()
-                  call endrun(subname//': unphysical MICM output concentration for '//trim(solsym(m)))
+                  call endrun(subname//': non-finite MICM output concentration for '//trim(solsym(m)))
                end if
                if (conc < 0._r8) then
                   call tally_neg(2, conc, vmr(i,k,m), i, k, m)

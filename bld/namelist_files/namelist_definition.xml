@@ -8013,6 +8013,20 @@ issue warnings and continue with the unconverged state.
 Default: TRUE
 </entry>
 
+<entry id="micm_rel_tol" type="real" category="chemistry"
+       group="micm_opts" valid_values="" >
+Relative tolerance of the MICM solver's error control.
+Default: 1.0e-3 (the built-in implicit solver's relative convergence criterion)
+</entry>
+
+<entry id="micm_abs_tol" type="real" category="chemistry"
+       group="micm_opts" valid_values="" >
+Absolute tolerance (mol m-3) of the MICM solver's error control, applied to
+every species. Set in the solver directly because MUSICA ignores the
+per-species "absolute tolerance" of the mechanism configuration.
+Default: 1.0e-20 (~0.006 molecules cm-3)
+</entry>
+
 <!-- Namelist read by seq_drydep_mod and shared by CAM and CLM -->
 
 <entry id="drydep_list" type="char*16(1000)" category="dry_deposition"

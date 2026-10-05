@@ -15,6 +15,7 @@ module spmd_utils
   integer, parameter :: mpicom = 0
   integer, parameter :: mpi_character = 1
   integer, parameter :: mpi_logical = 2
+  integer, parameter :: mpi_real8 = 3
   integer, parameter :: mpi_success = 0
 end module spmd_utils
 
