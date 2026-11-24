@@ -352,11 +352,129 @@ def _tuvx_install_dir(libroot):
     return corepaths[0]
 
 ###############################################################################
+def _musica_dep_lib(musica_libdir, base, debug):
+###############################################################################
+# Returns the path to a MUSICA dependency library, accounting for the
+# d-suffixed archive names (e.g. libyaml-cppd.a) some dependencies use for
+# Debug builds
+
+    names = [f"lib{base}d.a", f"lib{base}.a"] if debug else \
+            [f"lib{base}.a", f"lib{base}d.a"]
+    for name in names:
+        corelib = os.path.join(musica_libdir, name)
+        if os.path.exists(corelib):
+            return corelib
+    expect(False, f"{base} library not found in {musica_libdir}")
+
+###############################################################################
+def _build_musica(caseroot, libroot, bldroot):
+###############################################################################
+# Builds the MUSICA library (the MICM chemistry solver and its Fortran
+# interface) and updates the case variables used to link it into CAM
+
+    with Case(caseroot, read_only=False) as case:
+        config_opts = case.get_value("CAM_CONFIG_OPTS")
+
+        # Remove any MUSICA link options set by a previous build, so that
+        # re-building the case does not accumulate duplicate or stale
+        # options in CAM_LINKED_LIBS. The MUSICA archives are referenced by
+        # absolute path under <libroot>/musica/lib, so strip those tokens:
+        linked_libs = case.get_value("CAM_LINKED_LIBS",
+                                     subgroup="build_component_cam")
+        new_linked_libs = re.sub(r"\s*\S*/musica/lib/\S+\.a", "", linked_libs)
+        if "-micm" in config_opts:
+            expect(case.get_value("COMPILER") != "nag",
+                   "-micm is not supported with the nag compiler")
+            bldpath = os.path.join(bldroot, "musica")
+            if not os.path.exists(bldpath):
+                os.makedirs(bldpath)
+            srcroot = case.get_value("SRCROOT")
+            srcpath = os.path.abspath(os.path.join(srcroot, "libraries", "musica", ""))
+            installpath = os.path.join(libroot, "musica")
+            logger.info("Building MUSICA in {} from source in {}\n".format(bldpath, srcpath))
+
+            debug = case.get_value("DEBUG")
+            arg_dict = _cmake_default_args(caseroot)
+            cmake_args = "-DCMAKE_VERBOSE_MAKEFILE=ON "
+            cmake_args += "-DCMAKE_BUILD_TYPE={} ".format("Debug" if debug else "Release")
+            cmake_args += "-DCMAKE_Fortran_COMPILER=mpif90 "
+            cmake_args += "-DCMAKE_C_COMPILER=mpicc "
+            cmake_args += "-DCMAKE_CXX_COMPILER=mpicxx "
+            cmake_args += "-DCMAKE_Fortran_COMPILER_WORKS=1 "
+            cmake_args += "-DCMAKE_C_COMPILER_WORKS=1 "
+            cmake_args += "-DCMAKE_CXX_COMPILER_WORKS=1 "
+            cmake_args += f"-DCMAKE_Fortran_FLAGS='{arg_dict['FFLAGS']}' "
+            cmake_args += f"-DCMAKE_INSTALL_PREFIX='{installpath}' "
+            # Pin the library dir name: GNUInstallDirs would otherwise
+            # install to lib64 on some systems and lib on others
+            cmake_args += "-DCMAKE_INSTALL_LIBDIR=lib "
+            cmake_args += "-DMUSICA_BUILD_FORTRAN_INTERFACE=ON "
+            cmake_args += "-DMUSICA_ENABLE_MICM=ON "
+            cmake_args += "-DMUSICA_ENABLE_TUVX=OFF "
+            cmake_args += "-DMUSICA_ENABLE_CARMA=OFF "
+            cmake_args += "-DMUSICA_ENABLE_MIAM=OFF "
+            cmake_args += "-DMUSICA_ENABLE_MIEM=OFF "
+            cmake_args += "-DMUSICA_ENABLE_TESTS=OFF "
+            cmake_args += "-DMUSICA_SET_MICM_DEFAULT_VECTOR_SIZE=128 "
+            # Build all MUSICA dependencies from the submodules vendored
+            # under libraries/ rather than cloning them at configure time
+            # (which would require network access) or picking up whatever
+            # versions happen to be installed on the host system:
+            cmake_args += "-DFETCHCONTENT_TRY_FIND_PACKAGE_MODE=NEVER "
+            cmake_args += "-DFETCHCONTENT_SOURCE_DIR_MICM='{}' ".format(
+                os.path.join(srcroot, "libraries", "micm"))
+            cmake_args += "-DFETCHCONTENT_SOURCE_DIR_MECHANISM_CONFIGURATION='{}' ".format(
+                os.path.join(srcroot, "libraries", "mechanism-configuration"))
+            cmake_args += "-DFETCHCONTENT_SOURCE_DIR_YAML-CPP='{}' ".format(
+                os.path.join(srcroot, "libraries", "yaml-cpp"))
+            cmake_args += "-DFETCHCONTENT_SOURCE_DIR_FMT='{}' ".format(
+                os.path.join(srcroot, "libraries", "fmt"))
+            cmake_args += srcpath
+
+            gmake = case.get_value("GMAKE")
+            _run_cmd(f"cmake {cmake_args}", bldpath)
+            _run_cmd(f"{gmake} -j {case.get_value('GMAKE_J')}", bldpath)
+            _run_cmd(f"{gmake} install", bldpath)
+
+            # Copy the Fortran modules into the case include dir (INCROOT),
+            # which is already on the CAM build include path:
+            coreinc = os.path.join(libroot, "include")
+            expect(os.path.exists(coreinc), f"include directory not found at {coreinc}")
+            mods = glob(os.path.join(installpath, "include", "musica", "fortran", "*.mod"))
+            expect(len(mods) > 0, f"no MUSICA Fortran modules found under {installpath}")
+            for mod in mods:
+                shutil.copy(mod, coreinc)
+
+            # Reference the archives by absolute path: this avoids library
+            # name collisions in libroot with the TUV-x build (which bundles
+            # its own yaml-cpp) and handles Debug archive naming.
+            # CAVEAT: a case with both -tuvx and -micm links two different
+            # yaml-cpp builds (TUV-x's 0.8.0 via -lyaml-cpp, MUSICA's pin
+            # here); the first archive on the link line wins per symbol.
+            # Untested combination -- unify the yaml-cpp version if it is
+            # ever exercised:
+            musica_libdir = os.path.join(installpath, "lib")
+            musica_libs = []
+            for base in ("musica-fortran", "musica", "mechanism_configuration"):
+                corelib = os.path.join(musica_libdir, f"lib{base}.a")
+                expect(os.path.exists(corelib), f"MUSICA library not found at {corelib}")
+                musica_libs.append(corelib)
+            musica_libs.append(_musica_dep_lib(musica_libdir, "yaml-cpp", debug))
+            musica_libs.append(_musica_dep_lib(musica_libdir, "fmt", debug))
+
+            # Add MUSICA to CAM linked library list:
+            new_linked_libs = " ".join(musica_libs) + " " + new_linked_libs
+
+        if new_linked_libs != linked_libs:
+            case.set_value("CAM_LINKED_LIBS", new_linked_libs)
+
+###############################################################################
 
 
 def _main_func():
     caseroot, libroot, bldroot = parse_input(sys.argv)
     _build_tuvx(caseroot, libroot, bldroot)
+    _build_musica(caseroot, libroot, bldroot)
     _build_fms(caseroot, libroot, bldroot)
     _build_cam(caseroot, libroot, bldroot)
 

@@ -1,0 +1,1154 @@
+{
+  "camp-data": [
+    {
+      "name": "ALKNIT",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ALKOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "bc_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "bc_a4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BCARY",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BENZENE",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BENZOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BEPOMUC",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BIGALD",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BIGALD1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BIGALD2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BIGALD3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BIGALD4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BIGALK",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BIGENE",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BR",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BRCL",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BRO",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BRONO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BRY",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BZALD",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BZOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "C2H2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "C2H4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "C2H5OH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "C2H5OOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "C2H6",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "C3H6",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "C3H7OOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "C3H8",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "C6H5OOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CCL4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CF2CLBR",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CF3BR",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CFC11",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CFC113",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CFC114",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CFC115",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CFC12",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH2BR2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH2O",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH3BR",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH3CCL3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH3CHO",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH3CL",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH3CN",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH3COCH3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH3COCHO",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH3COOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH3COOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH3OH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH3OOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CHBR3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CL",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CL2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CL2O2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CLO",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CLONO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CLY",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CO",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "COF2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "COFCL",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CRESOL",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "DMS",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "dst_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "dst_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "dst_a3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "E90",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "EOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "F",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "GLYALD",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "GLYOXAL",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "H",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "H2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "H2402",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "H2O2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "H2SO4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HBR",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HCFC141B",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HCFC142B",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HCFC22",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HCL",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HCN",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HCOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HF",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HNO3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HO2NO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HOBR",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HOCL",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HONITR",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HPALD",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HYAC",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HYDRALD",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "IEPOX",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ISOP",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ISOPNITA",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ISOPNITB",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ISOPNO3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ISOPNOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ISOPOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "IVOC",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "MACR",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "MACROOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "MEK",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "MEKOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "MPAN",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "MTERP",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "MVK",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "N",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "N2O",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "N2O5",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NC4CH2OH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NC4CHO",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ncl_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ncl_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ncl_a3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NH3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NH4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NH_5",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NH_50",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NO",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NO3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NOA",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NTERPOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "num_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "num_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "num_a3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "num_a4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "num_a5",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "O",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "O3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "O3S",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "OCLO",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "OCS",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ONITR",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "PAN",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "PBZNIT",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "PHENO",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "PHENOL",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "PHENOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "pom_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "pom_a4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "POOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ROOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "S",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "SF6",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "SO",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "SO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "SO3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "so4_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "so4_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "so4_a3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "so4_a5",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "soa1_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "soa1_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "soa2_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "soa2_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "soa3_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "soa3_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "soa4_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "soa4_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "soa5_a1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "soa5_a2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "SOAG0",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "SOAG1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "SOAG2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "SOAG3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "SOAG4",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ST80_25",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "SVOC",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "TEPOMUC",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "TERP2OOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "TERPNIT",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "TERPOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "TERPROD1",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "TERPROD2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "TOLOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "TOLUENE",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "XOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "XYLENES",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "XYLENOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "XYLOL",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "XYLOLOOH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NHDEP",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NDEP",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ACBZO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ALKO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BCARYO2VBS",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BENZO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BENZO2VBS",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "BZOO",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "C2H5O2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "C3H7O2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "C6H5O2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH3CO3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "CH3O2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "DICARBO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ENEO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "EO",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "EO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "HOCH2OO",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ISOPAO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ISOPBO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "ISOPO2VBS",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "IVOCO2VBS",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "MACRO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "MALO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "MCO3",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "MDIALO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "MEKO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "MTERPO2VBS",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "NTERPO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "O1D",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "OH",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "PHENO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "PO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "RO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "TERP2O2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "TERPO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "TOLO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "TOLUO2VBS",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "XO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "XYLENO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "XYLEO2VBS",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "XYLOLO2",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    },
+    {
+      "name": "H2O",
+      "type": "CHEM_SPEC",
+      "absolute tolerance": 1e-12
+    }
+  ]
+}

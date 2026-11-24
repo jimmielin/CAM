@@ -290,6 +290,7 @@ contains
     use physconst,         only : rga, gravit
     use mo_photo,          only : set_ub_col, setcol, table_photo
     use mo_tuvx,           only : tuvx_get_photo_rates, tuvx_active
+    use mo_micm,           only : micm_solve, micm_active
     use mo_exp_sol,        only : exp_sol
     use mo_imp_sol,        only : imp_sol
     use mo_setrxt,         only : setrxt
@@ -1011,23 +1012,42 @@ contains
     !=======================================================================
     !        ... Call the class solution algorithms
     !=======================================================================
-    !-----------------------------------------------------------------------
-    !	... Solve for "Explicit" species
-    !-----------------------------------------------------------------------
-    call exp_sol( vmr, reaction_rates, het_rates, extfrc, delt, invariants(1,1,indexm), ncol, lchnk, ltrop_sol )
+    if ( micm_active ) then
+       !--------------------------------------------------------------------
+       ! ... MICM solves all species implicitly in a single system: the
+       !     explicit-class species (exp_sol) are folded into the implicit
+       !     solve since MICM has no solution-class split. Rates come from
+       !     the same reaction_rates/het_rates/extfrc arrays the built-in
+       !     solvers use, so all upstream rate computations are shared.
+       !     Per-class production/loss diagnostics are internal to the
+       !     built-in implicit solver and are not available from MICM, so
+       !     chem_prod_loss_diags_out is skipped and its history fields are
+       !     absent rather than wrong (prod_out/loss_out have no other use).
+       !--------------------------------------------------------------------
+       if ( has_strato_chem ) wrk(:,:) = vmr(:,:,h2o_ndx)
+       call t_startf('micm_solve')
+       call micm_solve( ncol, lchnk, delt, invariants(:,:,indexm), tfld(:ncol,:), &
+                        pmid(:ncol,:), vmr, reaction_rates, het_rates, extfrc )
+       call t_stopf('micm_solve')
+    else
+       !-----------------------------------------------------------------------
+       !	... Solve for "Explicit" species
+       !-----------------------------------------------------------------------
+       call exp_sol( vmr, reaction_rates, het_rates, extfrc, delt, invariants(1,1,indexm), ncol, lchnk, ltrop_sol )
 
-    !-----------------------------------------------------------------------
-    !	... Solve for "Implicit" species
-    !-----------------------------------------------------------------------
-    if ( has_strato_chem ) wrk(:,:) = vmr(:,:,h2o_ndx)
-    call t_startf('imp_sol')
-    !
-    call imp_sol( vmr, reaction_rates, het_rates, extfrc, delt, &
-                  ncol,pver, lchnk,  prod_out, loss_out )
+       !-----------------------------------------------------------------------
+       !	... Solve for "Implicit" species
+       !-----------------------------------------------------------------------
+       if ( has_strato_chem ) wrk(:,:) = vmr(:,:,h2o_ndx)
+       call t_startf('imp_sol')
+       !
+       call imp_sol( vmr, reaction_rates, het_rates, extfrc, delt, &
+                     ncol,pver, lchnk,  prod_out, loss_out )
 
-    call t_stopf('imp_sol')
+       call t_stopf('imp_sol')
 
-    call chem_prod_loss_diags_out( ncol, lchnk, vmr, reaction_rates, prod_out, loss_out, invariants(:ncol,:,indexm) )
+       call chem_prod_loss_diags_out( ncol, lchnk, vmr, reaction_rates, prod_out, loss_out, invariants(:ncol,:,indexm) )
+    end if
     if( h2o_ndx>0) call outfld( 'H2O_GAS',  vmr(1,1,h2o_ndx),  ncol ,lchnk )
 
     ! reset O3S to O3 in the stratosphere ...

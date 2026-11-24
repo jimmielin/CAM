@@ -1,0 +1,276 @@
+{
+  "camp-data": [
+    {
+      "name": "pp_trop_mam4",
+      "type": "MECHANISM",
+      "reactions": [
+        {
+          "type": "USER_DEFINED",
+          "MUSICA name": "jh2o2",
+          "reactants": {
+            "H2O2": {}
+          },
+          "products": {}
+        },
+        {
+          "type": "USER_DEFINED",
+          "MUSICA name": "jsoa_a1",
+          "reactants": {
+            "soa_a1": {}
+          },
+          "products": {}
+        },
+        {
+          "type": "USER_DEFINED",
+          "MUSICA name": "jsoa_a2",
+          "reactants": {
+            "soa_a2": {}
+          },
+          "products": {}
+        },
+        {
+          "type": "USER_DEFINED",
+          "MUSICA name": "OH_H2O2",
+          "reactants": {
+            "H2O2": {}
+          },
+          "products": {
+            "H2O": {}
+          }
+        },
+        {
+          "type": "EMISSION",
+          "MUSICA name": "usr_HO2_HO2",
+          "species": "H2O2"
+        },
+        {
+          "type": "USER_DEFINED",
+          "MUSICA name": "DMS_NO3",
+          "reactants": {
+            "DMS": {}
+          },
+          "products": {
+            "SO2": {}
+          }
+        },
+        {
+          "type": "USER_DEFINED",
+          "MUSICA name": "DMS_OHa",
+          "reactants": {
+            "DMS": {}
+          },
+          "products": {
+            "SO2": {}
+          }
+        },
+        {
+          "type": "USER_DEFINED",
+          "MUSICA name": "SO2_OH_M",
+          "reactants": {
+            "SO2": {}
+          },
+          "products": {
+            "H2SO4": {}
+          }
+        },
+        {
+          "type": "USER_DEFINED",
+          "MUSICA name": "usr_DMS_OH",
+          "reactants": {
+            "DMS": {}
+          },
+          "products": {
+            "SO2": {
+              "yield": 0.5
+            }
+          }
+        },
+        {
+          "type": "USER_DEFINED",
+          "MUSICA name": "SOAE_tau",
+          "reactants": {
+            "SOAE": {}
+          },
+          "products": {
+            "SOAG": {}
+          }
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "bc_a1",
+          "species": "bc_a1"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "bc_a4",
+          "species": "bc_a4"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "DMS",
+          "species": "DMS"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "dst_a1",
+          "species": "dst_a1"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "dst_a2",
+          "species": "dst_a2"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "dst_a3",
+          "species": "dst_a3"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "H2O2",
+          "species": "H2O2"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "H2SO4",
+          "species": "H2SO4"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "ncl_a1",
+          "species": "ncl_a1"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "ncl_a2",
+          "species": "ncl_a2"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "ncl_a3",
+          "species": "ncl_a3"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "num_a1",
+          "species": "num_a1"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "num_a2",
+          "species": "num_a2"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "num_a3",
+          "species": "num_a3"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "num_a4",
+          "species": "num_a4"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "pom_a1",
+          "species": "pom_a1"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "pom_a4",
+          "species": "pom_a4"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "SO2",
+          "species": "SO2"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "so4_a1",
+          "species": "so4_a1"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "so4_a2",
+          "species": "so4_a2"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "so4_a3",
+          "species": "so4_a3"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "soa_a1",
+          "species": "soa_a1"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "soa_a2",
+          "species": "soa_a2"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "SOAE",
+          "species": "SOAE"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "SOAG",
+          "species": "SOAG"
+        },
+        {
+          "type": "FIRST_ORDER_LOSS",
+          "MUSICA name": "H2O",
+          "species": "H2O"
+        },
+        {
+          "type": "EMISSION",
+          "MUSICA name": "ext_SO2",
+          "species": "SO2"
+        },
+        {
+          "type": "EMISSION",
+          "MUSICA name": "ext_so4_a1",
+          "species": "so4_a1"
+        },
+        {
+          "type": "EMISSION",
+          "MUSICA name": "ext_so4_a2",
+          "species": "so4_a2"
+        },
+        {
+          "type": "EMISSION",
+          "MUSICA name": "ext_pom_a4",
+          "species": "pom_a4"
+        },
+        {
+          "type": "EMISSION",
+          "MUSICA name": "ext_bc_a4",
+          "species": "bc_a4"
+        },
+        {
+          "type": "EMISSION",
+          "MUSICA name": "ext_H2O",
+          "species": "H2O"
+        },
+        {
+          "type": "EMISSION",
+          "MUSICA name": "ext_num_a1",
+          "species": "num_a1"
+        },
+        {
+          "type": "EMISSION",
+          "MUSICA name": "ext_num_a2",
+          "species": "num_a2"
+        },
+        {
+          "type": "EMISSION",
+          "MUSICA name": "ext_num_a4",
+          "species": "num_a4"
+        }
+      ]
+    }
+  ]
+}

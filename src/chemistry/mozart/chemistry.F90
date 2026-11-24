@@ -356,6 +356,7 @@ end function chem_is
     use ocean_emis,       only: ocean_emis_readnl
     use mo_slh_routines,  only: slh_readnl
     use mo_tuvx,          only: tuvx_readnl
+    use mo_micm,          only: micm_readnl
 
     ! args
 
@@ -570,6 +571,7 @@ end function chem_is
    call ocean_emis_readnl(nlfile)
    call slh_readnl(nlfile)
    call tuvx_readnl(nlfile)
+   call micm_readnl(nlfile)
 
  end subroutine chem_readnl
 
@@ -1370,6 +1372,7 @@ end function chem_is_active
     use rate_diags, only: rate_diags_final
     use species_sums_diags, only: species_sums_final
     use mo_tuvx, only: tuvx_finalize, tuvx_active
+    use mo_micm, only: micm_final, micm_active
     use short_lived_species, only: short_lived_species_final
 
     call mee_ion_final()
@@ -1377,6 +1380,9 @@ end function chem_is_active
     call species_sums_final()
     if (tuvx_active) then
        call tuvx_finalize()
+    end if
+    if (micm_active) then
+       call micm_final()
     end if
     call short_lived_species_final()
 
